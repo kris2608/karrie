@@ -1,33 +1,42 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Suspense, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Karrie } from "../../components/mascot/Karrie";
 import { ItemArt } from "../../components/ItemArt";
+import { ProductArt } from "../../components/ProductArt";
 import { ShopScene } from "../../components/scenery/ShopScene";
+import { DiscoverySwitch } from "../../components/ui/DiscoverySwitch";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
-import { BarcodeIcon } from "../../components/ui/ScanButton";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { productById } from "../../data/catalog";
-import { starTotal } from "../../domain/scoring";
+import { SCORING, starTotal } from "../../domain/scoring";
 import { activeItem, foundCount } from "../../domain/shopQueue";
-import type { ScanOutcome } from "../scanner/BarcodeScanner";
-import { LazyScanner } from "../scanner/ScanFlow";
+import type { AdventureItem } from "../../domain/types";
 import { productEnter, productExit, spring } from "../../motion/variants";
 import { useFoundSequence, type Flight } from "../../motion/useFoundSequence";
 import { useAdventure } from "../../state/AdventureContext";
+import { MissionCard, ParentCheck } from "./MissionCard";
 
 const SWIPE_DISTANCE = 90;
 const SWIPE_VELOCITY = 600;
+/** The child sees the regular product first, then Karrie brings up the mission. */
+const MISSION_DELAY_MS = 900;
 
 export function ShopScreen() {
   const { adventure, dispatch } = useAdventure();
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const [parentOpen, setParentOpen] = useState(false);
-  const [scanOpen, setScanOpen] = useState(false);
-  const artRef = useRef<HTMLSpanElement>(null);
+  const [checkOpen, setCheckOpen] = useState(false);
+  const [missionShown, setMissionShown] = useState<string | null>(null);
+  const keep = useRef<"original" | "alternative">("original");
+  const artRef = useRef<HTMLSpanElement | null>(null);
+  // The leaving product unmounts after the next one mounted; its null must not clear the new node.
+  const attachArt = useCallback((node: HTMLSpanElement | null) => {
+    if (node) artRef.current = node;
+  }, []);
   const basketRef = useRef<SVGRectElement>(null);
   const starRef = useRef<HTMLSpanElement>(null);
   const dragged = useRef(false);
@@ -37,43 +46,50 @@ export function ShopScreen() {
     artRef,
     basketRef,
     starRef,
-    onFound: ({ bonus, pack }) => dispatch({ type: "found", bonus, pack }),
+    onFound: (bonus) => dispatch(bonus ? { type: "mission-done", keep: keep.current } : { type: "found" }),
     onSkip: () => dispatch({ type: "skip" }),
     onUndo: () => dispatch({ type: "undo" }),
     onFinished: () => navigate("/klaar", { replace: true }),
   });
 
+  const current = adventure ? activeItem(adventure.items) : undefined;
+  const offered = current?.mission?.status === "offered" && !sequence.locked ? current.id : null;
+
+  useEffect(() => {
+    if (!offered) return;
+    const timer = window.setTimeout(() => setMissionShown(offered), reduced ? 0 : MISSION_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [offered, reduced]);
+
   if (!adventure || adventure.items.length === 0) return <Navigate to="/" replace />;
   if (adventure.phase === "draft") return <Navigate to="/controleren" replace />;
   if (adventure.phase === "done" && !sequence.finishing) return <Navigate to="/klaar" replace />;
 
-  const current = activeItem(adventure.items);
   const total = adventure.items.length;
   const found = foundCount(adventure.items) - (sequence.starPending ? 1 : 0);
   const stars = starTotal(adventure.items) - sequence.starPending;
   const openItems = adventure.items.filter((item) => item.status !== "found");
   const canSkip = openItems.length > 1 && !sequence.locked;
-
-  const canScan = Boolean(
-    current && !current.scan && !sequence.locked && (current.ean || (current.category !== "produce" && productById(current.productId))),
-  );
+  const searching = current?.mission?.status === "active" ? current : null;
+  const missionTarget = searching?.alternative?.targetType ? productById(searching.alternative.targetType) : undefined;
+  const showMission = Boolean(current && offered === current.id && missionShown === current.id);
 
   function collect() {
     if (!current) return;
+    if (searching) {
+      setCheckOpen(true);
+      return;
+    }
     sequence.collect(current, openItems.length === 1);
   }
 
-  function scanned(outcome: ScanOutcome) {
-    setScanOpen(false);
-    if (!current || outcome.kind === "lookup") return;
-    const isLast = openItems.length === 1;
-    if (outcome.kind === "confirmed") {
-      const photo = outcome.product.imageUrl;
-      const flying = photo ? { ...current, imageUrl: photo, imageKind: "photo" as const } : current;
-      sequence.collect(flying, isLast, { bonus: "confirmed", pack: outcome.product });
-    } else {
-      sequence.collect(current, isLast, { bonus: "verified" });
-    }
+  function missionFound(choice: "original" | "alternative") {
+    if (!searching) return;
+    setCheckOpen(false);
+    keep.current = choice;
+    const flying: AdventureItem =
+      choice === "alternative" && missionTarget ? { ...searching, icon: missionTarget.id, imageKind: "generic", photoId: undefined, imageUrl: undefined } : searching;
+    sequence.collect(flying, openItems.length === 1, SCORING.discoveryBonus);
   }
 
   return (
@@ -108,14 +124,14 @@ export function ShopScreen() {
         <Karrie mood={sequence.mood} beat={sequence.beat} basketRef={basketRef} className="shop-mascot" />
         <AnimatePresence mode="wait">
           <motion.p
-            key={current ? "search" : "done"}
+            key={!current ? "done" : showMission ? "mission" : searching ? "bonus" : "search"}
             className="speech"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
             transition={spring}
           >
-            {current ? "Zoek dit product!" : "Alles gevonden!"}
+            {!current ? "Alles gevonden!" : showMission ? "Ik heb een bonusmissie!" : searching ? "Zoek de bonus!" : "Zoek dit product!"}
           </motion.p>
         </AnimatePresence>
       </section>
@@ -157,7 +173,7 @@ export function ShopScreen() {
               }}
             >
               <span className="stage-glow" aria-hidden="true" />
-              <span ref={artRef} className="stage-art">
+              <span ref={attachArt} className="stage-art">
                 <ItemArt item={current} />
               </span>
             </motion.button>
@@ -183,21 +199,26 @@ export function ShopScreen() {
 
       <div className="scan-mission">
         <AnimatePresence>
-          {canScan && current && (
-            <motion.button
-              key={current.id}
-              type="button"
-              className="scan-pill"
-              data-testid="scan-mission"
+          {searching && missionTarget && (
+            <motion.div
+              key={searching.id}
+              className="scan-pill mission-pill"
+              data-testid="mission-active"
               initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1, transition: { ...spring, delay: sequence.enterDelay + 0.1 } }}
+              animate={{ scale: 1, opacity: 1, transition: spring }}
               exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
-              whileTap={{ scale: 0.94 }}
-              onClick={() => setScanOpen(true)}
             >
-              <BarcodeIcon />
-              Scan de barcode
-            </motion.button>
+              <ProductArt id={missionTarget.id} className="mission-pill-art" />
+              <span>{searching.alternative?.childPrompt ?? `Zoek ${missionTarget.name.toLowerCase()}`}</span>
+              <span className="mission-pill-stars" aria-label={`${SCORING.discoveryBonus} extra sterren`}>
+                <StarIcon />+{SCORING.discoveryBonus}
+              </span>
+              <button type="button" className="mission-stop" aria-label="Stop bonusmissie" data-testid="mission-stop" onClick={() => dispatch({ type: "mission-skip" })}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
@@ -231,12 +252,27 @@ export function ShopScreen() {
       {sequence.flight && <FlightLayer flight={sequence.flight} />}
 
       <AnimatePresence>
-        {scanOpen && current && (
-          <Suspense fallback={<div className="scanner" aria-busy="true" />}>
-            <LazyScanner mode="verify-adventure-item" target={current} onResult={scanned} onClose={() => setScanOpen(false)} />
-          </Suspense>
+        {showMission && current && (
+          <MissionCard
+            key={current.id}
+            item={current}
+            reduced={reduced}
+            onGo={() => dispatch({ type: "mission-accept" })}
+            onSkip={() => dispatch({ type: "mission-skip" })}
+          />
         )}
       </AnimatePresence>
+
+      <Sheet open={checkOpen && Boolean(searching)} onClose={() => setCheckOpen(false)} label="Bonusmissie controleren">
+        {searching && (
+          <ParentCheck
+            item={searching}
+            onAlternative={() => missionFound("alternative")}
+            onOriginal={() => missionFound("original")}
+            onNotYet={() => setCheckOpen(false)}
+          />
+        )}
+      </Sheet>
 
       <Sheet open={parentOpen} onClose={() => setParentOpen(false)} label="Overzicht voor ouders">
         <h2>Nog te vinden</h2>
@@ -269,6 +305,7 @@ export function ShopScreen() {
           ))}
         </ul>
         <SoundSwitch />
+        <DiscoverySwitch />
         <div className="sheet-actions">
           <PressButton variant="quiet" onClick={() => navigate("/controleren")}>
             Lijst aanpassen

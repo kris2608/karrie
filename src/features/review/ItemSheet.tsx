@@ -1,32 +1,68 @@
 import { useState } from "react";
 import { hasPhoto, ItemArt } from "../../components/ItemArt";
+import { CameraIcon } from "../../components/ui/PhotoButton";
 import { PressButton } from "../../components/ui/PressButton";
-import { BarcodeIcon, CameraIcon } from "../../components/ui/ScanButton";
 import { Sheet } from "../../components/ui/Sheet";
+import { StarIcon } from "../../components/ui/StarIcon";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
+import { hasSuggestion, missionOn } from "../../domain/discovery";
 import type { AdventureItem } from "../../domain/types";
 import { productById } from "../../data/catalog";
 import { useAdventure } from "../../state/AdventureContext";
-import { DrawingPicker } from "../scanner/ScanResultSheet";
+import { DrawingPicker } from "./DrawingPicker";
 
 type ItemSheetProps = {
   item: AdventureItem | null;
   onClose: () => void;
   onRestore: () => void;
-  onScan: () => void;
   onPhoto: () => void;
   onRemove: () => void;
 };
 
-export function ItemSheet({ item, onClose, onRestore, onScan, onPhoto, onRemove }: ItemSheetProps) {
+export function ItemSheet({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetProps) {
   return (
     <Sheet open={Boolean(item)} onClose={onClose} label={item ? `Bewerk ${item.name}` : "Product"}>
-      {item && <ItemEditor key={item.id} item={item} onClose={onClose} onRestore={onRestore} onScan={onScan} onPhoto={onPhoto} onRemove={onRemove} />}
+      {item && <ItemEditor key={item.id} item={item} onClose={onClose} onRestore={onRestore} onPhoto={onPhoto} onRemove={onRemove} />}
     </Sheet>
   );
 }
 
-function ItemEditor({ item, onClose, onRestore, onScan, onPhoto, onRemove }: ItemSheetProps & { item: AdventureItem }) {
+function MissionBlock({ item }: { item: AdventureItem }) {
+  const { settings, declined, dispatch } = useAdventure();
+  const assessment = item.alternative;
+  if (!assessment || !hasSuggestion(item)) return null;
+  const on = missionOn(item, declined);
+  const hint = on ? "Je kind krijgt deze missie in de winkel" : assessment.evidence === "label" ? "Uit" : "Uit: niet op het etiket gezien";
+  return (
+    <section className="mission-block" data-testid="mission-block">
+      <header>
+        <StarIcon />
+        <strong>Bonusmissie: {assessment.alternativeType}</strong>
+      </header>
+      {assessment.parentExplanation && <p>{assessment.parentExplanation}</p>}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        className={on ? "switch-row is-on" : "switch-row"}
+        data-testid="mission-switch"
+        onClick={() => dispatch({ type: "set-mission", itemId: item.id, enabled: !on })}
+      >
+        <span className="switch-label">
+          <strong>Bonusmissie {on ? "aan" : "uit"}</strong>
+          <small>{hint}</small>
+        </span>
+        <span className="switch-track" aria-hidden="true">
+          <span className="switch-thumb" />
+        </span>
+      </button>
+      {!settings.smartDiscovery && <small>Bonusmissies staan uit voor de hele app.</small>}
+      <small>Een suggestie van OpenAI. Kijk altijd zelf even op het etiket.</small>
+    </section>
+  );
+}
+
+function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetProps & { item: AdventureItem }) {
   const { dispatch } = useAdventure();
   const [name, setName] = useState(item.name);
   const [editing, setEditing] = useState(false);
@@ -57,7 +93,8 @@ function ItemEditor({ item, onClose, onRestore, onScan, onPhoto, onRemove }: Ite
           {item.source === "vision" && <small>Herkend van een foto</small>}
         </div>
       </div>
-      {item.offAttribution && <p className="scan-attribution">Gegevens: Open Food Facts (ODbL){parentPhoto ? "" : ", foto's CC BY-SA"}</p>}
+      {item.offAttribution && <p className="scan-attribution">Gegevens: Open Food Facts (ODbL){item.imageSource === "off" ? ", foto's CC BY-SA" : ""}</p>}
+      <MissionBlock item={item} />
 
       {editing ? (
         <div className="item-edit" data-testid="item-edit">
@@ -107,13 +144,9 @@ function ItemEditor({ item, onClose, onRestore, onScan, onPhoto, onRemove }: Ite
           <CameraIcon />
           {parentPhoto ? "Nieuwe foto" : "Maak foto"}
         </PressButton>
-        <PressButton variant="secondary" wide data-testid="scan-pack" onClick={onScan}>
-          <BarcodeIcon />
-          {item.ean ? "Scan andere verpakking" : "Scan verpakking"}
-        </PressButton>
-        {(hasPhoto(item) || item.ean) && (
+        {hasPhoto(item) && (
           <PressButton variant="quiet" wide data-testid="restore-generic" onClick={onRestore}>
-            {hasPhoto(item) ? "Gebruik Karrie-tekening" : "Barcode loskoppelen"}
+            Gebruik Karrie-tekening
           </PressButton>
         )}
         <PressButton variant="quiet" wide className="pbtn-danger" data-testid="remove-item" onClick={onRemove}>

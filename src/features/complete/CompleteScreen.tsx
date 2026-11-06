@@ -83,7 +83,7 @@ export function CompleteScreen() {
         <StarIcon />
         <strong>{shown}</strong> {stars === 1 ? "ster" : "sterren"}
       </p>
-      {bonus > 0 && <p className="bonus-line">Waarvan {bonus} bonussterren voor goed scannen!</p>}
+      {bonus > 0 && <p className="bonus-line">Waarvan {bonus} extra sterren van bonusmissies!</p>}
 
       <motion.div
         className="sticker-prize"

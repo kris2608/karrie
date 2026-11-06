@@ -1,20 +1,11 @@
-import type { AdventureItem, ScanResult } from "./types";
+import type { AdventureItem } from "./types";
 
-export const SCORING = { found: 1, exactScanBonus: 2, confirmedScanBonus: 2 };
+export const SCORING = { found: 1, discoveryBonus: 2 };
 
-export function scanBonus(scan?: ScanResult): number {
-  if (scan === "verified") return SCORING.exactScanBonus;
-  if (scan === "confirmed") return SCORING.confirmedScanBonus;
-  return 0;
-}
-
-export function awardedStars(scan?: ScanResult): number {
-  return SCORING.found + scanBonus(scan);
-}
-
+/** Discovery stars count even when the parent keeps the original product. */
 export function itemStars(item: AdventureItem): number {
-  if (item.status !== "found") return 0;
-  return item.stars ?? SCORING.found;
+  const found = item.status === "found" ? (item.stars ?? SCORING.found) : 0;
+  return found + (item.mission?.stars ?? 0);
 }
 
 export function starTotal(items: AdventureItem[]): number {

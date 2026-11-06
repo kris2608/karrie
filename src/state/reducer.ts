@@ -11,26 +11,16 @@ import {
   skipItem,
   sortByCategory,
 } from "../domain/shopQueue";
-import { sameEan } from "../domain/ean";
-import { awardedStars } from "../domain/scoring";
+import { declineKey, pickMissions } from "../domain/discovery";
+import { SCORING } from "../domain/scoring";
 import { nextSticker } from "../domain/stickers";
-import type {
-  Adventure,
-  AdventureItem,
-  CategoryId,
-  PackInfo,
-  Product,
-  SavedList,
-  ScannedProduct,
-  ScanResult,
-} from "../domain/types";
-import { products } from "../data/catalog";
+import type { Adventure, AdventureItem, CategoryId, MissionState, PackInfo, Product, SavedList } from "../domain/types";
+import { productById, products } from "../data/catalog";
 import {
   createAdventure,
   createItem,
   createSampleAdventure,
   itemFromSaved,
-  packFromScan,
   packFromVision,
   packOf,
   stripPack,
@@ -41,9 +31,10 @@ import {
 
 export type Settings = {
   soundEnabled: boolean;
+  smartDiscovery: boolean;
 };
 
-export const defaultSettings: Settings = { soundEnabled: false };
+export const defaultSettings: Settings = { soundEnabled: false, smartDiscovery: true };
 
 export type AppState = {
   adventure: Adventure | null;
@@ -51,6 +42,8 @@ export type AppState = {
   stickers: string[];
   categoryOrder: CategoryId[];
   settings: Settings;
+  /** declineKey()s of suggestions a parent turned down. */
+  declined: string[];
 };
 
 export const initialState: AppState = {
@@ -59,11 +52,17 @@ export const initialState: AppState = {
   stickers: [],
   categoryOrder: [...DEFAULT_CATEGORY_ORDER],
   settings: { ...defaultSettings },
+  declined: [],
 };
 
 export type Action =
   | { type: "hydrate"; data: Partial<AppState> }
   | { type: "set-sound"; enabled: boolean }
+  | { type: "set-discovery"; enabled: boolean }
+  | { type: "set-mission"; itemId: string; enabled: boolean }
+  | { type: "mission-accept" }
+  | { type: "mission-skip" }
+  | { type: "mission-done"; keep: "original" | "alternative" }
   | { type: "new-draft" }
   | { type: "start-sample" }
   | { type: "add-product"; product: Product }
@@ -73,16 +72,14 @@ export type Action =
   | { type: "move-item"; itemId: string; direction: -1 | 1 }
   | { type: "move-category"; category: CategoryId; direction: -1 | 1 }
   | { type: "set-category-order"; order: CategoryId[] }
-  | { type: "add-scanned"; product: ScannedProduct; name: string; category: CategoryId; icon: string; source: "off" | "manual"; photoId?: string }
-  | { type: "attach-pack"; itemId: string; product: ScannedProduct; source?: "off" | "manual" }
   | { type: "restore-generic"; itemId: string }
   | { type: "add-recognized"; name: string; category: CategoryId; icon: string; productId?: string; photoId?: string; pack?: VisionPack }
   | { type: "set-photo"; itemId: string; photoId: string }
-  | { type: "apply-recognition"; itemId: string; photoId: string; pack: VisionPack }
+  | { type: "apply-recognition"; itemId: string; photoId?: string; pack: VisionPack }
   | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }
   | { type: "insert-item"; item: AdventureItem; index: number }
   | { type: "start-shopping" }
-  | { type: "found"; bonus?: ScanResult; pack?: ScannedProduct }
+  | { type: "found" }
   | { type: "skip" }
   | { type: "undo" }
   | { type: "save-favorite" }
@@ -156,6 +153,25 @@ function updateItem(state: AppState, itemId: string, change: (item: AdventureIte
   return changed ? { ...state, adventure: touch(state.adventure, { items }) } : state;
 }
 
+/** Commits a shopping step with an undo entry, finishing the adventure when nothing is left. */
+function collected(state: AppState, items: AdventureItem[]): AppState {
+  if (!state.adventure) return state;
+  const history = withHistory(state, state.adventure);
+  if (isComplete(items)) {
+    const stickerId = state.adventure.stickerId ?? nextSticker(state.stickers);
+    const stickers = state.stickers.includes(stickerId) ? state.stickers : [...state.stickers, stickerId];
+    const adventure = touch(state.adventure, { items, history, phase: "done", stickerId });
+    return { ...state, stickers, adventure, saved: upsertSaved(state.saved, adventure) };
+  }
+  return { ...state, adventure: touch(state.adventure, { items, history, phase: "shopping" }) };
+}
+
+/** A list name that fits a row; long model descriptions fall back to the catalog name. */
+function shortName(text: string | undefined) {
+  const trimmed = text?.trim();
+  return trimmed && trimmed.length <= 32 ? `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}` : undefined;
+}
+
 function ensureDraft(state: AppState): Adventure {
   if (!state.adventure || state.adventure.phase === "done") return blankDraft(state.categoryOrder);
   return state.adventure;
@@ -184,10 +200,59 @@ export function reducer(state: AppState, action: Action): AppState {
         stickers: Array.isArray(action.data.stickers) ? action.data.stickers : [],
         categoryOrder: action.data.categoryOrder?.length ? action.data.categoryOrder : [...DEFAULT_CATEGORY_ORDER],
         settings: { ...defaultSettings, ...action.data.settings },
+        declined: Array.isArray(action.data.declined) ? action.data.declined : [],
       };
     }
     case "set-sound":
       return { ...state, settings: { ...state.settings, soundEnabled: action.enabled } };
+    case "set-discovery": {
+      const settings = { ...state.settings, smartDiscovery: action.enabled };
+      if (action.enabled || state.adventure?.phase !== "shopping") return { ...state, settings };
+      const items = state.adventure.items.map((item) => (item.mission && item.mission.status !== "done" ? { ...item, mission: undefined } : item));
+      return { ...state, settings, adventure: touch(state.adventure, { items }) };
+    }
+    case "set-mission": {
+      const item = state.adventure?.items.find((entry) => entry.id === action.itemId);
+      if (!item) return state;
+      const key = declineKey(item);
+      const declined = action.enabled ? state.declined.filter((entry) => entry !== key) : [...new Set([...state.declined, key])].slice(-200);
+      const next = updateItem(state, action.itemId, (entry) => ({ ...entry, missionEnabled: action.enabled }));
+      return { ...next, declined };
+    }
+    case "mission-accept":
+    case "mission-skip": {
+      if (!state.adventure) return state;
+      const current = activeItem(state.adventure.items);
+      if (!current?.mission || current.mission.status === "done") return state;
+      const status: MissionState["status"] = action.type === "mission-accept" ? "active" : "skipped";
+      const items = state.adventure.items.map((item) => (item.id === current.id ? { ...item, mission: { status } } : item));
+      return { ...state, adventure: touch(state.adventure, { items, history: withHistory(state, state.adventure) }) };
+    }
+    case "mission-done": {
+      if (!state.adventure) return state;
+      const current = activeItem(state.adventure.items);
+      const target = current?.alternative?.targetType ? productById(current.alternative.targetType) : undefined;
+      if (!current || current.mission?.status !== "active" || !target) return state;
+      const mission = { status: "done" as const, stars: SCORING.discoveryBonus, kept: action.keep };
+      const swapped: AdventureItem =
+        action.keep === "alternative"
+          ? {
+              ...stripPack(current),
+              productId: target.id,
+              name: shortName(current.alternative?.alternativeType) ?? target.name,
+              icon: target.id,
+              category: target.category,
+              source: "catalog",
+              mission: { ...mission, swappedFrom: current },
+            }
+          : { ...current, mission };
+      const items = markFound(
+        state.adventure.items.map((item) => (item.id === current.id ? swapped : item)),
+        current.id,
+      );
+      const declined = action.keep === "original" ? [...new Set([...state.declined, declineKey(current)])].slice(-200) : state.declined;
+      return { ...collected(state, items), declined };
+    }
     case "new-draft": {
       const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
       return { ...state, saved, adventure: blankDraft(state.categoryOrder) };
@@ -241,32 +306,8 @@ export function reducer(state: AppState, action: Action): AppState {
         categoryOrder: action.order,
         adventure: state.adventure ? touch(state.adventure, { categoryOrder: action.order }) : null,
       };
-    case "add-scanned": {
-      const adventure = ensureDraft(state);
-      const existing = adventure.items.find((item) => item.status !== "found" && sameEan(item.ean, action.product.ean));
-      if (existing) {
-        const items = adventure.items.map((item) =>
-          item.id === existing.id ? { ...item, quantity: Math.min(24, item.quantity + 1) } : item,
-        );
-        return { ...state, adventure: touch(adventure, { items }) };
-      }
-      const scanned: AdventureItem = {
-        id: crypto.randomUUID(),
-        productId: action.product.matchProductId ?? `ean:${action.product.ean}`,
-        name: action.name.trim() || action.product.name || "Product",
-        icon: action.icon,
-        category: action.category,
-        quantity: 1,
-        status: "pending",
-        ...packFromScan(action.product, action.source),
-      };
-      const item = action.photoId ? withParentPhoto(scanned, action.photoId) : scanned;
-      return { ...state, adventure: touch(adventure, { items: [...adventure.items, item] }) };
-    }
-    case "attach-pack":
-      return updateItem(state, action.itemId, (item) => ({ ...stripPack(item), ...packFromScan(action.product, action.source ?? "off") }));
     case "restore-generic":
-      return updateItem(state, action.itemId, (item) => (item.ean && item.imageSource === "parent" ? withoutImage(item) : stripPack(item)));
+      return updateItem(state, action.itemId, (item) => withoutImage(item));
     case "add-recognized": {
       const adventure = ensureDraft(state);
       const name = action.name.trim().slice(0, 40);
@@ -283,9 +324,11 @@ export function reducer(state: AppState, action: Action): AppState {
     case "set-photo":
       return updateItem(state, action.itemId, (item) => withParentPhoto(item, action.photoId));
     case "apply-recognition":
-      return updateItem(state, action.itemId, (item) =>
-        item.ean ? withParentPhoto(item, action.photoId) : { ...stripPack(item), ...packFromVision(action.pack, action.photoId) },
-      );
+      return updateItem(state, action.itemId, (item) => {
+        if (item.ean) return action.photoId ? withParentPhoto(item, action.photoId) : item;
+        const keep = action.photoId ? {} : packOf({ photoId: item.photoId, imageUrl: item.imageUrl, imageKind: item.imageKind, imageSource: item.imageSource });
+        return { ...stripPack(item), ...packFromVision(action.pack, action.photoId), ...keep };
+      });
     case "edit-item":
       return updateItem(state, action.itemId, (item) => ({
         ...item,
@@ -302,8 +345,10 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "start-shopping": {
       if (!state.adventure?.items.length || state.adventure.phase === "shopping") return state;
+      const reset = state.adventure.items.map(({ stars: _stars, scan: _scan, mission: _mission, ...item }) => ({ ...item, status: "pending" as const }));
+      const offered = new Set(pickMissions(reset, state.settings.smartDiscovery, state.declined));
       const items = sortByCategory(
-        state.adventure.items.map(({ stars: _stars, scan: _scan, ...item }) => ({ ...item, status: "pending" as const })),
+        reset.map((item) => (offered.has(item.id) ? { ...item, mission: { status: "offered" as const } } : item)),
         state.adventure.categoryOrder,
       );
       const adventure = touch(state.adventure, { items, phase: "shopping", history: [] });
@@ -313,22 +358,7 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!state.adventure) return state;
       const current = activeItem(state.adventure.items);
       if (!current) return state;
-      const pack: PackInfo = action.pack && action.bonus === "confirmed" ? packFromScan(action.pack, "off") : {};
-      const parentPhoto = current.imageSource === "parent" ? current.photoId : undefined;
-      const keepPhoto = (next: AdventureItem) => (parentPhoto ? withParentPhoto(next, parentPhoto) : next);
-      const items = markFound(state.adventure.items, current.id).map((item) =>
-        item.id === current.id
-          ? keepPhoto({ ...(action.pack ? stripPack(item) : item), ...pack, stars: awardedStars(action.bonus), scan: action.bonus })
-          : item,
-      );
-      const history = withHistory(state, state.adventure);
-      if (isComplete(items)) {
-        const stickerId = state.adventure.stickerId ?? nextSticker(state.stickers);
-        const stickers = state.stickers.includes(stickerId) ? state.stickers : [...state.stickers, stickerId];
-        const adventure = touch(state.adventure, { items, history, phase: "done", stickerId });
-        return { ...state, stickers, adventure, saved: upsertSaved(state.saved, adventure) };
-      }
-      return { ...state, adventure: touch(state.adventure, { items, history, phase: "shopping" }) };
+      return collected(state, markFound(state.adventure.items, current.id));
     }
     case "skip": {
       if (!state.adventure) return state;

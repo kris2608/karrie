@@ -1,8 +1,5 @@
 export type Size = { width: number; height: number };
 
-/** Image centre offset from the frame centre, in frame pixels, plus zoom on top of "cover". */
-export type CropView = { zoom: number; x: number; y: number };
-
 export type CropRect = { sx: number; sy: number; sw: number; sh: number };
 
 export const PHOTO_RULES = {
@@ -10,33 +7,39 @@ export const PHOTO_RULES = {
   uploadQuality: 0.82,
   savedMaxSide: 512,
   savedQuality: 0.8,
-  maxZoom: 4,
+  /** Width / height of the camera frame guide. */
+  frameAspect: 3 / 4,
+  stillTimeoutMs: 3000,
 };
 
-export const ASPECTS = { square: 1, portrait: 3 / 4 } as const;
-export type AspectId = keyof typeof ASPECTS;
-
-export function coverScale(image: Size, frame: Size): number {
-  return Math.max(frame.width / image.width, frame.height / image.height);
+/** The centred part of an image with the given aspect, as object-fit: cover shows it. */
+export function centerCrop(size: Size, aspect: number): CropRect {
+  let sw = size.width;
+  let sh = sw / aspect;
+  if (sh > size.height) {
+    sh = size.height;
+    sw = sh * aspect;
+  }
+  return { sx: (size.width - sw) / 2, sy: (size.height - sh) / 2, sw, sh };
 }
 
-export function clampView(view: CropView, image: Size, frame: Size): CropView {
-  const zoom = Math.min(PHOTO_RULES.maxZoom, Math.max(1, view.zoom));
-  const scale = coverScale(image, frame) * zoom;
-  const maxX = Math.max(0, (image.width * scale - frame.width) / 2);
-  const maxY = Math.max(0, (image.height * scale - frame.height) / 2);
-  return { zoom, x: Math.min(maxX, Math.max(-maxX, view.x)), y: Math.min(maxY, Math.max(-maxY, view.y)) };
+/**
+ * A full-resolution still usually has the video's horizontal field of view with
+ * more height. Cropping the same width fraction keeps what the parent saw.
+ */
+export function matchCrop(video: Size, still: Size, aspect: number): CropRect {
+  const fraction = centerCrop(video, aspect).sw / video.width;
+  let sw = still.width * fraction;
+  let sh = sw / aspect;
+  if (sh > still.height) {
+    sh = still.height;
+    sw = sh * aspect;
+  }
+  return { sx: (still.width - sw) / 2, sy: (still.height - sh) / 2, sw, sh };
 }
 
-/** The part of the source image visible in the frame, in source pixels. */
-export function cropRect(view: CropView, image: Size, frame: Size): CropRect {
-  const { zoom, x, y } = clampView(view, image, frame);
-  const scale = coverScale(image, frame) * zoom;
-  const sw = Math.min(image.width, frame.width / scale);
-  const sh = Math.min(image.height, frame.height / scale);
-  const sx = Math.min(image.width - sw, Math.max(0, image.width / 2 - (frame.width / 2 + x) / scale));
-  const sy = Math.min(image.height - sh, Math.max(0, image.height / 2 - (frame.height / 2 + y) / scale));
-  return { sx, sy, sw, sh };
+export function fullRect(size: Size): CropRect {
+  return { sx: 0, sy: 0, sw: size.width, sh: size.height };
 }
 
 /** Output size that fits maxSide and never upscales the crop. */
@@ -69,7 +72,7 @@ export function releasePhoto(image: HTMLImageElement) {
 }
 
 /** Redrawing on a canvas keeps only pixels: EXIF, GPS and other metadata are gone. */
-export async function renderCrop(image: HTMLImageElement, rect: CropRect, maxSide: number, quality: number): Promise<Blob> {
+export async function renderCrop(source: CanvasImageSource, rect: CropRect, maxSide: number, quality: number): Promise<Blob> {
   const size = outputSize(rect, maxSide);
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
@@ -79,7 +82,7 @@ export async function renderCrop(image: HTMLImageElement, rect: CropRect, maxSid
   context.fillStyle = "#fff";
   context.fillRect(0, 0, size.width, size.height);
   context.imageSmoothingQuality = "high";
-  context.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, size.width, size.height);
+  context.drawImage(source, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, size.width, size.height);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
   canvas.width = 0;
   canvas.height = 0;
@@ -98,10 +101,44 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 
 export type ProcessedPhoto = { upload: Blob; saved: Blob };
 
-export async function processCrop(image: HTMLImageElement, rect: CropRect): Promise<ProcessedPhoto> {
+export async function processPhoto(source: CanvasImageSource, rect: CropRect): Promise<ProcessedPhoto> {
   const [upload, saved] = await Promise.all([
-    renderCrop(image, rect, PHOTO_RULES.uploadMaxSide, PHOTO_RULES.uploadQuality),
-    renderCrop(image, rect, PHOTO_RULES.savedMaxSide, PHOTO_RULES.savedQuality),
+    renderCrop(source, rect, PHOTO_RULES.uploadMaxSide, PHOTO_RULES.uploadQuality),
+    renderCrop(source, rect, PHOTO_RULES.savedMaxSide, PHOTO_RULES.savedQuality),
   ]);
   return { upload, saved };
+}
+
+type StillCapture = { takePhoto(): Promise<Blob> };
+type StillCaptureClass = new (track: MediaStreamTrack) => StillCapture;
+
+async function takeStill(track: MediaStreamTrack | null): Promise<HTMLImageElement | null> {
+  const Capture = (globalThis as { ImageCapture?: StillCaptureClass }).ImageCapture;
+  if (!track || !Capture || track.readyState !== "live") return null;
+  try {
+    const blob = await Promise.race([
+      new Capture(track).takePhoto(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), PHOTO_RULES.stillTimeoutMs)),
+    ]);
+    return blob ? await decodePhoto(blob) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sharper full-resolution still where the browser offers it (Android Chrome), otherwise the current video frame. */
+export async function capturePhoto(video: HTMLVideoElement, track: MediaStreamTrack | null): Promise<ProcessedPhoto> {
+  const frame = { width: video.videoWidth, height: video.videoHeight };
+  if (!frame.width || !frame.height) throw new PhotoDecodeError("no frame");
+  const still = await takeStill(track);
+  if (still) {
+    const size = { width: still.naturalWidth, height: still.naturalHeight };
+    const sameOrientation = size.width > size.height === frame.width > frame.height;
+    try {
+      if (sameOrientation) return await processPhoto(still, matchCrop(frame, size, PHOTO_RULES.frameAspect));
+    } finally {
+      releasePhoto(still);
+    }
+  }
+  return processPhoto(video, centerCrop(frame, PHOTO_RULES.frameAspect));
 }

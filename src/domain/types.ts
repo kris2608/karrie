@@ -14,7 +14,7 @@ export type Product = {
 
 export type ImageKind = "generic" | "photo";
 
-/** How the product itself was identified: catalog, typed by a parent, Open Food Facts, or OpenAI photo recognition. */
+/** How the product itself was identified. "off" only appears on lists saved before barcode scanning was removed. */
 export type ItemSource = "catalog" | "manual" | "off" | "vision";
 
 /** Where the shown photo came from, independent of how the product was identified. */
@@ -22,17 +22,44 @@ export type ImageSource = "off" | "parent";
 
 export type Confidence = "high" | "medium" | "low";
 
+/** What OpenAI read or guessed from the photo. Nothing here is verified. */
 export type Recognition = {
   genericName?: string;
   variant?: string;
   subcategory?: string;
   claims?: string[];
   nutriScoreSeen?: string;
+  ingredientsSeen?: string;
+  /** A barcode the model read; checksum-valid but never confirmed, so never used for gameplay. */
+  eanCandidate?: string;
+  specific?: boolean;
   confidence: Confidence;
   inferred?: string[];
 };
 
+/** Legacy barcode-scan result on lists from before the scanner was removed. */
 export type ScanResult = "verified" | "confirmed";
+
+export type Criterion = "no-added-sugar" | "no-added-salt" | "unsalted" | "wholegrain" | "less-sugar" | "more-fibre" | "less-saturated-fat";
+
+/** "label": the issue was read on the pack; "inferred": the model's own product knowledge. */
+export type Evidence = "label" | "inferred" | "none";
+
+/** OpenAI's suggestion after the local guards. Never "verified": there is no second data source to check it against. */
+export type AlternativeAssessment = {
+  status: "none" | "possible" | "insufficient-data";
+  evidence: Evidence;
+  criteria: Criterion[];
+  alternativeType?: string;
+  /** Catalog id of the alternative; its drawing is what the child looks for. */
+  targetType?: string;
+  reason?: string;
+  parentExplanation?: string;
+  childPrompt?: string;
+  source: "photo";
+  model?: string;
+  assessedAt: number;
+};
 
 export type Nutrition = {
   nutriscore?: string;
@@ -58,18 +85,17 @@ export type PackInfo = {
   nutrition?: Nutrition;
   offAttribution?: boolean;
   recognition?: Recognition;
+  alternative?: AlternativeAssessment;
+  /** The parent's choice for the bonus mission; undefined means the evidence-based default. */
+  missionEnabled?: boolean;
 };
 
-export type ScannedProduct = {
-  ean: string;
-  name?: string;
-  brand?: string;
-  packageSize?: string;
-  imageUrl?: string;
-  categoryTags: string[];
-  nutrition?: Nutrition;
-  category: CategoryId;
-  matchProductId?: string;
+/** Per-adventure state of a bonus mission: offered at start, active once the child goes looking. */
+export type MissionState = {
+  status: "offered" | "active" | "skipped" | "done";
+  stars?: number;
+  kept?: "original" | "alternative";
+  swappedFrom?: AdventureItem;
 };
 
 export type AdventureItem = PackInfo & {
@@ -82,6 +108,7 @@ export type AdventureItem = PackInfo & {
   status: ItemStatus;
   stars?: number;
   scan?: ScanResult;
+  mission?: MissionState;
 };
 
 export type HistoryEntry = {

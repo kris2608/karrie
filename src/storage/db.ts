@@ -12,6 +12,7 @@ export type Persisted = {
   stickers: string[];
   categoryOrder: CategoryId[];
   settings: Settings;
+  declined: string[];
 };
 
 export const emptyPersisted = (): Persisted => ({
@@ -20,6 +21,7 @@ export const emptyPersisted = (): Persisted => ({
   stickers: [],
   categoryOrder: [...DEFAULT_CATEGORY_ORDER],
   settings: { ...defaultSettings },
+  declined: [],
 });
 
 let connection: ReturnType<typeof openDB> | null = null;
@@ -44,22 +46,6 @@ function database() {
     throw error;
   });
   return connection;
-}
-
-export async function readProductCache<T>(ean: string): Promise<T | undefined> {
-  try {
-    return (await (await database()).get("products", ean)) as T | undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export async function writeProductCache<T>(ean: string, value: T): Promise<void> {
-  try {
-    await (await database()).put("products", value, ean);
-  } catch {
-    // A full or blocked database only costs a repeat lookup later.
-  }
 }
 
 export async function writePhoto(id: string, blob: Blob): Promise<void> {
@@ -100,12 +86,14 @@ export async function loadPersisted(): Promise<Persisted> {
     const stickers = (await db.get("kv", "stickers")) as string[] | undefined;
     const categoryOrder = (await db.get("kv", "categoryOrder")) as CategoryId[] | undefined;
     const settings = (await db.get("kv", "settings")) as Partial<Settings> | undefined;
+    const discovery = (await db.get("kv", "discovery")) as { declined?: string[] } | undefined;
     return {
       adventure: adventure ?? null,
       saved: saved ?? [],
       stickers: stickers ?? [],
       categoryOrder: categoryOrder?.length ? categoryOrder : [...DEFAULT_CATEGORY_ORDER],
       settings: { ...defaultSettings, ...settings },
+      declined: Array.isArray(discovery?.declined) ? discovery.declined : [],
     };
   } catch {
     return emptyPersisted();
@@ -121,6 +109,7 @@ export async function savePersisted(data: Persisted): Promise<void> {
     tx.store.put(data.stickers, "stickers"),
     tx.store.put(data.categoryOrder, "categoryOrder"),
     tx.store.put(data.settings, "settings"),
+    tx.store.put({ declined: data.declined }, "discovery"),
     tx.done,
   ]);
 }

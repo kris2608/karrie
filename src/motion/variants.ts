@@ -47,6 +47,22 @@ export const badgeSpring: Variants = {
   gone: { scale: 0, opacity: 0, transition: { duration: 0.1 } },
 };
 
+/** Bonus mission: the two cards slide in from their own side, the star chip pops last. */
+export const missionCard: Variants = {
+  hidden: (side: number = 0) => ({ x: side * 60, y: 18, rotate: side * 6, opacity: 0 }),
+  shown: (side: number = 0) => ({ x: 0, y: 0, rotate: side * -2, opacity: 1, transition: { ...softSpring, delay: 0.12 + Math.abs(side) * 0.08 } }),
+};
+
+export const missionChip: Variants = {
+  hidden: { scale: 0, rotate: -30, opacity: 0 },
+  shown: { scale: [0, 1.25, 1], rotate: 0, opacity: 1, transition: { delay: 0.45, duration: 0.45 } },
+};
+
+export const fadeOnly: Variants = {
+  hidden: { opacity: 0 },
+  shown: { opacity: 1, transition: { duration: 0.15 } },
+};
+
 export const sheetUp: Variants = {
   hidden: { y: "100%" },
   shown: { y: 0, transition: { type: "spring", stiffness: 380, damping: 36 } },

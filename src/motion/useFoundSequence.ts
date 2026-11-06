@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { Mood } from "../components/mascot/Karrie";
-import { awardedStars, scanBonus } from "../domain/scoring";
-import type { AdventureItem, ScannedProduct, ScanResult } from "../domain/types";
+import { SCORING } from "../domain/scoring";
+import type { AdventureItem } from "../domain/types";
 import { buzz } from "../feedback/haptics";
 import { playPop, playStar } from "../feedback/sound";
 
@@ -16,8 +16,6 @@ export type Flight = {
   bonus: number;
 };
 
-export type CollectOptions = { bonus?: ScanResult; pack?: ScannedProduct };
-
 export type ExitKind = "found" | "skip" | "fade";
 
 type Options = {
@@ -25,7 +23,8 @@ type Options = {
   artRef: RefObject<HTMLElement | null>;
   basketRef: RefObject<SVGRectElement | null>;
   starRef: RefObject<HTMLElement | null>;
-  onFound: (options: CollectOptions) => void;
+  /** Commits the step; bonus stars come from a finished mission. */
+  onFound: (bonus: number) => void;
   onSkip: () => void;
   onUndo: () => void;
   onFinished: () => void;
@@ -87,7 +86,7 @@ export function useFoundSequence(options: Options) {
   }, []);
 
   const collect = useCallback(
-    (item: AdventureItem, isLast: boolean, collectOptions: CollectOptions = {}) => {
+    (item: AdventureItem, isLast: boolean, bonus = 0) => {
       if (lock.current) return;
       lock.current = true;
       setLocked(true);
@@ -102,15 +101,15 @@ export function useFoundSequence(options: Options) {
 
       setExitKind(flies ? "found" : "fade");
       setEnterDelay(timing.enterDelay);
-      if (flies) setFlight({ token, item, from, basket, star, bonus: scanBonus(collectOptions.bonus) });
-      setStarPending(awardedStars(collectOptions.bonus));
+      if (flies) setFlight({ token, item, from, basket, star, bonus });
+      setStarPending(SCORING.found + bonus);
       if (isLast) setFinishing(true);
 
-      onFound(collectOptions);
+      onFound(bonus);
       playPop();
       buzz(15);
 
-      const cheer = isLast || collectOptions.bonus ? "celebrating" : "happy";
+      const cheer = isLast || bonus ? "celebrating" : "happy";
       later(timing.happyAt, () => react(cheer, isLast ? 4000 : timing.calmAt));
       later(timing.starAt, () => {
         setStarPending(0);

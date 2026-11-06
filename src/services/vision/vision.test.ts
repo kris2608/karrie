@@ -19,6 +19,33 @@ const PEANUT: RecognizedProduct = {
   confidence: "high",
   needsConfirmation: true,
   containsPeople: false,
+  catalogType: "pindakaas",
+  specificProduct: true,
+  visibleIngredients: null,
+  alternative: {
+    status: "none",
+    evidence: "label",
+    criteria: [],
+    alternativeType: null,
+    targetType: null,
+    reason: "Al 100% pinda's.",
+    parentExplanation: null,
+    childPrompt: null,
+  },
+};
+
+const BREAD: RecognizedProduct = {
+  ...PEANUT,
+  productName: null,
+  genericName: "Wit brood",
+  brand: null,
+  variant: null,
+  category: "bakker",
+  subcategory: "witbrood",
+  visibleClaims: [],
+  visibleNutriScore: null,
+  catalogType: "brood",
+  specificProduct: false,
 };
 
 function memoryStorage() {
@@ -41,9 +68,54 @@ describe("visionMapping", () => {
     expect("ean" in draft.pack).toBe(false);
   });
 
-  it("matches only exact names or aliases, never loose text", () => {
-    expect(catalogMatch({ ...PEANUT, subcategory: "pindakaas met stukjes", genericName: "notenpasta" })).toBeNull();
-    expect(catalogMatch({ ...PEANUT, subcategory: null, genericName: "Melk" })?.id).toBe("melk");
+  it("prefers the catalog type the model picked, else matches only exact names or aliases", () => {
+    expect(catalogMatch({ ...PEANUT, catalogType: "brood", productName: "Wit casinobrood", subcategory: "casinobrood", genericName: "brood" })?.id).toBe("brood");
+    expect(catalogMatch({ ...PEANUT, catalogType: "brood", productName: "Volkoren casino", subcategory: "volkorenbrood", genericName: null })?.id).toBe("volkorenbrood");
+    expect(catalogMatch({ ...PEANUT, catalogType: "jam", productName: "Mister Choc Choco Pasta", subcategory: "chocopasta", genericName: "chocopasta" })).toBeNull();
+    expect(catalogMatch({ ...PEANUT, catalogType: "bestaat-niet", subcategory: null, genericName: "Melk" })?.id).toBe("melk");
+    expect(catalogMatch({ ...PEANUT, catalogType: null, subcategory: "pindakaas met stukjes", genericName: "notenpasta" })).toBeNull();
+    expect(catalogMatch({ ...PEANUT, catalogType: null, subcategory: null, genericName: "Melk" })?.id).toBe("melk");
+  });
+
+  it("shows the photo for a branded pack and the drawing for generic bread", () => {
+    expect(draftFromVision(PEANUT).keepPhoto).toBe(true);
+    const bread = draftFromVision(BREAD);
+    expect(bread).toMatchObject({ keepPhoto: false, icon: "brood", category: "bakery", name: "Wit brood" });
+    expect(bread.pack.recognition.specific).toBe(false);
+    expect(draftFromVision({ ...BREAD, catalogType: null, subcategory: "desembol", genericName: "Desembol" }).keepPhoto).toBe(true);
+  });
+
+  it("keeps a readable barcode only as an unverified candidate", () => {
+    const draft = draftFromVision({ ...PEANUT, ean: "3017620422003" });
+    expect(draft.pack.recognition.eanCandidate).toBe("3017620422003");
+    expect("ean" in draft.pack).toBe(false);
+    expect(draftFromVision({ ...PEANUT, ean: "3017620422004" }).pack.recognition.eanCandidate).toBeUndefined();
+  });
+
+  it("carries the guarded assessment: none for AH Terra, a label-backed mission for sweetened peanut butter", () => {
+    expect(draftFromVision(PEANUT).pack.alternative).toMatchObject({ status: "none", criteria: [], source: "photo" });
+    const sweet = draftFromVision({
+      ...PEANUT,
+      productName: "Pindakaas",
+      brand: "Calvé",
+      visibleIngredients: "pinda's (90%), suiker, plantaardige olie, zout",
+      alternative: {
+        status: "possible",
+        evidence: "label",
+        criteria: ["no-added-sugar", "no-added-salt"],
+        alternativeType: "100% pindakaas",
+        targetType: "pindakaas",
+        reason: "Suiker en zout toegevoegd.",
+        parentExplanation: "er staan suiker en zout in de ingrediënten",
+        childPrompt: "Kun jij pindakaas met alleen pinda's vinden?",
+      },
+    });
+    expect(sweet.pack.alternative).toMatchObject({
+      status: "possible",
+      evidence: "label",
+      targetType: "pindakaas",
+      parentExplanation: "Op het etiket gezien: er staan suiker en zout in de ingrediënten.",
+    });
   });
 
   it("drops brand or size the model only inferred", () => {
@@ -64,7 +136,7 @@ describe("visionMapping", () => {
   });
 
   it("falls back to the section icon when nothing in the catalog matches", () => {
-    const draft = draftFromVision({ ...PEANUT, productName: null, genericName: "Kokosmelk", subcategory: "kokosmelk", category: "houdbaar" });
+    const draft = draftFromVision({ ...PEANUT, catalogType: null, productName: null, genericName: "Kokosmelk", subcategory: "kokosmelk", category: "houdbaar" });
     expect(draft.match).toBeNull();
     expect(draft.name).toBe("Kokosmelk");
     expect(draft.icon).toBe("pakket");

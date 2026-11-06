@@ -1,32 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { clampView, coverScale, cropRect, outputSize } from "./imageProcessing";
+import { centerCrop, matchCrop, outputSize } from "./imageProcessing";
 
-const landscape = { width: 4000, height: 3000 };
-const square = { width: 300, height: 300 };
+const portraitVideo = { width: 1080, height: 1920 };
+const landscapeVideo = { width: 1920, height: 1080 };
 
 describe("crop math", () => {
-  it("covers the frame at zoom 1 and centres the crop", () => {
-    expect(coverScale(landscape, square)).toBeCloseTo(0.1);
-    expect(cropRect({ zoom: 1, x: 0, y: 0 }, landscape, square)).toEqual({ sx: 500, sy: 0, sw: 3000, sh: 3000 });
+  it("takes the centred 3:4 part a cover-fitted frame shows", () => {
+    expect(centerCrop(portraitVideo, 3 / 4)).toEqual({ sx: 0, sy: 240, sw: 1080, sh: 1440 });
+    expect(centerCrop(landscapeVideo, 3 / 4)).toEqual({ sx: 555, sy: 0, sw: 810, sh: 1080 });
   });
 
-  it("never pans past the image edge", () => {
-    expect(clampView({ zoom: 1, x: 999, y: 50 }, landscape, square)).toEqual({ zoom: 1, x: 50, y: 0 });
-    expect(cropRect({ zoom: 1, x: 999, y: 0 }, landscape, square).sx).toBe(0);
-    expect(cropRect({ zoom: 1, x: -999, y: 0 }, landscape, square).sx).toBe(1000);
-  });
-
-  it("zooms into a smaller region and clamps the zoom range", () => {
-    const rect = cropRect({ zoom: 2, x: 0, y: 0 }, landscape, square);
-    expect(rect).toEqual({ sx: 1250, sy: 750, sw: 1500, sh: 1500 });
-    expect(clampView({ zoom: 9, x: 0, y: 0 }, landscape, square).zoom).toBe(4);
-    expect(clampView({ zoom: 0.2, x: 0, y: 0 }, landscape, square).zoom).toBe(1);
-  });
-
-  it("portrait frames crop a 3:4 region", () => {
-    const rect = cropRect({ zoom: 1, x: 0, y: 0 }, landscape, { width: 300, height: 400 });
-    expect(rect.sw / rect.sh).toBeCloseTo(0.75);
-    expect(rect.sh).toBe(3000);
+  it("maps the visible part of the video onto a taller full-resolution still", () => {
+    const rect = matchCrop(portraitVideo, { width: 3024, height: 4032 }, 3 / 4);
+    expect(rect.sw).toBe(3024);
+    expect(rect.sh).toBe(4032);
+    const narrow = matchCrop(landscapeVideo, { width: 4032, height: 3024 }, 3 / 4);
+    expect(narrow.sw / 4032).toBeCloseTo(810 / 1920);
+    expect(narrow.sw / narrow.sh).toBeCloseTo(0.75);
+    expect(narrow.sx).toBeCloseTo((4032 - narrow.sw) / 2);
   });
 
   it("downscales to the size limit without upscaling small crops", () => {

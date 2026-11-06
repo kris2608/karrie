@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { canonicalEan, cleanEan, isValidEan, sameEan } from "./ean";
-import { awardedStars, itemStars, starTotal } from "./scoring";
+import { itemStars, SCORING, starTotal } from "./scoring";
 import type { AdventureItem } from "./types";
 
 it("controleert het controlecijfer en houdt voorloopnullen", () => {
@@ -27,13 +27,11 @@ it("zet een UPC-E-code om", () => {
   expect(canonicalEan("04252614", "upc-e")).toBe("0042100005264");
 });
 
-it("telt sterren per product, oude lijstjes tellen 1", () => {
+it("telt sterren per product: 1 voor gevonden, oude scanlijstjes houden hun 3, een missie geeft er 2 bij", () => {
   const base: AdventureItem = { id: "a", productId: "melk", name: "Melk", icon: "melk", category: "dairy", quantity: 1, status: "found" };
-  expect(awardedStars()).toBe(1);
-  expect(awardedStars("verified")).toBe(3);
-  expect(awardedStars("confirmed")).toBe(3);
-  expect(itemStars(base)).toBe(1);
+  expect(itemStars(base)).toBe(SCORING.found);
   expect(itemStars({ ...base, stars: 3 })).toBe(3);
   expect(itemStars({ ...base, status: "pending", stars: 3 })).toBe(0);
+  expect(itemStars({ ...base, mission: { status: "done", stars: SCORING.discoveryBonus, kept: "original" } })).toBe(3);
   expect(starTotal([base, { ...base, id: "b", stars: 3 }, { ...base, id: "c", status: "skipped" }])).toBe(4);
 });

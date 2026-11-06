@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createHandler, type AppDeps } from "./app.js";
 import { createLimits, type LimitConfig } from "./limits.js";
 import { errorCode, interpret, recognizePhoto, requestBody, type RecognizeConfig } from "./recognize.js";
-import { RecognizedProductSchema, type RecognizedProduct } from "./schema.js";
+import { RecognizedProductSchema, sanitize, type RecognizedProduct } from "./schema.js";
 import { checkImage } from "./validate.js";
 
 const JPEG_HEAD = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
@@ -28,6 +28,36 @@ const PEANUT: RecognizedProduct = {
   confidence: "high",
   needsConfirmation: false,
   containsPeople: false,
+  catalogType: "pindakaas",
+  specificProduct: true,
+  visibleIngredients: null,
+  alternative: {
+    status: "none",
+    evidence: "label",
+    criteria: [],
+    alternativeType: null,
+    targetType: null,
+    reason: "Al 100% pinda's.",
+    parentExplanation: null,
+    childPrompt: null,
+  },
+};
+
+const SWEET: RecognizedProduct = {
+  ...PEANUT,
+  productName: "Pindakaas",
+  brand: "Calvé",
+  visibleIngredients: "Pinda's (90%), suiker, plantaardige olie, zout",
+  alternative: {
+    status: "possible",
+    evidence: "label",
+    criteria: ["no-added-sugar", "no-added-salt", "no-added-sugar"],
+    alternativeType: "100% pindakaas",
+    targetType: "pindakaas",
+    reason: "Suiker en zout toegevoegd.",
+    parentExplanation: "Er staan suiker en zout in de ingrediënten.",
+    childPrompt: "Kun jij pindakaas met alleen pinda's vinden?",
+  },
 };
 
 const CONFIG: RecognizeConfig = { model: "gpt-5.4-mini", detail: "auto", reasoningEffort: "low", maxOutputTokens: 1200 };
@@ -72,9 +102,53 @@ describe("requestBody", () => {
   });
 
   it("produces a schema strict mode accepts: every property required, no extras", () => {
-    const schema = requestBody(CONFIG, jpeg()).text.format.schema as { required: string[]; properties: object; additionalProperties: boolean };
+    type Strict = { required: string[]; properties: Record<string, Strict>; additionalProperties: boolean };
+    const schema = requestBody(CONFIG, jpeg()).text.format.schema as Strict;
     expect(schema.additionalProperties).toBe(false);
     expect([...schema.required].sort()).toEqual(Object.keys(schema.properties).sort());
+    const alternative = schema.properties.alternative;
+    expect(alternative.additionalProperties).toBe(false);
+    expect([...alternative.required].sort()).toEqual(Object.keys(alternative.properties).sort());
+  });
+
+  it("assesses the alternative in the same call, with the same-type rules", () => {
+    const body = requestBody(CONFIG, jpeg());
+    expect(body.instructions).toMatch(/same narrow type/);
+    expect(body.instructions).toMatch(/peanut butter -> hummus/);
+    expect(body.instructions).toMatch(/always for non-food/);
+  });
+});
+
+describe("sanitizeAlternative", () => {
+  const alt = (patch: Partial<RecognizedProduct["alternative"]>, product: Partial<RecognizedProduct> = {}) =>
+    sanitize({ ...SWEET, ...product, alternative: { ...SWEET.alternative, ...patch } }).alternative;
+
+  it("keeps a real suggestion and removes duplicate criteria", () => {
+    expect(alt({})).toMatchObject({ status: "possible", criteria: ["no-added-sugar", "no-added-salt"], targetType: "pindakaas" });
+  });
+
+  it("downgrades a suggestion without criteria, target or evidence", () => {
+    expect(alt({ criteria: [] })).toMatchObject({ status: "none", criteria: [], childPrompt: null });
+    expect(alt({ targetType: null })).toMatchObject({ status: "none" });
+    expect(alt({ evidence: "none" })).toMatchObject({ status: "insufficient-data", alternativeType: null });
+  });
+
+  it("never suggests for non-food or unrecognised photos", () => {
+    expect(alt({}, { category: "huishouden" }).status).toBe("none");
+    expect(alt({}, { catalogType: "tandpasta" }).status).toBe("none");
+    expect(alt({}, { recognized: false }).status).toBe("none");
+  });
+
+  it("replaces a moralising or long child prompt with a neutral question", () => {
+    expect(alt({ childPrompt: "Kun jij gezonde pindakaas vinden?" }).childPrompt).toBe("Kun jij 100% pindakaas vinden?");
+    expect(alt({ childPrompt: "Deze is slecht, zoek een betere pot" }).childPrompt).toBe("Kun jij 100% pindakaas vinden?");
+    expect(alt({ childPrompt: "Kun jij een pot pindakaas vinden waar alleen pinda's in zitten?" }).childPrompt).toBe("Kun jij 100% pindakaas vinden?");
+  });
+
+  it("clears suggestion text when there is no suggestion and caps long text", () => {
+    expect(alt({ status: "none" })).toMatchObject({ criteria: [], alternativeType: null, parentExplanation: null, childPrompt: null, reason: "Suiker en zout toegevoegd." });
+    expect(alt({ parentExplanation: "x".repeat(400) }).parentExplanation).toHaveLength(160);
+    expect(sanitize({ ...SWEET, visibleIngredients: "y".repeat(900) }).visibleIngredients).toHaveLength(400);
   });
 });
 

@@ -4,12 +4,12 @@ import type {
   Adventure,
   AdventureItem,
   AdventurePhase,
+  AlternativeAssessment,
   CategoryId,
   PackInfo,
   Product,
   Recognition,
   SavedItem,
-  ScannedProduct,
 } from "../domain/types";
 import { productById } from "./catalog";
 
@@ -27,6 +27,8 @@ const PACK_KEYS = [
   "nutrition",
   "offAttribution",
   "recognition",
+  "alternative",
+  "missionEnabled",
 ] as const;
 const IMAGE_KEYS = ["imageUrl", "photoId", "imageKind", "imageSource"] as const;
 
@@ -40,20 +42,6 @@ export function stripPack<T extends PackInfo>(item: T): T {
   const copy = { ...item };
   for (const key of PACK_KEYS) delete copy[key];
   return copy;
-}
-
-export function packFromScan(product: ScannedProduct, source: "off" | "manual"): PackInfo {
-  return packOf({
-    ean: product.ean,
-    brand: product.brand,
-    packageSize: product.packageSize,
-    imageUrl: source === "off" ? product.imageUrl : undefined,
-    imageKind: source === "off" && product.imageUrl ? "photo" : "generic",
-    imageSource: source === "off" && product.imageUrl ? "off" : undefined,
-    source,
-    nutrition: product.nutrition,
-    offAttribution: source === "off" ? true : undefined,
-  });
 }
 
 export function withoutImage<T extends PackInfo>(item: T): T {
@@ -73,6 +61,7 @@ export type VisionPack = {
   brand?: string;
   packageSize?: string;
   recognition: Recognition;
+  alternative?: AlternativeAssessment;
 };
 
 /** Never carries an EAN: a model reading is not a verified barcode. */
@@ -85,6 +74,7 @@ export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
     imageSource: photoId ? "parent" : undefined,
     source: "vision",
     recognition: vision.recognition,
+    alternative: vision.alternative,
   });
 }
 

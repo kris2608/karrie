@@ -6,11 +6,12 @@ import type { AdventureItem, CategoryId } from "../../domain/types";
 import { ItemArt } from "../../components/ItemArt";
 import { TopBar } from "../../components/TopBar";
 import { PressButton } from "../../components/ui/PressButton";
+import { StarIcon } from "../../components/ui/StarIcon";
 import { Toast, useNotice } from "../../components/ui/Toast";
+import { useLongPress } from "../../components/ui/useLongPress";
+import { missionOn } from "../../domain/discovery";
 import { spring } from "../../motion/variants";
-import { warmImages } from "../../services/off/warmImages";
 import { useAdventure } from "../../state/AdventureContext";
-import { ScanFlow } from "../scanner/ScanFlow";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ItemSheet } from "./ItemSheet";
 
@@ -27,7 +28,6 @@ export function ReviewScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
-  const [scanTargetId, setScanTargetId] = useState<string | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
 
@@ -46,7 +46,6 @@ export function ReviewScreen() {
 
   const hasOpen = adventure.items.some((item) => item.status !== "found");
   const editing = adventure.items.find((item) => item.id === editId) ?? null;
-  const scanTarget = adventure.items.find((item) => item.id === scanTargetId);
 
   function saveForLater() {
     dispatch({ type: "save-favorite" });
@@ -55,7 +54,6 @@ export function ReviewScreen() {
 
   function start() {
     if (!adventure) return;
-    warmImages(adventure.items);
     if (adventure.phase !== "shopping") dispatch({ type: "start-shopping" });
     navigate("/winkel");
   }
@@ -142,11 +140,6 @@ export function ReviewScreen() {
           dispatch({ type: "restore-generic", itemId: editing.id });
           show(`${editing.name} heeft weer een Karrie-tekening`);
         }}
-        onScan={() => {
-          if (!editing) return;
-          setScanTargetId(editing.id);
-          setEditId(null);
-        }}
         onPhoto={() => {
           if (!editing) return;
           photo.current?.open(editing);
@@ -155,37 +148,39 @@ export function ReviewScreen() {
         onRemove={() => editing && remove(editing)}
       />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
-      <ScanFlow
-        open={Boolean(scanTarget)}
-        target={scanTarget}
-        items={adventure.items}
-        onClose={() => setScanTargetId(null)}
-        onDone={show}
-      />
       <Toast notice={notice} onDismiss={dismiss} />
     </main>
   );
 }
 
 function ItemRow({ item, first, last, onEdit, onRemove }: { item: AdventureItem; first: boolean; last: boolean; onEdit: () => void; onRemove: () => void }) {
-  const { dispatch } = useAdventure();
+  const { settings, declined, dispatch } = useAdventure();
+  const { pressing, handlers } = useLongPress(onRemove);
   const detail = [item.brand, item.packageSize].filter(Boolean).join(" · ");
+  const mission = settings.smartDiscovery && missionOn(item, declined);
   return (
     <motion.li
       layout="position"
-      className="item-row"
+      className={pressing ? "item-row is-pressing" : "item-row"}
+      data-testid="item-row"
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, x: -40, transition: { duration: 0.16 } }}
       transition={spring}
+      {...handlers}
     >
       <button type="button" className="item-art-button" aria-label={`Bewerk ${item.name}`} data-testid="edit-item" onClick={onEdit}>
         <ItemArt item={item} />
+        {mission && (
+          <span className="mission-badge" role="img" aria-label="Bonusmissie" data-testid="mission-badge">
+            <StarIcon />
+          </span>
+        )}
       </button>
       <div className="item-main">
         <strong>{item.name}</strong>
         {detail && <small className="item-detail">{detail}</small>}
-        <div className="stepper">
+        <div className="stepper" data-no-long-press>
           <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
             −
           </button>
@@ -195,7 +190,7 @@ function ItemRow({ item, first, last, onEdit, onRemove }: { item: AdventureItem;
           </button>
         </div>
       </div>
-      <div className="row-actions">
+      <div className="row-actions" data-no-long-press>
         <button type="button" className="round-button round-s" aria-label="Omhoog" disabled={first} onClick={() => dispatch({ type: "move-item", itemId: item.id, direction: -1 })}>
           <Arrow up />
         </button>

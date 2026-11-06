@@ -3,7 +3,7 @@ import { productById } from "../data/catalog";
 import type { VisionPack } from "../data/sample";
 import { starTotal } from "../domain/scoring";
 import { activeItem } from "../domain/shopQueue";
-import type { Adventure, ScannedProduct } from "../domain/types";
+import type { Adventure, PackInfo } from "../domain/types";
 import { referencedPhotos } from "../storage/photos";
 import { initialState, reducer, type AppState } from "./reducer";
 
@@ -12,13 +12,14 @@ const TERRA: VisionPack = {
   recognition: { genericName: "Pindakaas", variant: "Naturel", subcategory: "pindakaas", claims: ["100% pindakaas"], nutriScoreSeen: "A", confidence: "high" },
 };
 
-const CALVE: ScannedProduct = {
+/** What a barcode scan stored on lists saved before scanning was removed. */
+const CALVE_PACK: PackInfo = {
   ean: "8720182153305",
-  name: "Calvé Pindakaas",
   imageUrl: "https://images.openfoodfacts.org/images/products/872/018/215/3305/front_nl.jpg",
-  categoryTags: ["en:peanut-butters"],
-  category: "pantry",
-  matchProductId: "pindakaas",
+  imageKind: "photo",
+  imageSource: "off",
+  source: "off",
+  offAttribution: true,
 };
 
 function withProducts(...ids: string[]): AppState {
@@ -69,14 +70,24 @@ describe("foto herkennen", () => {
     expect(after).toMatchObject({ id: before.id, quantity: 3, category: "pantry", icon: "pindakaas", productId: "pindakaas", photoId: "p3", source: "vision" });
   });
 
-  it("keeps a verified Open Food Facts pack and only swaps the picture", () => {
-    let state = withProducts("pindakaas");
-    const id = items(state)[0].id;
-    state = reducer(state, { type: "attach-pack", itemId: id, product: CALVE, source: "off" });
-    state = reducer(state, { type: "apply-recognition", itemId: id, photoId: "p4", pack: TERRA });
-    expect(items(state)[0]).toMatchObject({ ean: CALVE.ean, source: "off", photoId: "p4", imageSource: "parent", imageKind: "photo" });
+  it("keeps a legacy barcode item from an old list and only swaps the picture", () => {
+    const legacy: AppState = {
+      ...initialState,
+      adventure: { ...withProducts("pindakaas").adventure!, items: [{ ...items(withProducts("pindakaas"))[0], ...CALVE_PACK }] },
+    };
+    const id = items(legacy)[0].id;
+    const state = reducer(legacy, { type: "apply-recognition", itemId: id, photoId: "p4", pack: TERRA });
+    expect(items(state)[0]).toMatchObject({ ean: CALVE_PACK.ean, source: "off", photoId: "p4", imageSource: "parent", imageKind: "photo" });
     expect(items(state)[0].imageUrl).toBeUndefined();
     expect(items(state)[0].recognition).toBeUndefined();
+  });
+
+  it("a generic recognition without a photo keeps the drawing", () => {
+    let state = withProducts("brood");
+    const id = items(state)[0].id;
+    state = reducer(state, { type: "apply-recognition", itemId: id, pack: { recognition: { genericName: "brood", confidence: "high", specific: false } } });
+    expect(items(state)[0]).toMatchObject({ id, icon: "brood", source: "vision" });
+    expect(items(state)[0].photoId).toBeUndefined();
   });
 
   it("D: corrections keep the photo; restoring the drawing removes it", () => {
@@ -89,7 +100,7 @@ describe("foto herkennen", () => {
     state = reducer(state, { type: "restore-generic", itemId: id });
     expect(items(state)[0]).toMatchObject({ id, name: "Hazelnootpasta", icon: "choco" });
     expect(items(state)[0].photoId).toBeUndefined();
-    expect(items(state)[0].imageKind).toBeUndefined();
+    expect(items(state)[0].imageKind).toBe("generic");
   });
 
   it("set-photo replaces only the image of a catalog item", () => {
@@ -108,14 +119,13 @@ describe("foto herkennen", () => {
     expect(productById("pindakaas")?.name).toBe("Pindakaas");
   });
 
-  it("adventure: a photo item is found with one star, and a confirmed scan keeps the parent photo", () => {
+  it("adventure: a photo item is found with one star and keeps its photo", () => {
     let state = reducer(initialState, { type: "add-recognized", name: "Pindakaas", category: "pantry", icon: "pindakaas", productId: "pindakaas", photoId: "p8", pack: TERRA });
     state = reducer(state, { type: "start-shopping" });
     expect(activeItem(items(state))?.photoId).toBe("p8");
     const plain = reducer(state, { type: "found" });
     expect(starTotal(items(plain))).toBe(1);
-    const confirmed = reducer(state, { type: "found", bonus: "confirmed", pack: CALVE });
-    expect(items(confirmed)[0]).toMatchObject({ ean: CALVE.ean, photoId: "p8", imageSource: "parent", stars: 3 });
+    expect(items(plain)[0]).toMatchObject({ photoId: "p8", imageSource: "parent", status: "found" });
   });
 
   it("photos stay referenced through history and saved lists", () => {
