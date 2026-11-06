@@ -1347,6 +1347,54 @@ h1, h2, p { margin: 0; }
   pointer-events: none;
 }
 
+/* Photo recognition */
+
+.scan-button .camera-icon { width: 27px; height: 27px; }
+.item-sheet-actions .camera-icon { width: 24px; height: 24px; }
+@media (max-width: 400px) {
+  .search-row { gap: 6px; }
+  .search-row .scan-button { width: 48px; }
+  .search-row .search { padding: 0 var(--space-3); }
+}
+.cropper { display: grid; gap: var(--space-3); justify-items: center; }
+.cropper-frame {
+  position: relative;
+  width: min(100%, 300px, 46dvh);
+  overflow: hidden;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--teal), 0 10px 24px -12px rgba(120, 72, 20, 0.45);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.cropper-portrait { width: min(100%, 240px, 37dvh); }
+.cropper-frame img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.cropper-controls { display: grid; gap: var(--space-3); justify-items: center; width: 100%; }
+.cropper-zoom { display: flex; align-items: center; gap: var(--space-2); width: min(100%, 300px); color: var(--ink-soft); }
+.cropper-zoom svg { width: 22px; height: 22px; flex: none; }
+.cropper-zoom input { flex: 1; min-width: 0; accent-color: var(--teal); }
+.photo-hint { text-align: center; }
+.photo-wait { display: grid; gap: var(--space-3); justify-items: center; padding: var(--space-4) 0; text-align: center; }
+.photo-wait strong { font-size: 1.2rem; font-weight: 900; }
+.photo-wait-art { width: 140px; animation: photo-look 1.4s ease-in-out infinite; }
+.photo-problem-art { width: 112px; justify-self: center; }
+@keyframes photo-look {
+  0%, 100% { transform: rotate(-3deg) scale(1); }
+  50% { transform: rotate(3deg) scale(1.04); }
+}
+.photo-source { color: var(--ink-mute); font-style: normal; font-weight: 700; font-size: 0.85rem; white-space: nowrap; }
+.photo-barcode .text-button { text-align: left; }
+.item-edit { display: grid; gap: var(--space-4); }
+
 /* Short screens */
 
 @media (max-height: 680px) {
@@ -1357,6 +1405,6 @@ h1, h2, p { margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .k-blink, .k-breath, .scanner-line, .scanner-dots i { animation: none; }
+  .k-blink, .k-breath, .scanner-line, .scanner-dots i, .photo-wait-art { animation: none; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
 }

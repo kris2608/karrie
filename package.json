@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:server": "npm test --prefix server",
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {

@@ -25,7 +25,19 @@ import type {
   ScanResult,
 } from "../domain/types";
 import { products } from "../data/catalog";
-import { createAdventure, createItem, createSampleAdventure, itemFromSaved, packOf, packFromScan, stripPack } from "../data/sample";
+import {
+  createAdventure,
+  createItem,
+  createSampleAdventure,
+  itemFromSaved,
+  packFromScan,
+  packFromVision,
+  packOf,
+  stripPack,
+  withoutImage,
+  withParentPhoto,
+  type VisionPack,
+} from "../data/sample";
 
 export type Settings = {
   soundEnabled: boolean;
@@ -61,9 +73,13 @@ export type Action =
   | { type: "move-item"; itemId: string; direction: -1 | 1 }
   | { type: "move-category"; category: CategoryId; direction: -1 | 1 }
   | { type: "set-category-order"; order: CategoryId[] }
-  | { type: "add-scanned"; product: ScannedProduct; name: string; category: CategoryId; icon: string; source: "off" | "manual" }
+  | { type: "add-scanned"; product: ScannedProduct; name: string; category: CategoryId; icon: string; source: "off" | "manual"; photoId?: string }
   | { type: "attach-pack"; itemId: string; product: ScannedProduct; source?: "off" | "manual" }
   | { type: "restore-generic"; itemId: string }
+  | { type: "add-recognized"; name: string; category: CategoryId; icon: string; productId?: string; photoId?: string; pack?: VisionPack }
+  | { type: "set-photo"; itemId: string; photoId: string }
+  | { type: "apply-recognition"; itemId: string; photoId: string; pack: VisionPack }
+  | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }
   | { type: "insert-item"; item: AdventureItem; index: number }
   | { type: "start-shopping" }
   | { type: "found"; bonus?: ScanResult; pack?: ScannedProduct }
@@ -234,7 +250,7 @@ export function reducer(state: AppState, action: Action): AppState {
         );
         return { ...state, adventure: touch(adventure, { items }) };
       }
-      const item: AdventureItem = {
+      const scanned: AdventureItem = {
         id: crypto.randomUUID(),
         productId: action.product.matchProductId ?? `ean:${action.product.ean}`,
         name: action.name.trim() || action.product.name || "Product",
@@ -244,12 +260,40 @@ export function reducer(state: AppState, action: Action): AppState {
         status: "pending",
         ...packFromScan(action.product, action.source),
       };
+      const item = action.photoId ? withParentPhoto(scanned, action.photoId) : scanned;
       return { ...state, adventure: touch(adventure, { items: [...adventure.items, item] }) };
     }
     case "attach-pack":
       return updateItem(state, action.itemId, (item) => ({ ...stripPack(item), ...packFromScan(action.product, action.source ?? "off") }));
     case "restore-generic":
-      return updateItem(state, action.itemId, (item) => stripPack(item));
+      return updateItem(state, action.itemId, (item) => (item.ean && item.imageSource === "parent" ? withoutImage(item) : stripPack(item)));
+    case "add-recognized": {
+      const adventure = ensureDraft(state);
+      const name = action.name.trim().slice(0, 40);
+      if (!name) return state;
+      const base = { productId: action.productId ?? `photo:${crypto.randomUUID()}`, name, icon: action.icon, category: action.category };
+      const pack: PackInfo = action.pack
+        ? packFromVision(action.pack, action.photoId)
+        : action.photoId
+          ? withParentPhoto({ source: "manual" as const }, action.photoId)
+          : { source: "manual" };
+      const item: AdventureItem = { id: crypto.randomUUID(), ...base, quantity: 1, status: "pending", ...pack };
+      return { ...state, adventure: touch(adventure, { items: [...adventure.items, item] }) };
+    }
+    case "set-photo":
+      return updateItem(state, action.itemId, (item) => withParentPhoto(item, action.photoId));
+    case "apply-recognition":
+      return updateItem(state, action.itemId, (item) =>
+        item.ean ? withParentPhoto(item, action.photoId) : { ...stripPack(item), ...packFromVision(action.pack, action.photoId) },
+      );
+    case "edit-item":
+      return updateItem(state, action.itemId, (item) => ({
+        ...item,
+        name: action.name?.trim().slice(0, 40) || item.name,
+        category: action.category ?? item.category,
+        icon: action.icon ?? item.icon,
+        productId: action.productId ?? item.productId,
+      }));
     case "insert-item": {
       if (!state.adventure || state.adventure.items.some((item) => item.id === action.item.id)) return state;
       const items = [...state.adventure.items];
@@ -270,9 +314,11 @@ export function reducer(state: AppState, action: Action): AppState {
       const current = activeItem(state.adventure.items);
       if (!current) return state;
       const pack: PackInfo = action.pack && action.bonus === "confirmed" ? packFromScan(action.pack, "off") : {};
+      const parentPhoto = current.imageSource === "parent" ? current.photoId : undefined;
+      const keepPhoto = (next: AdventureItem) => (parentPhoto ? withParentPhoto(next, parentPhoto) : next);
       const items = markFound(state.adventure.items, current.id).map((item) =>
         item.id === current.id
-          ? { ...(action.pack ? stripPack(item) : item), ...pack, stars: awardedStars(action.bonus), scan: action.bonus }
+          ? keepPhoto({ ...(action.pack ? stripPack(item) : item), ...pack, stars: awardedStars(action.bonus), scan: action.bonus })
           : item,
       );
       const history = withHistory(state, state.adventure);

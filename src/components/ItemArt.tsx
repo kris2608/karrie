@@ -1,16 +1,18 @@
 import { useState } from "react";
 import type { PackInfo } from "../domain/types";
+import { usePhotoUrl } from "../storage/photos";
 import { ProductArt } from "./ProductArt";
 
-type ArtItem = Pick<PackInfo, "imageUrl" | "imageKind"> & { icon: string; name: string };
+type ArtItem = Pick<PackInfo, "imageUrl" | "imageKind" | "photoId"> & { icon: string; name: string };
 
-export function hasPhoto(item: Pick<PackInfo, "imageUrl" | "imageKind">): boolean {
-  return item.imageKind === "photo" && Boolean(item.imageUrl);
+export function hasPhoto(item: Pick<PackInfo, "imageUrl" | "imageKind" | "photoId">): boolean {
+  return item.imageKind === "photo" && Boolean(item.photoId || item.imageUrl);
 }
 
 export function ItemArt({ item, className }: { item: ArtItem; className?: string }) {
   const [failed, setFailed] = useState<string | null>(null);
-  const url = hasPhoto(item) ? item.imageUrl : undefined;
+  const local = usePhotoUrl(item.imageKind === "photo" ? item.photoId : undefined);
+  const url = !hasPhoto(item) ? undefined : item.photoId ? (local ?? undefined) : item.imageUrl;
 
   if (url && failed !== url) {
     return (

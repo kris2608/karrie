@@ -256,7 +256,7 @@ function ResultBody({ result, target, items, onRescan, onClose, onDone, onEdit }
   );
 }
 
-function DrawingPicker({ name, category, icon, onPick }: { name: string; category: CategoryId; icon: string; onPick: (id: string) => void }) {
+export function DrawingPicker({ name, category, icon, onPick }: { name: string; category: CategoryId; icon: string; onPick: (id: string) => void }) {
   const needle = normalize(name);
   const named = needle
     ? products.filter((product) => normalize(product.name).includes(needle) || product.aliases.some((alias) => normalize(alias).includes(needle)))

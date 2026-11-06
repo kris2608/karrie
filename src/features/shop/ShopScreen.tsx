@@ -9,6 +9,7 @@ import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
 import { BarcodeIcon } from "../../components/ui/ScanButton";
 import { StarIcon } from "../../components/ui/StarIcon";
+import { productById } from "../../data/catalog";
 import { starTotal } from "../../domain/scoring";
 import { activeItem, foundCount } from "../../domain/shopQueue";
 import type { ScanOutcome } from "../scanner/BarcodeScanner";
@@ -53,7 +54,9 @@ export function ShopScreen() {
   const openItems = adventure.items.filter((item) => item.status !== "found");
   const canSkip = openItems.length > 1 && !sequence.locked;
 
-  const canScan = Boolean(current && !current.scan && !sequence.locked && (current.ean || current.category !== "produce"));
+  const canScan = Boolean(
+    current && !current.scan && !sequence.locked && (current.ean || (current.category !== "produce" && productById(current.productId))),
+  );
 
   function collect() {
     if (!current) return;

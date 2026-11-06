@@ -7,6 +7,7 @@ import type {
   CategoryId,
   PackInfo,
   Product,
+  Recognition,
   SavedItem,
   ScannedProduct,
 } from "../domain/types";
@@ -14,7 +15,20 @@ import { productById } from "./catalog";
 
 export const SAMPLE_IDS = ["appel", "banaan", "brood", "melk"] as const;
 
-const PACK_KEYS = ["ean", "brand", "packageSize", "imageUrl", "imageKind", "source", "nutrition", "offAttribution"] as const;
+const PACK_KEYS = [
+  "ean",
+  "brand",
+  "packageSize",
+  "imageUrl",
+  "photoId",
+  "imageKind",
+  "imageSource",
+  "source",
+  "nutrition",
+  "offAttribution",
+  "recognition",
+] as const;
+const IMAGE_KEYS = ["imageUrl", "photoId", "imageKind", "imageSource"] as const;
 
 export function packOf(item: PackInfo): PackInfo {
   const pack: Record<string, unknown> = {};
@@ -35,9 +49,42 @@ export function packFromScan(product: ScannedProduct, source: "off" | "manual"):
     packageSize: product.packageSize,
     imageUrl: source === "off" ? product.imageUrl : undefined,
     imageKind: source === "off" && product.imageUrl ? "photo" : "generic",
+    imageSource: source === "off" && product.imageUrl ? "off" : undefined,
     source,
     nutrition: product.nutrition,
     offAttribution: source === "off" ? true : undefined,
+  });
+}
+
+export function withoutImage<T extends PackInfo>(item: T): T {
+  const copy = { ...item };
+  for (const key of IMAGE_KEYS) delete copy[key];
+  return { ...copy, imageKind: "generic" };
+}
+
+/** Swaps only the picture for a parent photo; product identity stays as it was. */
+export function withParentPhoto<T extends PackInfo>(item: T, photoId: string): T {
+  const copy = { ...item };
+  for (const key of IMAGE_KEYS) delete copy[key];
+  return { ...copy, photoId, imageKind: "photo", imageSource: "parent" };
+}
+
+export type VisionPack = {
+  brand?: string;
+  packageSize?: string;
+  recognition: Recognition;
+};
+
+/** Never carries an EAN: a model reading is not a verified barcode. */
+export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
+  return packOf({
+    brand: vision.brand,
+    packageSize: vision.packageSize,
+    photoId,
+    imageKind: photoId ? "photo" : "generic",
+    imageSource: photoId ? "parent" : undefined,
+    source: "vision",
+    recognition: vision.recognition,
   });
 }
 

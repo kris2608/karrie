@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { categoryLabel } from "../../domain/categories";
 import type { AdventureItem, CategoryId } from "../../domain/types";
@@ -11,6 +11,7 @@ import { spring } from "../../motion/variants";
 import { warmImages } from "../../services/off/warmImages";
 import { useAdventure } from "../../state/AdventureContext";
 import { ScanFlow } from "../scanner/ScanFlow";
+import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ItemSheet } from "./ItemSheet";
 
 function Arrow({ up }: { up?: boolean }) {
@@ -27,6 +28,7 @@ export function ReviewScreen() {
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
   const [scanTargetId, setScanTargetId] = useState<string | null>(null);
+  const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
 
   useEffect(() => {
@@ -145,8 +147,14 @@ export function ReviewScreen() {
           setScanTargetId(editing.id);
           setEditId(null);
         }}
+        onPhoto={() => {
+          if (!editing) return;
+          photo.current?.open(editing);
+          setEditId(null);
+        }}
         onRemove={() => editing && remove(editing)}
       />
+      <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <ScanFlow
         open={Boolean(scanTarget)}
         target={scanTarget}

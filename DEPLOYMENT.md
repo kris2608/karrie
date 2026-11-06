@@ -16,6 +16,14 @@ npm run build
 
 `npm run build` moet zonder fouten eindigen. De site staat daarna in `dist/`.
 
+Voor foto herkennen is er ook een kleine server in `server/` (zie [Foto herkennen](#foto-herkennen-openai)):
+
+```bash
+npm ci --prefix server
+npm run test:server
+npm run build --prefix server
+```
+
 ## 2. GitHub
 
 Commit ook `package-lock.json`. Zonder dat bestand faalt `npm ci` op Render.
@@ -32,8 +40,10 @@ Commit ook `package-lock.json`. Zonder dat bestand faalt `npm ci` op Render.
    - build: `npm ci && npm run build`
    - publish-map: `dist`
    - rewrite van `/*` naar `/index.html`, zodat `/winkel` bij verversen de app blijft
-4. Bevestig het blueprint. Render bouwt en geeft één adres, `https://karrieapp.onrender.com`.
-5. Elke push naar de gekoppelde branch publiceert opnieuw naar datzelfde adres.
+   - gratis web service `karrie-api` (map `server/`) voor foto herkennen
+4. Render vraagt om `OPENAI_API_KEY` voor `karrie-api`. Plak daar de sleutel. Hij staat alleen op Render, niet in GitHub en niet in de app.
+5. Bevestig het blueprint. De app staat op `https://karrieapp.onrender.com`, de server op `https://karrie-api.onrender.com`.
+6. Elke push naar de gekoppelde branch publiceert opnieuw naar datzelfde adres.
 
 Bestaande bestanden (JavaScript, iconen, service worker) worden rechtstreeks geserveerd. Alleen paden zonder bestand vallen terug op `index.html`.
 
@@ -130,7 +140,7 @@ Karrie zoekt gescande barcodes op in [Open Food Facts](https://world.openfoodfac
 - De barcode wordt op het toestel zelf herkend (`@zxing/browser`). Camerabeelden worden niet opgeslagen en nergens heen gestuurd. Er wordt geen video bewaard.
 - Alleen het barcodenummer gaat naar Open Food Facts, zonder cookies (`credentials: "omit"`) en zonder referrer.
 - De camera stopt zodra er een geldige barcode is gelezen, als de scanner sluit en als de app naar de achtergrond gaat.
-- Er gaat niets naar Render. Render levert alleen de statische bestanden.
+- Bij het scannen gaat er niets naar Render. Alleen **Herken product** gebruikt de server, zie hieronder.
 
 **Camera-toegang per platform**
 
@@ -146,3 +156,90 @@ Karrie zoekt gescande barcodes op in [Open Food Facts](https://world.openfoodfac
 - Losse groente en fruit en schapkaartjes worden niet gecontroleerd.
 - Bij weinig licht, glimmende verpakkingen of gebogen barcodes kan het lezen langer duren. Dichterbij of verder weg houden helpt meestal.
 - Scannen is in deze browserversie niet op echte iPhones en Android-telefoons getest. Gebruik de checklist hierboven.
+
+## Foto herkennen (OpenAI)
+
+Een ouder kan een product fotograferen. Karrie stuurt de uitsnede naar OpenAI, krijgt naam, merk, afdeling en soort terug en laat de ouder alles bevestigen of aanpassen. Zonder bevestiging komt er niets op de lijst.
+
+**Opbouw**
+
+- `server/` is een kleine Node-server (`karrie-api`) met één route: `POST /api/products/recognize-photo`. `GET /api/health` geeft status en tellers, zonder geheimen.
+- De server roept de OpenAI Responses API aan met model `gpt-5.4-mini`, een strikt JSON-schema (`server/src/schema.ts`) en `store: false`. Geen web search, geen beeldgeneratie.
+- De OpenAI-sleutel staat alleen in de omgeving van de server. De app kent hem niet; `VITE_API_ORIGIN` is alleen het openbare adres van de server.
+- Lokaal: zet de sleutel in `server/.env` (kopie van `server/.env.example`, staat in `.gitignore`). Start `npm run build --prefix server` en `npm start --prefix server` (poort 8787). `npm run dev` en `npm run preview` sturen `/api` daarheen door.
+
+**Instellingen op Render (`karrie-api`)**
+
+| Variabele | Standaard | Betekenis |
+|---|---|---|
+| `OPENAI_API_KEY` | (geheim) | Alleen in het Render-dashboard invullen |
+| `OPENAI_VISION_MODEL` | `gpt-5.4-mini` | Model voor herkennen |
+| `OPENAI_IMAGE_DETAIL` | `auto` | `low`, `high` of `auto` |
+| `OPENAI_REASONING_EFFORT` | `low` | `none`, `low`, `medium`, `high` |
+| `ALLOWED_ORIGINS` | `https://karrieapp.onrender.com` | Komma-lijst van toegestane app-adressen |
+| `LIMIT_PER_IP_HOUR` / `LIMIT_PER_IP_DAY` | 20 / 60 | Per IP-adres |
+| `LIMIT_DAILY_REQUESTS` | 300 | Alle gebruikers samen, per UTC-dag |
+| `DAILY_BUDGET_USD` | 1 | Server stopt met herkennen boven dit bedrag per dag |
+
+Krijgt de server van Render een ander adres dan `https://karrie-api.onrender.com`? Zet dat adres dan in `VITE_API_ORIGIN` van `karrieapp` en bouw de site opnieuw.
+
+**Gratis plan: slaapstand**
+
+De gratis web service slaapt na ongeveer 15 minuten zonder verkeer. De eerste herkenning daarna duurt tot ongeveer een minuut. Karrie wekt de server al zodra iemand op de cameraknop tikt, dus terwijl de foto gemaakt en bijgesneden wordt. Na 5 seconden wachten toont hij **Karrie wordt even wakker** en hij wacht tot 75 seconden. Wie dat niet wil, zet `karrie-api` op een betaald plan.
+
+**Privacy**
+
+- Foto's worden niet automatisch verstuurd. Alleen na **Herken product** gaat er één uitsnede naar de server.
+- De app verkleint de uitsnede eerst tot hoogstens 1024 pixels en maakt er een nieuwe JPEG van. Daardoor verdwijnen EXIF-gegevens zoals GPS-locatie en toestelnaam.
+- Het bijsnijdkader vraagt vooraf om alleen het product in beeld te brengen, zonder mensen. Ziet het model toch een gezicht of lichaam, dan toont Karrie geen resultaat en vraagt hij om bij te snijden. Die ene uitsnede is dan wel al bij OpenAI geweest: herkennen op het toestel zelf bestaat niet in gewone mobiele browsers. Een hand die het product vasthoudt is goed.
+- De server bewaart geen foto's en logt geen beelden, Base64 of IP-adressen. Het log bevat alleen tijd, grootte, status, model en tokengebruik.
+- OpenAI verwerkt de foto. Met `store: false` bewaart OpenAI de aanvraag niet voor later ophalen; OpenAI kan aanvragen wel tijdelijk bewaren voor misbruikcontrole volgens de [API-gegevensregels](https://platform.openai.com/docs/guides/your-data). De app zegt bij de knop dat de foto naar OpenAI gaat.
+- De bevestigde foto (512 pixels) blijft alleen op het toestel, in IndexedDB. Foto's die nergens meer gebruikt worden, worden bij het opstarten opgeruimd. Ze worden niet gedeeld met Open Food Facts of een andere catalogus.
+- **Gebruik foto** in het productvenster zet een foto bij een product zonder hem te versturen.
+
+**Wat Karrie wel en niet doet**
+
+- Een barcode die op de foto leesbaar is, wordt nooit zomaar overgenomen. Karrie biedt aan om hem bij Open Food Facts op te zoeken; pas dan telt hij als gecontroleerd.
+- Een product dat alleen via een foto is herkend, geeft in de winkel geen barcodebonus. De scanknop verschijnt alleen als er een gecontroleerde barcode is of het product bij een catalogusproduct hoort.
+- Herkent Karrie een product dat al op de lijst staat (zelfde catalogussoort), dan vraagt hij **Wil je deze foto gebruiken voor …?** Bij weinig zekerheid vraagt hij dat niet.
+- Merk of inhoud die het model alleen gokt, worden niet overgenomen. In het resultaat staat **gelezen op de verpakking** of **geschat**.
+
+**Limieten en misbruik**
+
+- De server accepteert alleen JPEG, PNG of WebP als data-URL, controleert de bestandskop en weigert aanvragen boven 2 MB (`413`).
+- Alleen aanvragen vanaf `ALLOWED_ORIGINS` worden geaccepteerd. Per IP-adres loopt er hoogstens één herkenning tegelijk.
+- De app staat per toestel 25 herkenningen per dag toe.
+- De tellers op de server staan in het geheugen. Ze beginnen opnieuw na een herstart of slaapstand, en per-IP-limieten zijn te omzeilen door een ander IP-adres. **Stel daarom ook een maandlimiet in bij OpenAI** (platform.openai.com → Settings → Limits). Dat is de harde grens.
+
+**Kosten (gemeten met `gpt-5.4-mini`, november 2026)**
+
+Prijs: $0,75 per miljoen invoertokens, $4,50 per miljoen uitvoertokens.
+
+| Foto | Invoer | Uitvoer | Kosten |
+|---|---|---|---|
+| Eén pot pindakaas, scherp | ~1.650 | 110–160 | ~$0,002 |
+| Wazige foto | ~1.650 | ~300 | ~$0,0026 |
+| Twee producten naast elkaar | ~1.960 | ~360 | ~$0,003 |
+
+Reken op ongeveer $0,002 tot $0,003 per foto: 100 foto's per maand kosten zo'n $0,25. Het dagbudget van $1 is genoeg voor ruim 300 foto's; de daglimiet van 300 aanvragen grijpt eerder in. Een herkenning duurt 2 tot 4 seconden als de server wakker is.
+
+**Checklist foto herkennen (op een echte telefoon)**
+
+- **Toevoegen**: tik op de camera naast de barcodeknop. De telefoon biedt camera of fotobibliotheek aan. Maak een foto van één product.
+- Schuif en zoom in het kader, kies **Vierkant** of **Staand** en tik op **Herken product**. Na 2 tot 4 seconden zie je **Herkend!** met naam, merk en afdeling.
+- Pas de naam aan en tik op **Toevoegen aan lijst**. Het product staat met jouw foto op de lijst.
+- Zet eerst **Pindakaas** uit de catalogus op de lijst en fotografeer een pot pindakaas. Karrie vraagt **Wil je deze foto gebruiken voor Pindakaas?** en maakt geen dubbele regel.
+- Fotografeer twee producten tegelijk of maak een wazige foto. Karrie zegt **Klopt dit?** of **Niet zeker** en laat je alles zelf invullen.
+- Fotografeer een product met iemands gezicht erbij. Karrie toont geen resultaat maar **Alleen het product graag**, met **Bijsnijden**.
+- Zet vliegtuigmodus aan en tik op **Herken product**. Je krijgt **Geen internet** en kunt het product zelf invullen.
+- **Controleren**: tik op een product → **Maak foto** → **Gebruik foto**. De foto staat erbij zonder dat er iets verstuurd is. **Naam, afdeling of tekening aanpassen** werkt ook voor fotoproducten.
+- Start het avontuur, zet vliegtuigmodus aan en ververs `/winkel`. De eigen foto's staan er nog.
+- Open de app na een kwartier niets doen. De eerste herkenning toont **Karrie wordt even wakker** en lukt daarna alsnog.
+- Getest op iPhone en Android? Noteer toestel, versie en of de camera direct of via de bibliotheek opende.
+
+**Bekende beperkingen**
+
+- Foto herkennen is niet getest op een echte iPhone of Android-telefoon, alleen in een desktopbrowser met echte productfoto's en echte OpenAI-aanroepen.
+- Het model leest kleine tekst soms net verkeerd (bijvoorbeeld "Choco Paste" voor "Choco Pasta"). Daarom bevestigt de ouder altijd.
+- Bij meerdere producten op één foto kiest Karrie het meest zichtbare product.
+- Hoe `X-Forwarded-For` er op Render precies uitziet, is niet gecontroleerd; de per-IP-limieten zijn daarom een extra rem, niet de hoofdbeveiliging.

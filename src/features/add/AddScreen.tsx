@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../../domain/categories";
 import { normalize } from "../../domain/matchProduct";
@@ -8,10 +8,11 @@ import { products } from "../../data/catalog";
 import { ProductArt } from "../../components/ProductArt";
 import { TopBar } from "../../components/TopBar";
 import { PressButton } from "../../components/ui/PressButton";
-import { ScanButton } from "../../components/ui/ScanButton";
+import { PhotoButton, ScanButton } from "../../components/ui/ScanButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { ScanFlow } from "../scanner/ScanFlow";
+import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { buzz } from "../../feedback/haptics";
 import { playPop } from "../../feedback/sound";
 import { badgeSpring, spring } from "../../motion/variants";
@@ -48,6 +49,7 @@ export function AddScreen() {
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [burst, setBurst] = useState<{ id: string; token: number } | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
 
   const count = adventure && adventure.phase !== "done" ? adventure.items.length : 0;
@@ -122,13 +124,14 @@ export function AddScreen() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Zoek brood, melk, appel…"
+              placeholder="Zoek brood, melk…"
               enterKeyHint="search"
               autoComplete="off"
               type="search"
             />
           </label>
           <ScanButton onClick={() => setScanOpen(true)} />
+          <PhotoButton onClick={() => photo.current?.open()} />
         </div>
         <div className="tabs" role="tablist" aria-label="Categorieën">
           {tabs.map((tab) => {
@@ -276,6 +279,15 @@ export function AddScreen() {
           buzz(8);
         }}
         onEdit={(itemId) => navigate("/controleren", { state: { editItem: itemId } })}
+      />
+      <PhotoFlow
+        ref={photo}
+        items={adventure && adventure.phase !== "done" ? adventure.items : []}
+        onDone={(message) => {
+          show(message);
+          playPop();
+          buzz(8);
+        }}
       />
       <Toast notice={notice} onDismiss={dismiss} />
     </main>

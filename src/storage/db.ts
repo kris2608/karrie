@@ -4,7 +4,7 @@ import type { Adventure, CategoryId, SavedList } from "../domain/types";
 import { defaultSettings, type Settings } from "../state/reducer";
 
 const DB_NAME = "karrie";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export type Persisted = {
   adventure: Adventure | null;
@@ -29,6 +29,7 @@ function database() {
     upgrade(db) {
       if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
       if (!db.objectStoreNames.contains("products")) db.createObjectStore("products");
+      if (!db.objectStoreNames.contains("photos")) db.createObjectStore("photos");
     },
     blocking(_current, _next, event) {
       // A newer Karrie in another tab needs to upgrade; let it.
@@ -58,6 +59,36 @@ export async function writeProductCache<T>(ean: string, value: T): Promise<void>
     await (await database()).put("products", value, ean);
   } catch {
     // A full or blocked database only costs a repeat lookup later.
+  }
+}
+
+export async function writePhoto(id: string, blob: Blob): Promise<void> {
+  await (await database()).put("photos", blob, id);
+}
+
+export async function readPhoto(id: string): Promise<Blob | undefined> {
+  try {
+    return (await (await database()).get("photos", id)) as Blob | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function photoKeys(): Promise<string[]> {
+  try {
+    return (await (await database()).getAllKeys("photos")).map(String);
+  } catch {
+    return [];
+  }
+}
+
+export async function deletePhotos(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  try {
+    const tx = (await database()).transaction("photos", "readwrite");
+    await Promise.all([...ids.map((id) => tx.store.delete(id)), tx.done]);
+  } catch {
+    // Left-over photos only cost space; the next start tries again.
   }
 }
 

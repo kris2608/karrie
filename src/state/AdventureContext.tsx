@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { setSoundEnabled } from "../feedback/sound";
 import { loadPersisted, savePersisted } from "../storage/db";
+import { preparePhotos } from "../storage/photos";
 import { Karrie } from "../components/mascot/Karrie";
 import { initialState, reducer, type Action, type AppState } from "./reducer";
 
@@ -17,7 +18,9 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancel = false;
     loadPersisted()
-      .then((data) => {
+      .then(async (data) => {
+        const photos = preparePhotos(data.adventure, data.saved).catch(() => undefined);
+        await Promise.race([photos, new Promise((resolve) => window.setTimeout(resolve, 1500))]);
         if (!cancel) dispatch({ type: "hydrate", data });
       })
       .finally(() => {

@@ -27,6 +27,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2}"],
         runtimeCaching: [
           {
@@ -43,6 +44,8 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  server: { proxy: { "/api": "http://localhost:8787" } },
+  preview: { proxy: { "/api": "http://localhost:8787" } },
   build: {
     rollupOptions: {
       output: {

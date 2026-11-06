@@ -14,7 +14,23 @@ export type Product = {
 
 export type ImageKind = "generic" | "photo";
 
-export type ItemSource = "catalog" | "manual" | "off";
+/** How the product itself was identified: catalog, typed by a parent, Open Food Facts, or OpenAI photo recognition. */
+export type ItemSource = "catalog" | "manual" | "off" | "vision";
+
+/** Where the shown photo came from, independent of how the product was identified. */
+export type ImageSource = "off" | "parent";
+
+export type Confidence = "high" | "medium" | "low";
+
+export type Recognition = {
+  genericName?: string;
+  variant?: string;
+  subcategory?: string;
+  claims?: string[];
+  nutriScoreSeen?: string;
+  confidence: Confidence;
+  inferred?: string[];
+};
 
 export type ScanResult = "verified" | "confirmed";
 
@@ -34,10 +50,14 @@ export type PackInfo = {
   brand?: string;
   packageSize?: string;
   imageUrl?: string;
+  /** Key of a parent photo stored on this device. */
+  photoId?: string;
   imageKind?: ImageKind;
+  imageSource?: ImageSource;
   source?: ItemSource;
   nutrition?: Nutrition;
   offAttribution?: boolean;
+  recognition?: Recognition;
 };
 
 export type ScannedProduct = {

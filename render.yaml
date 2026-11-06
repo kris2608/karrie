@@ -27,3 +27,38 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: VITE_API_ORIGIN
+        value: https://karrie-api.onrender.com
+
+  - type: web
+    runtime: node
+    name: karrie-api
+    plan: free
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_VISION_MODEL
+        value: gpt-5.4-mini
+      - key: OPENAI_IMAGE_DETAIL
+        value: auto
+      - key: OPENAI_REASONING_EFFORT
+        value: low
+      - key: ALLOWED_ORIGINS
+        value: https://karrieapp.onrender.com
+      - key: REQUIRE_ORIGIN
+        value: "true"
+      - key: LIMIT_PER_IP_HOUR
+        value: "20"
+      - key: LIMIT_PER_IP_DAY
+        value: "60"
+      - key: LIMIT_DAILY_REQUESTS
+        value: "300"
+      - key: DAILY_BUDGET_USD
+        value: "1"

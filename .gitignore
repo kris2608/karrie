@@ -5,3 +5,6 @@ dev-dist
 *.local
 .vite
 *.tsbuildinfo
+.env
+server/dist
+.testdata
