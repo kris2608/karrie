@@ -1,8 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { z } from "zod";
+import { ImageIdentitySchema, type ImageDiscovery } from "./images.js";
 import type { Limits } from "./limits.js";
 import type { RecognizeResult } from "./recognize.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
+
+export type ImageDeps = {
+  discovery: Pick<ImageDiscovery, "discover" | "cached" | "busy" | "provider">;
+  limits: Limits;
+  /** Dollars per paid search call (OpenAI web search or Brave); tokens are counted separately. */
+  searchCallUsd: number;
+  providerCallUsd: number;
+};
 
 export type AppDeps = {
   allowedOrigins: string[];
@@ -11,9 +21,12 @@ export type AppDeps = {
   model: string;
   limits: Limits;
   recognize: (dataUrl: string) => Promise<RecognizeResult>;
+  images?: ImageDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
 };
+
+const ROUTES = ["/api/products/recognize-photo", "/api/images/discover"];
 
 const STATUS_BY_CODE: Record<string, number> = {
   refused: 422,
@@ -99,10 +112,16 @@ export function createHandler(deps: AppDeps) {
     }
 
     if (url.pathname === "/api/health" && req.method === "GET") {
-      return send(200, { status: "ok", configured: deps.configured, model: deps.model, stats: deps.limits.stats() });
+      return send(200, {
+        status: "ok",
+        configured: deps.configured,
+        model: deps.model,
+        stats: deps.limits.stats(),
+        images: deps.images ? { provider: deps.images.discovery.provider, stats: deps.images.limits.stats() } : undefined,
+      });
     }
 
-    if (url.pathname !== "/api/products/recognize-photo") return send(404, { status: "error", code: "not-found" });
+    if (!ROUTES.includes(url.pathname)) return send(404, { status: "error", code: "not-found" });
     if (req.method !== "POST") return send(405, { status: "error", code: "method" });
     if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
     if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) return send(415, { status: "error", code: "unsupported-type" });
@@ -122,6 +141,8 @@ export function createHandler(deps: AppDeps) {
     } catch {
       return send(400, { status: "error", code: "bad-request" });
     }
+    if (url.pathname === "/api/images/discover") return discoverImages(body);
+
     const image = checkImage(body);
     if (!image.ok) return send(image.status, { status: "error", code: image.code });
     if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
@@ -143,5 +164,37 @@ export function createHandler(deps: AppDeps) {
     } finally {
       inFlight.delete(ip);
     }
+
+    /** Cached answers are free and skip the limits; new searches are rate limited, budgeted and capped in number. */
+    async function discoverImages(body: unknown) {
+      const images = deps.images;
+      if (!deps.configured || !images) return send(503, { status: "error", code: "misconfigured" });
+      const request = ImageRequestSchema.safeParse(body);
+      if (!request.success) return send(400, { status: "error", code: "bad-request" });
+      const { identity, refresh } = request.data;
+      entry.generic = identity.generic;
+
+      const hit = refresh ? null : images.discovery.cached(identity);
+      if (hit) {
+        entry.cached = true;
+        return send(200, { status: "ok", discovery: hit });
+      }
+      if (images.discovery.busy()) return send(503, { status: "error", code: "busy" });
+      const ip = clientIp(req);
+      const denial = images.limits.admit(ip);
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+
+      const callStarted = now();
+      const result = await images.discovery.discover(identity, { refresh });
+      const latencyMs = now() - callStarted;
+      const extraUsd = result.searchCalls * images.searchCallUsd + result.providerCalls * images.providerCallUsd;
+      images.limits.record({ ok: result.ok, latencyMs, usage: result.usage, extraUsd });
+      Object.assign(entry, { provider: images.discovery.provider, openaiMs: latencyMs, usage: result.usage, searchCalls: result.searchCalls, cached: result.ok ? result.cached : undefined });
+      if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
+      entry.found = result.discovery.status;
+      return send(200, { status: "ok", discovery: result.discovery, selectedData: result.selectedData });
+    }
   };
 }
+
+const ImageRequestSchema = z.object({ identity: ImageIdentitySchema, refresh: z.boolean().optional() }).strict();

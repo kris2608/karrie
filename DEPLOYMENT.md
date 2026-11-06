@@ -186,6 +186,46 @@ Bij een herkend voedingsproduct kijkt OpenAI of er binnen dezelfde soort een een
 - Voor de hele app: tandwiel op het beginscherm, of het menu in de winkel → **Bonusmissies**. Uitzetten tijdens een avontuur haalt de open missies weg.
 - Per product: het blok **Bonusmissie** in het productvenster.
 
+## Voorbeeldfoto's (automatisch zoeken)
+
+Karrie zoekt bij elk product op de lijst een echte foto, en ook bij de producten waar een bonusmissie naar wijst. Dat gebeurt op de achtergrond; het toevoegen wacht er nooit op. Alleen de productnaam (en bij een herkende verpakking merk, variant en inhoud) gaat naar de server, nooit een foto.
+
+**Waarom niet de beeldzoekfunctie van OpenAI.** Die is eerst los getest (`server/scripts/diagnose-image-search.mjs`) met de gedocumenteerde instellingen (`search_content_types: ["image","text"]`, `image_settings`, `include: ["web_search_call.results"]`, verplichte zoekaanroep) op vijf producten en twee modellen. Uitkomst: **0 van 10 aanvragen gaf een `image_result`**, zonder foutmelding, terwijl de server de instellingen wel terugmeldde. Elke aanvraag duurde 13 tot 20 seconden en kostte $0,03 tot $0,04. Daarom gebruikt Karrie de webzoekfunctie alleen om productpagina's te vinden. De server haalt de foto zelf van die pagina's: van Wikimedia Commons via de Commons-API (met licentie), van Unsplash en Pixabay, en anders de `og:image` van de pagina.
+
+**Hoe een foto gekozen wordt.** Elke foto wordt gedownload en gecontroleerd: alleen HTTPS, geen interne adressen (ook niet via een doorverwijzing), echte JPEG, PNG of WebP en hoogstens 4 MB. Daarna vergelijkt OpenAI-vision de foto's met het product: soort, merk, variant, inhoud, vooraanzicht, scherpte, het hele product zoals in de winkel (geen plakje, geen close-up), en bij een algemeen product geen merk in beeld. Een ander merk, een andere variant of inhoud, of een persoon in beeld valt af. Een vergelijkbaar product wordt nooit gebruikt als het exacte product.
+
+**Gebruiksrechten.**
+- *Open licentie* (CC0, publiek domein, CC BY / BY-SA, Unsplash, Pixabay): de foto wordt automatisch gebruikt, met naam van de maker en licentie in het productvenster. De server onthoudt hem 30 dagen voor alle gebruikers.
+- *Rechten onbekend* (winkels en merksites): past de foto precies, dan gebruikt Karrie hem automatisch, maar **alleen op dit toestel** als persoonlijk voorbeeld, met een link naar de bron. De server bewaart zo'n foto niet en geeft hem nooit aan een ander gezin. Dit is een bewuste keuze van de eigenaar van de app.
+- Twijfelt de controle, dan staan de gevonden foto's in het productvenster en kiest de ouder er een, of niet.
+
+**Wat het kind ziet.** De keuze van de ouder gaat voor. Anders: voorbeeldfoto, dan de eigen foto, dan de Karrie-tekening. In het productvenster (alleen voor ouders) staat **Je kind ziet** met *Voorbeeldfoto*, *Eigen foto* en *Tekening*, de gevonden foto's om uit te kiezen, de bron, **Opnieuw zoeken** en **Geen voorbeeldfoto**. Het hele zoeken staat aan of uit bij **Voor ouders → Voorbeeldfoto's**.
+
+**Bewaren en opnieuw proberen.** Antwoorden staan in IndexedDB op het toestel; de gekozen foto wordt er als bestand bij bewaard, zodat hij ook offline werkt. Een product met een antwoord wordt niet opnieuw gezocht. Niets gevonden: na 14 dagen opnieuw. Fout: na 2, 8, 32 minuten enzovoort (hoogstens een dag). Limiet bereikt: na 3 uur. Offline: zodra er weer verbinding is. Er lopen hoogstens twee zoekopdrachten tegelijk.
+
+**Gemeten op 20 Nederlandse producten** (15 merkproducten, 5 algemene; `server/scripts/validate-image-search.mjs`, november 2026, provider OpenAI-webzoeken):
+
+| Meting | Uitkomst |
+|---|---|
+| Met een passende foto (na controle) | 15 van 20 (75%) |
+| Met een open licentie | 4 van 20 (20%) |
+| Automatisch gebruikt | 13 van 20 (65%): 2 met open licentie, 11 als persoonlijk voorbeeld |
+| Daarvan goed, met het oog nagekeken | 12 van 13; Almhof yoghurt was het juiste product maar een uitsnede van de verpakking |
+| Aan de ouder voorgelegd | 2 (Calvé, eieren met merk in beeld) |
+| Mediaan zoektijd | 6,9 s |
+| Kosten | $0,017 per product, $0,026 per automatisch gebruikte foto |
+| Opnieuw opgevraagd, uit het geheugen van de server | 9 van 9 deelbare antwoorden, zonder kosten; 0 persoonlijke foto's gedeeld |
+
+Niets gevonden: Unox rookworst, Lay's paprika, Verkade chocolade, Heinz ketchup en appel. De uitkomst verschilt per keer: in een eerdere ronde vonden Lay's en Heinz wel iets en Almhof niet. Oorzaken bij het ophalen: pagina niet bereikbaar (43 keer), geen foto op de pagina (23 keer), geen afbeelding (4 keer). Merkfoto's komen bijna altijd van winkels (Jumbo, Hoogvliet, ingredientenlijst.nl, mijn-boodschappen.nl), dus met onbekende rechten.
+
+Een eerdere ronde liet zien waarom de controle op "het hele product" nodig is: zonder die controle koos Karrie een plakje komkommer, een gepelde banaan en een eierdoos met merk.
+
+**Andere zoekdiensten** (niet actief). De code heeft een adapter voor **Brave Image Search** (`BRAVE_SEARCH_API_KEY`): $5 per 1.000 zoekopdrachten met vooraf betaald tegoed; resultaten bewaren mag alleen met een abonnement met opslagrechten. **SerpApi** (Google Images): 250 zoekopdrachten per maand gratis, $25 per maand voor 1.000. Geen van beide is aangezet.
+
+## Mijn producten
+
+Een product dat van een foto is herkend en een merk heeft, of dat niet in de catalogus staat, onthoudt Karrie op dit toestel als **Mijn producten**: naam, merk, afdeling, foto en eventuele bonusmissie. In **Toevoegen** staat het met een hartje onder zijn eigen afdeling, onder **Alles** en in de zoekresultaten. Tikken zet het op de lijst (of telt er één bij). Lang drukken haalt het van de lijst en vergeet het, met **Ongedaan maken**. Een herkende AH Terra pindakaas telt op zijn eigen tegel, niet ook op de tegel Pindakaas. Karrie onthoudt hoogstens 120 producten.
+
 ## Kosten (gemeten met `gpt-5.4-mini`, november 2026)
 
 Prijs: $0,75 per miljoen invoertokens, $4,50 per miljoen uitvoertokens. Het schema met de bonusmissie maakt elke aanvraag wat groter dan voorheen.
@@ -194,11 +234,14 @@ Gemeten op echte productfoto's (pindakaas voor- en achterkant, chocopasta, frisd
 
 Reken op ongeveer $0,004 per foto: 100 foto's per maand kosten zo'n $0,40. Het dagbudget van $1 is genoeg voor ongeveer 250 foto's, dus dat grijpt nu eerder in dan de daglimiet van 300 aanvragen. Een herkenning duurt ongeveer 3 seconden als de server wakker is.
 
+**Voorbeeldfoto's** kosten per nieuw product ongeveer $0,017: $0,01 voor de webzoekaanroep plus zo'n 9.000 invoertokens (zoekresultaten en kleine versies van de foto's). Een product dat al bekend is, kost niets. Een gezin dat 50 verschillende producten gebruikt, kost dus eenmalig ongeveer $0,85. Een open-licentiefoto die de server al kent, is voor andere gezinnen gratis. Voorbeeldfoto's hebben een eigen dagbudget (`IMAGE_DAILY_BUDGET_USD`, standaard $1, ongeveer 60 nieuwe producten per dag). `/api/health` toont onder `images` het aantal zoekopdrachten en de kosten van vandaag.
+
 ## Limieten en misbruik
 
 - De server accepteert alleen JPEG, PNG of WebP als data-URL, controleert de bestandskop en weigert aanvragen boven 2 MB (`413`).
 - Alleen aanvragen vanaf `ALLOWED_ORIGINS` worden geaccepteerd. Per IP-adres loopt er hoogstens één herkenning tegelijk.
 - De app staat per toestel 25 herkenningen per dag toe.
+- Voorbeeldfoto's: per toestel 40 zoekopdrachten per dag; op de server per IP 30 per uur en 80 per dag (`IMAGE_LIMIT_PER_IP_HOUR`, `IMAGE_LIMIT_PER_IP_DAY`), 200 per dag in totaal (`IMAGE_LIMIT_DAILY_REQUESTS`) en hoogstens 3 tegelijk (`IMAGE_MAX_CONCURRENT`, daarboven `503`). Antwoorden uit het geheugen van de server tellen niet mee. Optioneel: `OPENAI_IMAGE_SEARCH_MODEL` (standaard het herkenningsmodel) en `BRAVE_SEARCH_API_KEY` (zet Brave aan in plaats van OpenAI-webzoeken).
 - De tellers op de server staan in het geheugen. Ze beginnen opnieuw na een herstart of slaapstand, en per-IP-limieten zijn te omzeilen door een ander IP-adres. **Stel daarom ook een maandlimiet in bij OpenAI** (platform.openai.com → Settings → Limits). Dat is de harde grens.
 
 ## Checklist camera en bonusmissies (op een echte telefoon)
@@ -207,7 +250,9 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 
 - **Toevoegen**: tik op de camera naast het zoekveld. De telefoon vraagt één keer om camera-toegang. Het camerascherm toont live beeld van de achtercamera, niet de galerij.
 - Richt op een pot pindakaas en tik op de ontspanknop. Na ongeveer 3 seconden zie je **Herkend!** met naam, merk en afdeling. Er is geen bijsnijdstap.
-- Tik op **Toevoegen aan lijst**. Het product staat met jouw foto op de lijst, niet met een tekening.
+- Tik op **Toevoegen aan lijst**. Het product staat met jouw foto op de lijst, niet met een tekening. Binnen ongeveer 10 seconden kan die foto vervangen worden door een voorbeeldfoto; in het productvenster zie je welke en waarvandaan.
+- Ga terug naar **Toevoegen**. Het herkende product staat met een hartje onder zijn afdeling en vind je via het zoekveld. Lang drukken vergeet het; **Ongedaan maken** zet het terug.
+- Zet vliegtuigmodus aan en open de lijst opnieuw. De voorbeeldfoto's van open bronnen en van dit toestel staan er nog.
 - Fotografeer een los brood. Het resultaat zegt **Karrie gebruikt de tekening van brood** en de lijst toont de tekening.
 - Zet eerst **Pindakaas** uit de catalogus op de lijst en fotografeer een pot pindakaas. Karrie vraagt **Wil je deze foto gebruiken voor Pindakaas?** en maakt geen dubbele regel.
 - Fotografeer de achterkant met de ingrediënten (suiker, zout). Het resultaat toont **Bonusmissie: …** met **Op het etiket gezien** en **Staat aan**.
@@ -229,3 +274,8 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - Of een product "algemeen" of "specifiek" is, beslist het model. Twijfelt de ouder, dan kan **Gebruik Karrie-tekening** of **Maak foto** in het productvenster het plaatje alsnog wisselen.
 - De tekst van een missie komt van het model en kan soms wat stroef Nederlands zijn ("zonder toegevoegd suiker").
 - Hoe `X-Forwarded-For` er op Render precies uitziet, is niet gecontroleerd; de per-IP-limieten zijn daarom een extra rem, niet de hoofdbeveiliging.
+- OpenAI levert bij de webzoekfunctie geen `image_result` (zie Voorbeeldfoto's). Als dat verandert, leest de code ze automatisch als eerste.
+- Voorbeeldfoto's van merkproducten komen bijna altijd van winkelsites met onbekende rechten. Ze worden alleen op het eigen toestel bewaard en getoond; of dat voor jouw gebruik mag, is aan de eigenaar van de app.
+- De zoekresultaten verschillen per keer: hetzelfde product vond de ene keer wel en de andere keer geen foto. **Opnieuw zoeken** helpt soms.
+- Het geheugen van de server met open-licentiefoto's is leeg na een herstart of slaapstand; dan wordt opnieuw (betaald) gezocht.
+- De server controleert adressen op interne IP-nummers, maar zoekt de DNS-naam niet zelf op. Een domein dat naar een intern adres wijst, wordt dus niet herkend; op Render is er geen intern netwerk om te bereiken.

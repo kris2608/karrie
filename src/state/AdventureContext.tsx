@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useReducer, useState, ty
 import { setSoundEnabled } from "../feedback/sound";
 import { loadPersisted, savePersisted } from "../storage/db";
 import { preparePhotos } from "../storage/photos";
+import { references } from "../storage/references";
+import { wantedReferences } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
 import { initialState, reducer, type Action, type AppState } from "./reducer";
 
@@ -17,9 +19,10 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancel = false;
-    loadPersisted()
-      .then(async (data) => {
-        const photos = preparePhotos(data.adventure, data.saved).catch(() => undefined);
+    Promise.all([loadPersisted(), references.hydrate()])
+      .then(async ([data]) => {
+        const minePhotos = data.mine.flatMap((entry) => (entry.photoId ? [entry.photoId] : []));
+        const photos = preparePhotos(data.adventure, data.saved, [...references.photoIds(), ...minePhotos]).catch(() => undefined);
         await Promise.race([photos, new Promise((resolve) => window.setTimeout(resolve, 1500))]);
         if (!cancel) dispatch({ type: "hydrate", data });
       })
@@ -39,6 +42,12 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSoundEnabled(state.settings.soundEnabled);
   }, [state.settings.soundEnabled]);
+
+  const wanted = useMemo(() => (ready && state.settings.referenceImages ? wantedReferences(state.adventure) : []), [ready, state.adventure, state.settings.referenceImages]);
+  useEffect(() => {
+    references.setEnabled(state.settings.referenceImages);
+    for (const identity of wanted) references.request(identity);
+  }, [wanted, state.settings.referenceImages]);
 
   const value = useMemo(() => ({ ...state, dispatch }), [state]);
   if (!ready) {

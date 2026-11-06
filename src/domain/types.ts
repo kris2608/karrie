@@ -14,6 +14,9 @@ export type Product = {
 
 export type ImageKind = "generic" | "photo";
 
+/** The parent's choice of picture; undefined lets a found reference picture win over the photo, then the drawing. */
+export type ImageChoice = "reference" | "photo" | "drawing";
+
 /** How the product itself was identified. "off" only appears on lists saved before barcode scanning was removed. */
 export type ItemSource = "catalog" | "manual" | "off" | "vision";
 
@@ -81,6 +84,7 @@ export type PackInfo = {
   photoId?: string;
   imageKind?: ImageKind;
   imageSource?: ImageSource;
+  imageChoice?: ImageChoice;
   source?: ItemSource;
   nutrition?: Nutrition;
   offAttribution?: boolean;

@@ -6,6 +6,7 @@ import { ItemArt } from "../../components/ItemArt";
 import { HomeScene } from "../../components/scenery/HomeScene";
 import { StickerBadge } from "../../components/StickerBadge";
 import { DiscoverySwitch } from "../../components/ui/DiscoverySwitch";
+import { ReferenceSwitch } from "../../components/ui/ReferenceSwitch";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
@@ -158,6 +159,7 @@ export function HomeScreen() {
         <h2>Voor ouders</h2>
         <SoundSwitch />
         <DiscoverySwitch />
+        <ReferenceSwitch />
         <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome.</p>
         <PressButton variant="secondary" wide onClick={() => setParentOpen(false)}>
           Klaar

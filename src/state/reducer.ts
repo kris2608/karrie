@@ -14,7 +14,8 @@ import {
 import { declineKey, pickMissions } from "../domain/discovery";
 import { SCORING } from "../domain/scoring";
 import { nextSticker } from "../domain/stickers";
-import type { Adventure, AdventureItem, CategoryId, MissionState, PackInfo, Product, SavedList } from "../domain/types";
+import { mineKey, remember as rememberMine } from "../domain/mine";
+import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
 import { productById, products } from "../data/catalog";
 import {
   createAdventure,
@@ -32,9 +33,11 @@ import {
 export type Settings = {
   soundEnabled: boolean;
   smartDiscovery: boolean;
+  /** Look up reference pictures for products on the list; sends only product names, never photos. */
+  referenceImages: boolean;
 };
 
-export const defaultSettings: Settings = { soundEnabled: false, smartDiscovery: true };
+export const defaultSettings: Settings = { soundEnabled: false, smartDiscovery: true, referenceImages: true };
 
 export type AppState = {
   adventure: Adventure | null;
@@ -44,6 +47,8 @@ export type AppState = {
   settings: Settings;
   /** declineKey()s of suggestions a parent turned down. */
   declined: string[];
+  /** Mijn producten, newest first. */
+  mine: SavedItem[];
 };
 
 export const initialState: AppState = {
@@ -53,12 +58,18 @@ export const initialState: AppState = {
   categoryOrder: [...DEFAULT_CATEGORY_ORDER],
   settings: { ...defaultSettings },
   declined: [],
+  mine: [],
 };
 
 export type Action =
   | { type: "hydrate"; data: Partial<AppState> }
   | { type: "set-sound"; enabled: boolean }
   | { type: "set-discovery"; enabled: boolean }
+  | { type: "set-reference-images"; enabled: boolean }
+  | { type: "set-image-choice"; itemId: string; choice: ImageChoice | undefined }
+  | { type: "add-mine"; key: string }
+  | { type: "forget-mine"; key: string }
+  | { type: "restore-mine"; entry: SavedItem; index: number }
   | { type: "set-mission"; itemId: string; enabled: boolean }
   | { type: "mission-accept" }
   | { type: "mission-skip" }
@@ -201,7 +212,24 @@ export function reducer(state: AppState, action: Action): AppState {
         categoryOrder: action.data.categoryOrder?.length ? action.data.categoryOrder : [...DEFAULT_CATEGORY_ORDER],
         settings: { ...defaultSettings, ...action.data.settings },
         declined: Array.isArray(action.data.declined) ? action.data.declined : [],
+        mine: Array.isArray(action.data.mine) ? action.data.mine : [],
       };
+    }
+    case "add-mine": {
+      const entry = state.mine.find((saved) => mineKey(saved) === action.key);
+      if (!entry) return state;
+      const adventure = ensureDraft(state);
+      const existing = adventure.items.find((item) => item.status !== "found" && mineKey(item) === action.key);
+      const items = existing
+        ? adventure.items.map((item) => (item === existing ? { ...item, quantity: Math.min(24, item.quantity + 1) } : item))
+        : [...adventure.items, itemFromSaved(entry)];
+      return { ...state, adventure: touch(adventure, { items }) };
+    }
+    case "forget-mine":
+      return { ...state, mine: state.mine.filter((entry) => mineKey(entry) !== action.key) };
+    case "restore-mine": {
+      const mine = state.mine.filter((entry) => mineKey(entry) !== mineKey(action.entry));
+      return { ...state, mine: [...mine.slice(0, action.index), action.entry, ...mine.slice(action.index)] };
     }
     case "set-sound":
       return { ...state, settings: { ...state.settings, soundEnabled: action.enabled } };
@@ -211,6 +239,13 @@ export function reducer(state: AppState, action: Action): AppState {
       const items = state.adventure.items.map((item) => (item.mission && item.mission.status !== "done" ? { ...item, mission: undefined } : item));
       return { ...state, settings, adventure: touch(state.adventure, { items }) };
     }
+    case "set-reference-images":
+      return { ...state, settings: { ...state.settings, referenceImages: action.enabled } };
+    case "set-image-choice":
+      return updateItem(state, action.itemId, (item) => {
+        const { imageChoice: _previous, ...rest } = item;
+        return action.choice ? { ...rest, imageChoice: action.choice } : rest;
+      });
     case "set-mission": {
       const item = state.adventure?.items.find((entry) => entry.id === action.itemId);
       if (!item) return state;
@@ -319,16 +354,19 @@ export function reducer(state: AppState, action: Action): AppState {
           ? withParentPhoto({ source: "manual" as const }, action.photoId)
           : { source: "manual" };
       const item: AdventureItem = { id: crypto.randomUUID(), ...base, quantity: 1, status: "pending", ...pack };
-      return { ...state, adventure: touch(adventure, { items: [...adventure.items, item] }) };
+      return { ...state, mine: rememberMine(state.mine, item), adventure: touch(adventure, { items: [...adventure.items, item] }) };
     }
     case "set-photo":
       return updateItem(state, action.itemId, (item) => withParentPhoto(item, action.photoId));
-    case "apply-recognition":
-      return updateItem(state, action.itemId, (item) => {
+    case "apply-recognition": {
+      const next = updateItem(state, action.itemId, (item) => {
         if (item.ean) return action.photoId ? withParentPhoto(item, action.photoId) : item;
         const keep = action.photoId ? {} : packOf({ photoId: item.photoId, imageUrl: item.imageUrl, imageKind: item.imageKind, imageSource: item.imageSource });
         return { ...stripPack(item), ...packFromVision(action.pack, action.photoId), ...keep };
       });
+      const updated = next.adventure?.items.find((item) => item.id === action.itemId);
+      return updated ? { ...next, mine: rememberMine(next.mine, updated) } : next;
+    }
     case "edit-item":
       return updateItem(state, action.itemId, (item) => ({
         ...item,

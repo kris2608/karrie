@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Karrie } from "../../components/mascot/Karrie";
 import { ItemArt } from "../../components/ItemArt";
-import { ProductArt } from "../../components/ProductArt";
 import { ShopScene } from "../../components/scenery/ShopScene";
 import { DiscoverySwitch } from "../../components/ui/DiscoverySwitch";
 import { PressButton } from "../../components/ui/PressButton";
@@ -208,7 +207,7 @@ export function ShopScreen() {
               animate={{ scale: 1, opacity: 1, transition: spring }}
               exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
             >
-              <ProductArt id={missionTarget.id} className="mission-pill-art" />
+              <ItemArt item={{ icon: missionTarget.id, name: missionTarget.name }} className="mission-pill-art" />
               <span>{searching.alternative?.childPrompt ?? `Zoek ${missionTarget.name.toLowerCase()}`}</span>
               <span className="mission-pill-stars" aria-label={`${SCORING.discoveryBonus} extra sterren`}>
                 <StarIcon />+{SCORING.discoveryBonus}

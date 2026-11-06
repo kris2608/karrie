@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../../domain/categories";
 import { normalize } from "../../domain/matchProduct";
-import type { AdventureItem, CategoryId, Product } from "../../domain/types";
+import { matchesMine, mineKey } from "../../domain/mine";
+import type { AdventureItem, CategoryId, Product, SavedItem } from "../../domain/types";
 import { productById, products } from "../../data/catalog";
 import { hasPhoto, ItemArt } from "../../components/ItemArt";
 import { ProductArt } from "../../components/ProductArt";
@@ -46,17 +47,24 @@ type GridTileProps = {
   pop: { token: number } | null;
   onAdd: () => void;
   onRemove: () => void;
+  /** Mijn producten can always be long-pressed: that also forgets them. */
+  mine?: boolean;
 };
 
-function GridTile({ name, category, art, quantity, pop, onAdd, onRemove }: GridTileProps) {
-  const { pressing, handlers } = useLongPress(onRemove, quantity === 0);
-  const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : ""].filter(Boolean).join(" ");
+function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, mine = false }: GridTileProps) {
+  const { pressing, handlers } = useLongPress(onRemove, quantity === 0 && !mine);
+  const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : "", mine ? "is-mine" : ""].filter(Boolean).join(" ");
+  const label = mine
+    ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}. Lang drukken om te vergeten`
+    : quantity
+      ? `${name}, ${quantity} op de lijst. Lang drukken om te verwijderen`
+      : name;
   return (
     <motion.button
       type="button"
       className={classes}
       style={{ ["--blob" as string]: TINT[category] }}
-      aria-label={quantity ? `${name}, ${quantity} op de lijst. Lang drukken om te verwijderen` : name}
+      aria-label={label}
       data-testid="product-card"
       whileTap={{ scale: 0.94 }}
       transition={{ duration: 0.09 }}
@@ -73,6 +81,13 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove }: GridT
         {art}
       </motion.span>
       <span className="card-name">{name}</span>
+      {mine && (
+        <span className="card-mine" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="currentColor" />
+          </svg>
+        </span>
+      )}
       <AnimatePresence>
         {quantity > 0 && (
           <motion.span key="badge" className="card-badge" variants={badgeSpring} initial="hidden" animate="shown" exit="gone">
@@ -105,7 +120,7 @@ function matches(product: Product, needle: string) {
 }
 
 export function AddScreen() {
-  const { adventure, dispatch } = useAdventure();
+  const { adventure, mine, dispatch } = useAdventure();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryId | "all">("produce");
@@ -117,26 +132,32 @@ export function AddScreen() {
   const { notice, show, dismiss } = useNotice();
 
   const count = adventure && adventure.phase !== "done" ? adventure.items.length : 0;
+  const mineKeys = useMemo(() => new Set(mine.map(mineKey)), [mine]);
+  /** A remembered product counts on its own tile, not on the catalog tile of the same type. */
+  const tileOf = (item: AdventureItem) => (mineKeys.has(mineKey(item)) ? mineKey(item) : item.productId);
   const onList = useMemo(() => {
     const entries = new Map<string, OnList>();
     if (!adventure || adventure.phase === "done") return entries;
     for (const item of adventure.items) {
       if (item.status === "found") continue;
-      const entry = entries.get(item.productId);
-      entries.set(item.productId, entry ? { item: hasPhoto(entry.item) ? entry.item : item, quantity: entry.quantity + item.quantity } : { item, quantity: item.quantity });
+      const tile = mineKeys.has(mineKey(item)) ? mineKey(item) : item.productId;
+      const entry = entries.get(tile);
+      entries.set(tile, entry ? { item: hasPhoto(entry.item) ? entry.item : item, quantity: entry.quantity + item.quantity } : { item, quantity: item.quantity });
     }
     return entries;
-  }, [adventure]);
+  }, [adventure, mineKeys]);
 
   const needle = normalize(query);
   const activeTab = needle ? null : category;
+  const inTab = (entryCategory: CategoryId) => Boolean(needle) || category === "all" || entryCategory === category;
   const visible = useMemo(
     () => products.filter((product) => matches(product, needle) && (needle || category === "all" || product.category === category)),
     [category, needle],
   );
-  const extras = [...onList.values()].filter(
-    ({ item }) => !productById(item.productId) && (needle ? normalize(item.name).includes(needle) : category === "all" || item.category === category),
-  );
+  const mineVisible = mine.filter((entry) => matchesMine(entry, needle) && inTab(entry.category));
+  const extras = [...onList.entries()]
+    .filter(([tile, { item }]) => !productById(tile) && !mineKeys.has(tile) && (needle ? normalize(item.name).includes(needle) : inTab(item.category)))
+    .map(([, entry]) => entry);
 
   function addMore(item: AdventureItem) {
     dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 });
@@ -145,15 +166,43 @@ export function AddScreen() {
     buzz(8);
   }
 
-  function removeProduct(productId: string) {
-    if (!adventure) return;
-    const removed = adventure.items.flatMap((item, index) => (item.productId === productId && item.status !== "found" ? [{ item, index }] : []));
-    if (!removed.length) return;
+  function takeOff(tile: string) {
+    if (!adventure || adventure.phase === "done") return [];
+    const removed = adventure.items.flatMap((item, index) => (tileOf(item) === tile && item.status !== "found" ? [{ item, index }] : []));
     for (const { item } of removed) dispatch({ type: "remove-item", itemId: item.id });
+    return removed;
+  }
+
+  function removeProduct(tile: string) {
+    const removed = takeOff(tile);
+    if (!removed.length) return;
     show(`${removed[0].item.name} verwijderd`, {
       label: "Ongedaan maken",
       run: () => removed.forEach(({ item, index }) => dispatch({ type: "insert-item", item, index })),
     });
+  }
+
+  function forgetMine(entry: SavedItem) {
+    const key = mineKey(entry);
+    const index = mine.findIndex((saved) => mineKey(saved) === key);
+    const removed = takeOff(key);
+    dispatch({ type: "forget-mine", key });
+    buzz(12);
+    show(`${entry.name} vergeten`, {
+      label: "Ongedaan maken",
+      run: () => {
+        dispatch({ type: "restore-mine", entry, index });
+        removed.forEach(({ item, index: at }) => dispatch({ type: "insert-item", item, index: at }));
+      },
+    });
+  }
+
+  function addMine(entry: SavedItem) {
+    const key = mineKey(entry);
+    dispatch({ type: "add-mine", key });
+    setBurst((current) => ({ id: key, token: (current?.token ?? 0) + 1 }));
+    playPop();
+    buzz(8);
   }
 
   useEffect(() => {
@@ -243,6 +292,23 @@ export function AddScreen() {
       </div>
 
       <div className="product-grid">
+        {mineVisible.map((entry) => {
+          const key = mineKey(entry);
+          const listed = onList.get(key);
+          return (
+            <GridTile
+              key={key}
+              name={entry.name}
+              category={entry.category}
+              art={<ItemArt item={listed ? listed.item : entry} />}
+              quantity={listed?.quantity ?? 0}
+              pop={burst?.id === key ? burst : null}
+              onAdd={() => addMine(entry)}
+              onRemove={() => forgetMine(entry)}
+              mine
+            />
+          );
+        })}
         {extras.map((entry) => (
           <GridTile
             key={entry.item.id}
@@ -252,7 +318,7 @@ export function AddScreen() {
             quantity={entry.quantity}
             pop={burst?.id === entry.item.productId ? burst : null}
             onAdd={() => addMore(entry.item)}
-            onRemove={() => removeProduct(entry.item.productId)}
+            onRemove={() => removeProduct(tileOf(entry.item))}
           />
         ))}
         {visible.map((product) => {
@@ -262,7 +328,7 @@ export function AddScreen() {
               key={product.id}
               name={product.name}
               category={product.category}
-              art={entry ? <ItemArt item={entry.item} /> : <ProductArt id={product.id} />}
+              art={<ItemArt item={entry ? entry.item : { icon: product.id, name: product.name }} />}
               quantity={entry?.quantity ?? 0}
               pop={burst?.id === product.id ? burst : null}
               onAdd={() => addProduct(product)}
@@ -271,8 +337,9 @@ export function AddScreen() {
           );
         })}
       </div>
-      {visible.length === 0 && extras.length === 0 && <p className="empty">Niets gevonden. Probeer een ander woord.</p>}
+      {visible.length === 0 && extras.length === 0 && mineVisible.length === 0 && <p className="empty">Niets gevonden. Probeer een ander woord.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
+      {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje zijn eerder herkend. Lang drukken vergeet ze.</p>}
 
       <div className="dock dock-fixed">
         <PressButton variant="quiet" data-testid="paste" onClick={() => setPasteOpen(true)}>

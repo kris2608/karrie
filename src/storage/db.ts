@@ -1,6 +1,6 @@
 import { openDB } from "idb";
 import { DEFAULT_CATEGORY_ORDER } from "../domain/categories";
-import type { Adventure, CategoryId, SavedList } from "../domain/types";
+import type { Adventure, CategoryId, SavedItem, SavedList } from "../domain/types";
 import { defaultSettings, type Settings } from "../state/reducer";
 
 const DB_NAME = "karrie";
@@ -13,6 +13,7 @@ export type Persisted = {
   categoryOrder: CategoryId[];
   settings: Settings;
   declined: string[];
+  mine: SavedItem[];
 };
 
 export const emptyPersisted = (): Persisted => ({
@@ -22,6 +23,7 @@ export const emptyPersisted = (): Persisted => ({
   categoryOrder: [...DEFAULT_CATEGORY_ORDER],
   settings: { ...defaultSettings },
   declined: [],
+  mine: [],
 });
 
 let connection: ReturnType<typeof openDB> | null = null;
@@ -78,6 +80,18 @@ export async function deletePhotos(ids: string[]): Promise<void> {
   }
 }
 
+export async function readKv<T>(key: string): Promise<T | undefined> {
+  try {
+    return (await (await database()).get("kv", key)) as T | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function writeKv(key: string, value: unknown): Promise<void> {
+  await (await database()).put("kv", value, key);
+}
+
 export async function loadPersisted(): Promise<Persisted> {
   try {
     const db = await database();
@@ -87,6 +101,7 @@ export async function loadPersisted(): Promise<Persisted> {
     const categoryOrder = (await db.get("kv", "categoryOrder")) as CategoryId[] | undefined;
     const settings = (await db.get("kv", "settings")) as Partial<Settings> | undefined;
     const discovery = (await db.get("kv", "discovery")) as { declined?: string[] } | undefined;
+    const mine = (await db.get("kv", "mine")) as SavedItem[] | undefined;
     return {
       adventure: adventure ?? null,
       saved: saved ?? [],
@@ -94,6 +109,7 @@ export async function loadPersisted(): Promise<Persisted> {
       categoryOrder: categoryOrder?.length ? categoryOrder : [...DEFAULT_CATEGORY_ORDER],
       settings: { ...defaultSettings, ...settings },
       declined: Array.isArray(discovery?.declined) ? discovery.declined : [],
+      mine: Array.isArray(mine) ? mine : [],
     };
   } catch {
     return emptyPersisted();
@@ -110,6 +126,7 @@ export async function savePersisted(data: Persisted): Promise<void> {
     tx.store.put(data.categoryOrder, "categoryOrder"),
     tx.store.put(data.settings, "settings"),
     tx.store.put({ declined: data.declined }, "discovery"),
+    tx.store.put(data.mine, "mine"),
     tx.done,
   ]);
 }

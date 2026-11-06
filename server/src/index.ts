@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import OpenAI from "openai";
 import { createHandler } from "./app.js";
+import { createImageDiscovery } from "./images.js";
 import { createLimits } from "./limits.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
 
@@ -39,6 +40,24 @@ const limits = createLimits({
   outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
 });
 
+const imageLimits = createLimits({
+  perIpPerHour: number("IMAGE_LIMIT_PER_IP_HOUR", 30),
+  perIpPerDay: number("IMAGE_LIMIT_PER_IP_DAY", 80),
+  dailyRequests: number("IMAGE_LIMIT_DAILY_REQUESTS", 200),
+  dailyBudgetUsd: number("IMAGE_DAILY_BUDGET_USD", 1),
+  inputUsdPerMTok: number("PRICE_INPUT_PER_MTOK", 0.75),
+  cachedInputUsdPerMTok: number("PRICE_CACHED_INPUT_PER_MTOK", 0.075),
+  outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
+});
+
+const discovery = client
+  ? createImageDiscovery(client, {
+      model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model,
+      maxConcurrent: number("IMAGE_MAX_CONCURRENT", 3),
+      braveKey: env.BRAVE_SEARCH_API_KEY || undefined,
+    })
+  : null;
+
 const handler = createHandler({
   allowedOrigins: (env.ALLOWED_ORIGINS ?? "https://karrieapp.onrender.com,http://localhost:5173,http://localhost:4173")
     .split(",")
@@ -49,6 +68,14 @@ const handler = createHandler({
   model: config.model,
   limits,
   recognize: (dataUrl) => recognizePhoto(client!, config, dataUrl),
+  images: discovery
+    ? {
+        discovery,
+        limits: imageLimits,
+        searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01),
+        providerCallUsd: number("PRICE_BRAVE_CALL", 0.005),
+      }
+    : undefined,
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 
@@ -59,5 +86,5 @@ createServer((req, res) => {
     res.end(JSON.stringify({ status: "error", code: "server" }));
   });
 }).listen(port, () => {
-  console.log(JSON.stringify({ event: "listening", port, model: config.model, configured: Boolean(client) }));
+  console.log(JSON.stringify({ event: "listening", port, model: config.model, configured: Boolean(client), imageProvider: discovery?.provider }));
 });

@@ -60,9 +60,10 @@ export function referencedPhotos(adventure: Adventure | null, saved: SavedList[]
 }
 
 /** Decodes every photo still in use and deletes the rest. Runs once at start so undo keeps working. */
-export async function preparePhotos(adventure: Adventure | null, saved: SavedList[]): Promise<void> {
+export async function preparePhotos(adventure: Adventure | null, saved: SavedList[], alsoKeep: string[] = []): Promise<void> {
   const keep = referencedPhotos(adventure, saved);
   await Promise.all([...keep].map(load));
+  const spare = new Set(alsoKeep);
   const stored = await photoKeys();
-  await deletePhotos(stored.filter((id) => !keep.has(id)));
+  await deletePhotos(stored.filter((id) => !keep.has(id) && !spare.has(id)));
 }

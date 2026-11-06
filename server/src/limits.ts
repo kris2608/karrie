@@ -65,11 +65,16 @@ export function createLimits(config: LimitConfig, now: () => number = Date.now) 
       totals.requests += 1;
       return null;
     },
-    record(outcome: { ok: boolean; latencyMs: number; usage?: Usage }) {
+    /** extraUsd covers what tokens do not show, such as paid web search calls. */
+    record(outcome: { ok: boolean; latencyMs: number; usage?: Usage; extraUsd?: number }) {
       roll();
       if (outcome.ok) totals.ok += 1;
       else totals.errors += 1;
       totals.latencyMs += outcome.latencyMs;
+      if (outcome.extraUsd) {
+        today.costUsd += outcome.extraUsd;
+        totals.costUsd += outcome.extraUsd;
+      }
       if (outcome.usage) {
         const cost = costOf(outcome.usage);
         today.costUsd += cost;

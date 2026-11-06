@@ -1,12 +1,12 @@
 import { motion } from "motion/react";
 import { ItemArt } from "../../components/ItemArt";
-import { ProductArt } from "../../components/ProductArt";
 import { AttributeBadge } from "../../components/ui/AttributeBadge";
 import { PressButton } from "../../components/ui/PressButton";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { badgeFor } from "../../domain/discovery";
 import { SCORING } from "../../domain/scoring";
 import type { AdventureItem } from "../../domain/types";
+import { productById } from "../../data/catalog";
 import { fadeOnly, missionCard, missionChip, popIn } from "../../motion/variants";
 
 type MissionCardProps = {
@@ -50,7 +50,7 @@ export function MissionCard({ item, reduced, onGo, onSkip }: MissionCardProps) {
           </span>
           <motion.figure className="mission-side is-target" custom={1} variants={card} initial="hidden" animate="shown">
             <span className="mission-art">
-              <ProductArt id={target} />
+              <ItemArt item={{ icon: target, name: productById(target)?.name ?? "" }} />
               <AttributeBadge kind={badgeFor(assessment)} />
               <em className="mission-tag">voorbeeld</em>
             </span>

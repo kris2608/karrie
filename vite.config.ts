@@ -39,6 +39,16 @@ export default defineConfig({
               expiration: { maxEntries: 300, maxAgeSeconds: 90 * 24 * 60 * 60, purgeOnQuotaError: true },
             },
           },
+          {
+            // Open-licence reference pictures only; pictures with unclear rights are kept as local copies instead.
+            urlPattern: /^https:\/\/(upload\.wikimedia\.org|thumb\.wikimedia\.org|images\.unsplash\.com|cdn\.pixabay\.com)\//,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "reference-images",
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 24 * 60 * 60, purgeOnQuotaError: true },
+            },
+          },
         ],
       },
       devOptions: { enabled: false },

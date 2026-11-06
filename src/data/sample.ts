@@ -23,6 +23,7 @@ const PACK_KEYS = [
   "photoId",
   "imageKind",
   "imageSource",
+  "imageChoice",
   "source",
   "nutrition",
   "offAttribution",
@@ -30,7 +31,7 @@ const PACK_KEYS = [
   "alternative",
   "missionEnabled",
 ] as const;
-const IMAGE_KEYS = ["imageUrl", "photoId", "imageKind", "imageSource"] as const;
+const IMAGE_KEYS = ["imageUrl", "photoId", "imageKind", "imageSource", "imageChoice"] as const;
 
 export function packOf(item: PackInfo): PackInfo {
   const pack: Record<string, unknown> = {};
@@ -47,14 +48,14 @@ export function stripPack<T extends PackInfo>(item: T): T {
 export function withoutImage<T extends PackInfo>(item: T): T {
   const copy = { ...item };
   for (const key of IMAGE_KEYS) delete copy[key];
-  return { ...copy, imageKind: "generic" };
+  return { ...copy, imageKind: "generic", imageChoice: "drawing" };
 }
 
 /** Swaps only the picture for a parent photo; product identity stays as it was. */
 export function withParentPhoto<T extends PackInfo>(item: T, photoId: string): T {
   const copy = { ...item };
   for (const key of IMAGE_KEYS) delete copy[key];
-  return { ...copy, photoId, imageKind: "photo", imageSource: "parent" };
+  return { ...copy, photoId, imageKind: "photo", imageSource: "parent", imageChoice: "photo" };
 }
 
 export type VisionPack = {
