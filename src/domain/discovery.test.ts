@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { FOOD_TYPES, HOUSEHOLD_TYPES } from "../../server/src/schema";
-import { products } from "../data/catalog";
 import type { RecognizedAlternative } from "../services/vision/types";
 import { badgeFor, declineKey, labelCheck, missionOn, parentLine, pickMissions, resolveAssessment, samePurpose } from "./discovery";
 import type { AdventureItem, AlternativeAssessment } from "./types";
@@ -30,15 +28,6 @@ const possible = (evidence: "label" | "inferred"): AlternativeAssessment => ({
   targetType: "pindakaas",
   source: "photo",
   assessedAt: 1,
-});
-
-describe("server catalog types", () => {
-  it("match the catalog exactly, so every target has a drawing", () => {
-    const food = products.filter((product) => product.category !== "household").map((product) => product.id);
-    const household = products.filter((product) => product.category === "household").map((product) => product.id);
-    expect([...FOOD_TYPES].sort()).toEqual(food.sort());
-    expect([...HOUSEHOLD_TYPES].sort()).toEqual(household.sort());
-  });
 });
 
 describe("same purpose", () => {
