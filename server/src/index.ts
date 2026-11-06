@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import OpenAI from "openai";
 import { createHandler } from "./app.js";
+import { createBarcodeLookup } from "./barcode.js";
 import { createImageDiscovery } from "./images.js";
 import { createLimits } from "./limits.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
@@ -59,6 +60,21 @@ const discovery = client
     })
   : null;
 
+const barcodeLimits = createLimits({
+  perIpPerHour: number("BARCODE_LIMIT_PER_IP_HOUR", 60),
+  perIpPerDay: number("BARCODE_LIMIT_PER_IP_DAY", 200),
+  dailyRequests: number("BARCODE_LIMIT_DAILY_REQUESTS", 1000),
+  dailyBudgetUsd: number("BARCODE_DAILY_BUDGET_USD", 0.5),
+  inputUsdPerMTok: number("PRICE_INPUT_PER_MTOK", 0.75),
+  cachedInputUsdPerMTok: number("PRICE_CACHED_INPUT_PER_MTOK", 0.075),
+  outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
+});
+
+const barcode = createBarcodeLookup({
+  userAgent: env.OFF_USER_AGENT || "Karrie/1.0 (https://karrieapp.onrender.com)",
+  web: client && env.BARCODE_WEB_SEARCH !== "off" ? { client, model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model } : undefined,
+});
+
 const handler = createHandler({
   allowedOrigins: (env.ALLOWED_ORIGINS ?? "https://karrieapp.onrender.com,http://localhost:5173,http://localhost:4173")
     .split(",")
@@ -68,7 +84,7 @@ const handler = createHandler({
   configured: Boolean(client),
   model: config.model,
   limits,
-  recognize: (dataUrl) => recognizePhoto(client!, config, dataUrl),
+  recognize: (dataUrl, scannedEan) => recognizePhoto(client!, config, dataUrl, scannedEan),
   images: discovery
     ? {
         discovery,
@@ -77,6 +93,7 @@ const handler = createHandler({
         providerCallUsd: number("PRICE_BRAVE_CALL", 0.005),
       }
     : undefined,
+  barcode: { lookup: barcode, limits: barcodeLimits, searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01) },
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 

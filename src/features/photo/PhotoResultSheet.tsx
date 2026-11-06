@@ -5,16 +5,17 @@ import { PressButton } from "../../components/ui/PressButton";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { categoryIcon } from "../../domain/categoryIcon";
 import { declineKey, missionOn } from "../../domain/discovery";
-import { draftFromVision, needsCheck } from "../../domain/visionMapping";
+import type { DraftField, ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem, AlternativeAssessment, CategoryId } from "../../domain/types";
-import type { RecognizedProduct } from "../../services/vision/types";
 import { useAdventure } from "../../state/AdventureContext";
-import { savePhoto } from "../../storage/photos";
+import { savePhoto, usePhotoUrl } from "../../storage/photos";
 
 type PhotoResultSheetProps = {
-  product: RecognizedProduct | null;
-  photoUrl: string;
-  photo: Blob;
+  /** Null: nothing usable was found and the parent fills it in. */
+  draft: ProductDraft | null;
+  /** The new photo, if the parent took one; a barcode alone needs none. */
+  photoUrl?: string;
+  photo?: Blob;
   items: AdventureItem[];
   onRetake: () => void;
   onCancel: () => void;
@@ -38,28 +39,50 @@ function MissionNote({ assessment, state }: { assessment?: AlternativeAssessment
   );
 }
 
-export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, onCancel, onDone }: PhotoResultSheetProps) {
+export function sourceLabel(field: DraftField | undefined, draft: ProductDraft): string | null {
+  if (!field) return null;
+  if (field.source === "parent") return "uit Mijn producten";
+  if (field.source === "off") return "Open Food Facts";
+  if (field.source === "web") return `gevonden op ${draft.from.barcode?.source.name ?? "internet"}`;
+  if (field.source === "photo") return "gelezen op de verpakking";
+  return "geschat";
+}
+
+/** Each source says what it is and under which licence; Open Food Facts data and its photos are listed apart. */
+export function sourcesLine(draft: ProductDraft | null, hasPhoto: boolean): string {
+  if (!draft) return "De foto blijft alleen op dit apparaat.";
+  const parts: string[] = [];
+  const barcode = draft.from.barcode;
+  if (barcode?.source.kind === "off") parts.push(`Gegevens: Open Food Facts (ODbL)${draft.imageUrl && !hasPhoto ? ", foto CC BY-SA" : ""}.`);
+  if (barcode?.source.kind === "web") parts.push(`Gevonden op ${barcode.source.name} via de streepjescode.`);
+  if (draft.from.photo) parts.push("Herkend met OpenAI.");
+  if (draft.from.mine && !barcode && !draft.from.photo) return "Uit Mijn producten.";
+  parts.push("Controleer het altijd even zelf.");
+  return parts.join(" ");
+}
+
+export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCancel, onDone }: PhotoResultSheetProps) {
   const { declined, dispatch } = useAdventure();
-  const draft = product ? draftFromVision(product) : null;
   const [name, setName] = useState(draft?.name ?? "");
   const [category, setCategory] = useState<CategoryId>(draft?.category ?? "pantry");
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const earlier = usePhotoUrl(photoUrl ? undefined : draft?.photoId);
   const open = items.filter((item) => item.status !== "found");
   const candidates = draft?.match ? open.filter((item) => item.productId === draft.match!.id) : [];
-  const inferred = new Set(product?.inferredFields ?? []);
-  const unsure = product ? needsCheck(product) : false;
   const drawing = draft && !draft.keepPhoto ? draft.match : null;
   const assessment = draft?.pack.alternative;
   const keyed = draft ? { name: draft.name, brand: draft.pack.brand, alternative: assessment } : null;
   const missionDefault = Boolean(keyed && missionOn(keyed, declined));
   const missionState = missionDefault ? "on" : keyed && assessment?.evidence === "label" && declined.includes(declineKey(keyed)) ? "declined" : "off";
+  const picture = photoUrl ?? earlier ?? draft?.imageUrl ?? null;
 
+  /** The new photo is stored when asked for; without one, the parent's earlier photo stays with the product. */
   async function commit(run: (photoId?: string) => string, withPhoto: boolean) {
     if (saving) return;
     setSaving(true);
     try {
-      const photoId = withPhoto ? await savePhoto(photo) : undefined;
+      const photoId = withPhoto && photo ? await savePhoto(photo) : photo ? undefined : draft?.photoId;
       onDone(run(photoId));
     } catch {
       setSaving(false);
@@ -71,7 +94,7 @@ export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, on
     void commit((photoId) => {
       if (withInfo && draft) dispatch({ type: "apply-recognition", itemId: item.id, photoId, pack: draft.pack });
       else if (photoId) dispatch({ type: "set-photo", itemId: item.id, photoId });
-      return `Jouw foto staat bij ${item.name}`;
+      return photo ? `Jouw foto staat bij ${item.name}` : `${item.name} is bijgewerkt`;
     }, true);
   }
 
@@ -92,40 +115,53 @@ export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, on
     }, withPhoto);
   }
 
-  const brandLine = product && [product.brand, product.variant].filter(Boolean).join(" · ");
+  const brandField = draft?.fields.brand ?? draft?.fields.variant;
+  const brandLine = draft && [draft.fields.brand?.value, draft.fields.variant?.value].filter(Boolean).join(" · ");
   const card = (
     <div className="scan-card photo-card" data-testid="photo-card">
       {drawing ? (
         <ProductArt id={drawing.id} className="scan-card-art" />
-      ) : (
+      ) : picture ? (
         <span className="product-art item-photo scan-card-art">
-          <img src={photoUrl} alt="" />
+          <img src={picture} alt="" referrerPolicy="no-referrer" />
         </span>
+      ) : (
+        <ProductArt id={draft?.icon ?? categoryIcon(category)} className="scan-card-art" />
       )}
       <div className="scan-card-text">
-        <strong>{product ? (product.productName ?? product.genericName ?? "Onbekend product") : "Jouw foto"}</strong>
-        {brandLine && (
+        <strong>{draft ? draft.name || "Onbekend product" : "Jouw foto"}</strong>
+        {brandLine && draft && (
           <span>
-            {brandLine} <em className="photo-source">{inferred.has("brand") || inferred.has("variant") ? "geschat" : "gelezen op de verpakking"}</em>
+            {brandLine} <em className="photo-source">{sourceLabel(brandField, draft)}</em>
           </span>
         )}
-        {product?.packageSize && <span>{product.packageSize}</span>}
-        {drawing ? <small data-testid="photo-drawing">Karrie gebruikt de tekening van {drawing.name.toLowerCase()}</small> : product?.genericName && <small>{product.genericName}</small>}
+        {draft?.fields.packageSize && <span>{draft.fields.packageSize.value}</span>}
+        {drawing ? (
+          <small data-testid="photo-drawing">Karrie gebruikt de tekening van {drawing.name.toLowerCase()}</small>
+        ) : (
+          draft?.from.photo?.genericName && <small>{draft.from.photo.genericName}</small>
+        )}
+        {draft?.ean && (
+          <small className="photo-ean" data-testid="photo-ean">
+            Streepjescode {draft.ean}
+          </small>
+        )}
       </div>
     </div>
   );
 
-  const notes = product && (
+  const notes = draft && (
     <>
-      {!product.recognized && <p className="sheet-note">Karrie ziet niet goed welk product dit is. Maak een nieuwe foto van één product, of vul het zelf in.</p>}
-      {product.recognized && unsure && <p className="sheet-note">Karrie weet het niet helemaal zeker. Kijk even of het klopt.</p>}
+      {!draft.recognized && draft.from.photo && <p className="sheet-note">Karrie ziet niet goed welk product dit is. Maak een nieuwe foto van één product, of vul het zelf in.</p>}
+      {draft.recognized && draft.unsure && <p className="sheet-note">Karrie weet het niet helemaal zeker. Kijk even of het klopt.</p>}
       <MissionNote assessment={assessment} state={missionState} />
     </>
   );
 
-  const footer = <p className="scan-attribution">{product ? "Herkend met OpenAI. Controleer het altijd even zelf." : "De foto blijft alleen op dit apparaat."}</p>;
+  const footer = <p className="scan-attribution">{sourcesLine(draft, Boolean(photoUrl))}</p>;
+  const retakeLabel = photo ? "Opnieuw fotograferen" : "Terug naar camera";
 
-  if (picking) {
+  if (picking && photo) {
     return (
       <>
         <h2>Welke afbeelding wil je vervangen?</h2>
@@ -147,7 +183,7 @@ export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, on
     );
   }
 
-  if (draft && candidates.length > 0 && product?.recognized && product.confidence !== "low") {
+  if (draft && candidates.length > 0 && draft.recognized && draft.confident) {
     const single = candidates.length === 1 ? candidates[0] : null;
     if (!draft.keepPhoto && single) {
       return (
@@ -170,14 +206,15 @@ export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, on
         </>
       );
     }
+    const question = single ? (photo ? `Wil je deze foto gebruiken voor ${single.name}?` : `Is dit de ${single.name.toLowerCase()} van je lijst?`) : `Bij welk product hoort ${photo ? "deze foto" : "dit"}?`;
     return (
       <>
-        <h2>{single ? `Wil je deze foto gebruiken voor ${single.name}?` : "Bij welk product hoort deze foto?"}</h2>
+        <h2>{question}</h2>
         {card}
         {notes}
         {single ? (
           <PressButton variant="primary" wide data-testid="photo-use-existing" disabled={saving} onClick={() => attachTo(single, true)}>
-            Gebruik foto voor {single.name}
+            {photo ? `Gebruik foto voor ${single.name}` : `Ja, werk ${single.name} bij`}
           </PressButton>
         ) : (
           <ul className="scan-pick">
@@ -204,9 +241,10 @@ export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, on
     );
   }
 
+  const heading = !draft || (!draft.recognized && !draft.from.photo) ? "Wat is het?" : !draft.recognized ? "Niet zeker" : draft.unsure ? "Klopt dit?" : "Herkend!";
   return (
     <>
-      <h2>{!product ? "Wat is het?" : !product.recognized ? "Niet zeker" : unsure ? "Klopt dit?" : "Herkend!"}</h2>
+      <h2>{heading}</h2>
       {card}
       {notes}
       <label className="scan-field">
@@ -233,7 +271,7 @@ export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, on
       <PressButton variant="primary" wide data-testid="photo-add" disabled={saving || !name.trim()} onClick={addNew}>
         Toevoegen aan lijst
       </PressButton>
-      {open.length > 0 && (
+      {open.length > 0 && photo && (
         <PressButton variant="secondary" wide data-testid="photo-replace" disabled={saving} onClick={() => setPicking(true)}>
           Vervang bestaande afbeelding
         </PressButton>
@@ -243,7 +281,7 @@ export function PhotoResultSheet({ product, photoUrl, photo, items, onRetake, on
           Annuleren
         </PressButton>
         <PressButton variant="secondary" data-testid="photo-retake" onClick={onRetake}>
-          Opnieuw fotograferen
+          {retakeLabel}
         </PressButton>
       </div>
       {footer}

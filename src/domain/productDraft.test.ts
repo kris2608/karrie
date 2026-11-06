@@ -1,0 +1,109 @@
+import { describe, expect, it } from "vitest";
+import { sourcesLine } from "../features/photo/PhotoResultSheet";
+import type { FoundAnswer } from "../services/barcode/lookup";
+import type { RecognizedProduct } from "../services/vision/types";
+import { catalogByName, categoryFromTags, mergeDraft } from "./productDraft";
+import type { SavedItem } from "./types";
+
+const CALVE = "8710400000006";
+
+const OFF: FoundAnswer = {
+  ean: CALVE,
+  status: "off-exact",
+  product: { name: "Pindakaas", brand: "Calvé", quantity: "350 g", imageUrl: "https://images.openfoodfacts.org/x.jpg", nutriScore: "C", per100: { sugars: 6.5, salt: 0.9 }, categories: ["en:spreads"] },
+  source: { kind: "off", name: "Open Food Facts", url: `https://world.openfoodfacts.org/product/${CALVE}`, dataLicense: "ODbL", imageLicense: "CC BY-SA" },
+  at: 1,
+};
+
+const WEB: FoundAnswer = {
+  ean: CALVE,
+  status: "web-page",
+  product: { name: "Pindakaas met stukjes pinda", brand: "Calvé", quantity: "350 g" },
+  source: { kind: "web", name: "jumbo.com", url: "https://www.jumbo.com/p" },
+  at: 1,
+};
+
+const PHOTO: RecognizedProduct = {
+  recognized: true,
+  productName: "Calvé Pindakaas",
+  genericName: "Pindakaas",
+  brand: "Calvé",
+  variant: "Met stukjes pinda",
+  packageSize: "600 g",
+  category: "houdbaar",
+  subcategory: "pindakaas",
+  ean: null,
+  visibleNutriScore: null,
+  visibleClaims: [],
+  inferredFields: ["packageSize"],
+  confidence: "medium",
+  needsConfirmation: false,
+  containsPeople: false,
+  catalogType: "pindakaas",
+  specificProduct: true,
+  visibleIngredients: null,
+  alternative: { status: "none", evidence: "none", criteria: [], alternativeType: null, targetType: null, reason: null, parentExplanation: null, childPrompt: null },
+};
+
+describe("merging barcode, photo and my products", () => {
+  it("a complete Open Food Facts record needs no photo and keeps each field's source", () => {
+    const draft = mergeDraft({ ean: CALVE, barcode: OFF });
+    expect(draft).toMatchObject({ name: "Pindakaas", ean: CALVE, recognized: true, unsure: false, keepPhoto: true, imageUrl: OFF.product.imageUrl, match: { id: "pindakaas" } });
+    expect(draft.fields.brand).toEqual({ value: "Calvé", source: "off", verified: false });
+    expect(draft.pack).toMatchObject({
+      ean: CALVE,
+      brand: "Calvé",
+      packageSize: "350 g",
+      imageUrl: OFF.product.imageUrl,
+      barcode: { status: "off-exact", sourceName: "Open Food Facts" },
+      nutrition: { nutriscore: "c", sugars100g: 6.5, salt100g: 0.9 },
+      fieldSources: { name: "off", brand: "off", packageSize: "off", image: "off", nutrition: "off" },
+    });
+    expect(sourcesLine(draft, false)).toBe("Gegevens: Open Food Facts (ODbL), foto CC BY-SA. Controleer het altijd even zelf.");
+  });
+
+  it("Open Food Facts beats what the photo read, and what the photo read beats a web page or a guess", () => {
+    const off = mergeDraft({ ean: CALVE, barcode: OFF, photo: PHOTO });
+    expect(off.fields.name).toMatchObject({ value: "Pindakaas", source: "off" });
+    expect(off.fields.variant).toMatchObject({ value: "Met stukjes pinda", source: "photo" });
+    expect(off.fields.packageSize).toMatchObject({ value: "350 g", source: "off" });
+    expect(off.pack.recognition?.variant).toBe("Met stukjes pinda");
+
+    const web = mergeDraft({ ean: CALVE, barcode: WEB, photo: PHOTO });
+    expect(web.fields.name).toMatchObject({ value: "Calvé Pindakaas", source: "photo" });
+    expect(web.fields.packageSize).toMatchObject({ value: "350 g", source: "web" });
+    expect(web.unsure).toBe(true);
+    expect(sourcesLine(web, true)).toBe("Gevonden op jumbo.com via de streepjescode. Herkend met OpenAI. Controleer het altijd even zelf.");
+
+    const guess = mergeDraft({ photo: PHOTO });
+    expect(guess.fields.packageSize).toMatchObject({ value: "600 g", source: "guess" });
+    expect(guess.pack.packageSize).toBeUndefined();
+    expect(guess.pack.ean).toBeUndefined();
+  });
+
+  it("never lets an uncertain source overwrite what the parent confirmed before", () => {
+    const mine = { name: "Onze pindakaas", brand: "Calvé", ean: CALVE, productId: "pindakaas", icon: "pindakaas", category: "pantry", quantity: 1, photoId: "p1", source: "off" } as SavedItem;
+    const draft = mergeDraft({ ean: CALVE, mine, barcode: OFF, photo: { ...PHOTO, brand: "Calvé" } });
+    expect(draft.fields.name).toEqual({ value: "Onze pindakaas", source: "parent", verified: true });
+    expect(draft.fields.packageSize).toMatchObject({ value: "350 g", source: "off" });
+    expect(draft).toMatchObject({ photoId: "p1", unsure: false, recognized: true });
+    expect(mergeDraft({ ean: CALVE, mine })).toMatchObject({ name: "Onze pindakaas", unsure: false });
+  });
+
+  it("flags a photo that shows another brand than the barcode says", () => {
+    const draft = mergeDraft({ ean: CALVE, barcode: OFF, photo: { ...PHOTO, brand: "Duyvis" } });
+    expect(draft).toMatchObject({ unsure: true, confident: false });
+    expect(draft.fields.brand?.value).toBe("Calvé");
+  });
+
+  it("a scanned code with nothing found leaves the parent to fill it in, but keeps the code", () => {
+    expect(mergeDraft({ ean: CALVE })).toMatchObject({ name: "", ean: CALVE, recognized: false, pack: { ean: CALVE } });
+  });
+
+  it("uses only exact catalog names and clear Open Food Facts shop sections", () => {
+    expect(catalogByName("Pindakaas")?.id).toBe("pindakaas");
+    expect(catalogByName("Chocoladereep melk")).toBeNull();
+    expect(categoryFromTags(["en:frozen-desserts", "en:ice-creams"])).toBe("frozen");
+    expect(categoryFromTags(["en:spreads", "en:peanut-butters"])).toBeUndefined();
+  });
+});

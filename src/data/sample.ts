@@ -5,7 +5,10 @@ import type {
   AdventureItem,
   AdventurePhase,
   AlternativeAssessment,
+  BarcodeInfo,
   CategoryId,
+  FieldSources,
+  Nutrition,
   PackInfo,
   Product,
   Recognition,
@@ -27,6 +30,8 @@ const PACK_KEYS = [
   "source",
   "nutrition",
   "offAttribution",
+  "barcode",
+  "fieldSources",
   "recognition",
   "alternative",
   "missionEnabled",
@@ -58,22 +63,36 @@ export function withParentPhoto<T extends PackInfo>(item: T, photoId: string): T
   return { ...copy, photoId, imageKind: "photo", imageSource: "parent", imageChoice: "photo" };
 }
 
+/** What the confirmation sheet stores: from the photo, the barcode lookup, or both. */
 export type VisionPack = {
   brand?: string;
   packageSize?: string;
-  recognition: Recognition;
+  recognition?: Recognition;
   alternative?: AlternativeAssessment;
+  /** Decoded by the phone's barcode reader; a model reading never ends up here. */
+  ean?: string;
+  barcode?: BarcodeInfo;
+  /** The Open Food Facts front photo; a parent photo replaces it. */
+  imageUrl?: string;
+  nutrition?: Nutrition;
+  fieldSources?: FieldSources;
 };
 
-/** Never carries an EAN: a model reading is not a verified barcode. */
 export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
+  const offImage = photoId ? undefined : vision.imageUrl;
   return packOf({
+    ean: vision.ean,
     brand: vision.brand,
     packageSize: vision.packageSize,
     photoId,
-    imageKind: photoId ? "photo" : "generic",
-    imageSource: photoId ? "parent" : undefined,
-    source: "vision",
+    imageUrl: offImage,
+    imageKind: photoId || offImage ? "photo" : "generic",
+    imageSource: photoId ? "parent" : offImage ? "off" : undefined,
+    source: vision.barcode ? (vision.barcode.status === "web-page" ? "barcode" : "off") : vision.recognition ? "vision" : "manual",
+    nutrition: vision.nutrition,
+    offAttribution: vision.barcode && vision.barcode.status !== "web-page" ? true : undefined,
+    barcode: vision.barcode,
+    fieldSources: vision.fieldSources,
     recognition: vision.recognition,
     alternative: vision.alternative,
   });

@@ -111,6 +111,13 @@ describe("requestBody", () => {
     expect([...alternative.required].sort()).toEqual(Object.keys(alternative.properties).sort());
   });
 
+  it("passes a scanned barcode as context only, and nothing when there is none", () => {
+    const withCode = requestBody(CONFIG, jpeg(), "8710400000006").input[0].content[0];
+    expect(withCode.type === "input_text" && withCode.text).toMatch(/streepjescode 8710400000006.*alleen als context/s);
+    const plain = requestBody(CONFIG, jpeg()).input[0].content[0];
+    expect(plain.type === "input_text" && plain.text).toBe("Welk product staat op deze foto?");
+  });
+
   it("assesses the alternative in the same call, with the same-type rules", () => {
     const body = requestBody(CONFIG, jpeg());
     expect(body.instructions).toMatch(/same narrow type/);

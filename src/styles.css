@@ -1253,6 +1253,9 @@ h1, h2, p { margin: 0; }
 }
 .scanner-message { min-height: 2.6rem; display: grid; place-items: center; text-align: center; }
 .scanner-hint { font-size: 1.15rem; font-weight: 900; }
+.camera-barcode { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 var(--space-2); max-width: 340px; font-size: 0.9rem; font-weight: 800; }
+.camera-barcode .text-button { color: inherit; text-decoration: underline; }
+.photo-ean { color: var(--ink-mute); font-variant-numeric: tabular-nums; }
 .scanner-help {
   display: grid;
   align-content: center;

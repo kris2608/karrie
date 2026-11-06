@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pickArt } from "../components/ItemArt";
-import { identityKey, identityOf, type ImageIdentity } from "../domain/imageIdentity";
+import { hasOffPhoto, identityKey, identityOf, wantsReference, type ImageIdentity } from "../domain/imageIdentity";
 import { cleanFacts, factsFor } from "../domain/productFacts";
 import { wantedReferences } from "../domain/referenceTargets";
 import type { Adventure, AdventureItem } from "../domain/types";
@@ -70,6 +70,28 @@ describe("identity", () => {
     expect(pickArt("drawing", "ref", "photo", true)).toBeNull();
     expect(pickArt("reference", null, "photo", true)).toBe("photo");
     expect(pickArt("reference", "ref", null, true)).toBe("ref");
+  });
+
+  it("keeps the Open Food Facts front photo and only searches a barcode product without one, or on request", () => {
+    const item = (overrides: Partial<AdventureItem>): AdventureItem => ({ id: "1", productId: "p", name: "Pindakaas", icon: "pindakaas", category: "pantry", quantity: 1, status: "pending", ...overrides });
+    const off = { brand: "Calvé", source: "off" as const, imageUrl: "https://images.openfoodfacts.org/x.jpg", imageKind: "photo" as const, imageSource: "off" as const };
+    const identity = identityOf(item(off));
+    expect(identity).toEqual({ name: "Pindakaas", brand: "Calvé", generic: false });
+    expect(hasOffPhoto(off)).toBe(true);
+    expect(wantsReference(identity, undefined, true)).toBe(false);
+    expect(wantsReference(identity, "reference", true)).toBe(true);
+    expect(wantsReference(identity, undefined, false)).toBe(true);
+
+    const adventure = {
+      phase: "draft",
+      items: [
+        item(off),
+        item({ id: "2", ...off, name: "Hagelslag", brand: "De Ruijter", imageChoice: "reference" }),
+        item({ id: "3", name: "Speculaas", brand: "Verkade", source: "barcode" }),
+        item({ id: "4", name: "Stroop", brand: "Hero", source: "off" }),
+      ],
+    } as unknown as Adventure;
+    expect(wantedReferences(adventure).map(identityKey)).toEqual(["p|de ruijter|hagelslag||", "p|verkade|speculaas||", "p|hero|stroop||"]);
   });
 });
 

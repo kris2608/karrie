@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
+import type { BarcodeLookup, LookupResult } from "./barcode.js";
+import { canonicalEan } from "./ean.js";
 import { ImageIdentitySchema, type ImageDiscovery } from "./images.js";
 import type { Limits } from "./limits.js";
 import type { RecognizeResult } from "./recognize.js";
@@ -14,19 +16,27 @@ export type ImageDeps = {
   providerCallUsd: number;
 };
 
+export type BarcodeDeps = {
+  lookup: Pick<BarcodeLookup, "lookup" | "cached" | "webEnabled">;
+  /** Per-IP limits for new lookups; its budget only gates the paid web search, Open Food Facts stays available. */
+  limits: Limits;
+  searchCallUsd: number;
+};
+
 export type AppDeps = {
   allowedOrigins: string[];
   requireOrigin: boolean;
   configured: boolean;
   model: string;
   limits: Limits;
-  recognize: (dataUrl: string) => Promise<RecognizeResult>;
+  recognize: (dataUrl: string, scannedEan?: string) => Promise<RecognizeResult>;
   images?: ImageDeps;
+  barcode?: BarcodeDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
 };
 
-const ROUTES = ["/api/products/recognize-photo", "/api/images/discover"];
+const ROUTES = ["/api/products/recognize-photo", "/api/images/discover", "/api/products/barcode"];
 
 const STATUS_BY_CODE: Record<string, number> = {
   refused: 422,
@@ -81,6 +91,9 @@ export function createHandler(deps: AppDeps) {
   /** Why picture leads failed, by type only; shown on /api/health so a blocked host is visible without logs. */
   const imageFailures: Record<string, number> = {};
   const imageOutcomes: Record<string, number> = {};
+  const barcodeFailures: Record<string, number> = {};
+  const barcodeOutcomes: Record<string, number> = {};
+  const count = (into: Record<string, number>, key: string) => (into[key] = (into[key] ?? 0) + 1);
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     const id = randomUUID().slice(0, 8);
@@ -121,6 +134,7 @@ export function createHandler(deps: AppDeps) {
         model: deps.model,
         stats: deps.limits.stats(),
         images: deps.images ? { provider: deps.images.discovery.provider, stats: deps.images.limits.stats(), outcomes: imageOutcomes, failures: imageFailures } : undefined,
+        barcode: deps.barcode ? { webSearch: deps.barcode.lookup.webEnabled, stats: deps.barcode.limits.stats(), outcomes: barcodeOutcomes, failures: barcodeFailures } : undefined,
       });
     }
 
@@ -145,6 +159,7 @@ export function createHandler(deps: AppDeps) {
       return send(400, { status: "error", code: "bad-request" });
     }
     if (url.pathname === "/api/images/discover") return discoverImages(body);
+    if (url.pathname === "/api/products/barcode") return lookupBarcode(body);
 
     const image = checkImage(body);
     if (!image.ok) return send(image.status, { status: "error", code: image.code });
@@ -158,7 +173,7 @@ export function createHandler(deps: AppDeps) {
     inFlight.add(ip);
     const callStarted = now();
     try {
-      const result = await deps.recognize(image.dataUrl);
+      const result = await deps.recognize(image.dataUrl, canonicalEan((body as { scannedEan?: unknown }).scannedEan) ?? undefined);
       const latencyMs = now() - callStarted;
       deps.limits.record({ ok: result.ok, latencyMs, usage: result.usage });
       Object.assign(entry, { model: deps.model, openaiMs: latencyMs, usage: result.usage, code: result.ok ? undefined : result.code });
@@ -200,7 +215,40 @@ export function createHandler(deps: AppDeps) {
       entry.found = result.discovery.status;
       return send(200, { status: "ok", discovery: result.discovery, selectedData: result.selectedData });
     }
+
+    /** Only the barcode number arrives here; it goes to Open Food Facts and, if needed, one web search. */
+    async function lookupBarcode(body: unknown) {
+      const barcode = deps.barcode;
+      if (!barcode) return send(503, { status: "error", code: "misconfigured" });
+      const request = BarcodeRequestSchema.safeParse(body);
+      const ean = request.success ? canonicalEan(request.data.ean) : null;
+      if (!ean) return send(400, { status: "error", code: "bad-request" });
+
+      const reply = (result: LookupResult) => {
+        if (!result.ok) return send(502, { status: "error", code: result.code });
+        entry.found = result.answer.status;
+        return send(200, { status: "ok", answer: result.answer });
+      };
+      const hit = barcode.lookup.cached(ean);
+      if (hit) {
+        entry.cached = true;
+        return reply(hit);
+      }
+      const denial = barcode.limits.admit(clientIp(req));
+      if (denial && denial !== "budget") return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+
+      const callStarted = now();
+      const result = await barcode.lookup.lookup(ean, { allowWeb: !denial });
+      const latencyMs = now() - callStarted;
+      if (!denial) barcode.limits.record({ ok: result.ok, latencyMs, usage: result.ok ? result.usage : undefined, extraUsd: result.ok ? result.searchCalls * barcode.searchCallUsd : 0 });
+      Object.assign(entry, { lookupMs: latencyMs, searchCalls: result.ok ? result.searchCalls : undefined });
+      for (const failure of result.failures) count(barcodeFailures, failure);
+      count(barcodeOutcomes, result.ok ? result.answer.status : `error-${result.code}`);
+      return reply(result);
+    }
   };
 }
+
+const BarcodeRequestSchema = z.object({ ean: z.string().max(14) }).strict();
 
 const ImageRequestSchema = z.object({ identity: ImageIdentitySchema, refresh: z.boolean().optional() }).strict();

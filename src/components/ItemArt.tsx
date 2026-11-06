@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { identityOf, wantsReference } from "../domain/imageIdentity";
+import { hasOffPhoto, identityOf, wantsReference } from "../domain/imageIdentity";
 import type { PackInfo } from "../domain/types";
 import { usePhotoUrl } from "../storage/photos";
 import { useReferenceUrl } from "../storage/references";
 import { ProductArt } from "./ProductArt";
 
-type ArtItem = Pick<PackInfo, "imageUrl" | "imageKind" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition"> & { icon: string; name: string };
+type ArtItem = Pick<PackInfo, "imageUrl" | "imageKind" | "imageSource" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition"> & { icon: string; name: string };
 
 export function hasPhoto(item: Pick<PackInfo, "imageUrl" | "imageKind" | "photoId">): boolean {
   return item.imageKind === "photo" && Boolean(item.photoId || item.imageUrl);
@@ -24,7 +24,7 @@ export function ItemArt({ item, className }: { item: ArtItem; className?: string
   const local = usePhotoUrl(item.imageKind === "photo" ? item.photoId : undefined);
   const photo = !hasPhoto(item) ? null : item.photoId ? local : (item.imageUrl ?? null);
   const identity = identityOf(item);
-  const wanted = wantsReference(identity, item.imageChoice);
+  const wanted = wantsReference(identity, item.imageChoice, hasOffPhoto(item));
   const reference = useReferenceUrl(wanted ? identity : null);
   const usable = (url: string | null | undefined) => (url && !failed.includes(url) ? url : null);
   const url = pickArt(item.imageChoice, usable(reference?.url), usable(photo), wanted);

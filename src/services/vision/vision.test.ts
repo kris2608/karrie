@@ -81,15 +81,15 @@ describe("visionMapping", () => {
     expect(draftFromVision(PEANUT).keepPhoto).toBe(true);
     const bread = draftFromVision(BREAD);
     expect(bread).toMatchObject({ keepPhoto: false, icon: "brood", category: "bakery", name: "Wit brood" });
-    expect(bread.pack.recognition.specific).toBe(false);
+    expect(bread.pack.recognition?.specific).toBe(false);
     expect(draftFromVision({ ...BREAD, catalogType: null, subcategory: "desembol", genericName: "Desembol" }).keepPhoto).toBe(true);
   });
 
   it("keeps a readable barcode only as an unverified candidate", () => {
     const draft = draftFromVision({ ...PEANUT, ean: "3017620422003" });
-    expect(draft.pack.recognition.eanCandidate).toBe("3017620422003");
+    expect(draft.pack.recognition?.eanCandidate).toBe("3017620422003");
     expect("ean" in draft.pack).toBe(false);
-    expect(draftFromVision({ ...PEANUT, ean: "3017620422004" }).pack.recognition.eanCandidate).toBeUndefined();
+    expect(draftFromVision({ ...PEANUT, ean: "3017620422004" }).pack.recognition?.eanCandidate).toBeUndefined();
   });
 
   it("carries the guarded assessment: none for AH Terra, a label-backed mission for sweetened peanut butter", () => {

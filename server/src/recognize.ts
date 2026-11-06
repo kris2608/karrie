@@ -44,7 +44,11 @@ function usageOf(response: RawResponse): Usage | undefined {
   };
 }
 
-export function requestBody(config: RecognizeConfig, dataUrl: string) {
+/** scannedEan: a barcode the phone decoded on this pack. Context only; the model reports `ean` only if it can read it. */
+export function requestBody(config: RecognizeConfig, dataUrl: string, scannedEan?: string) {
+  const question = scannedEan
+    ? `Welk product staat op deze foto?\nDe telefoon las op deze verpakking de streepjescode ${scannedEan}. Gebruik die alleen als context; vul ean alleen in als je de cijfers zelf op de foto kunt lezen.`
+    : "Welk product staat op deze foto?";
   return {
     model: config.model,
     store: false,
@@ -53,7 +57,7 @@ export function requestBody(config: RecognizeConfig, dataUrl: string) {
       {
         role: "user" as const,
         content: [
-          { type: "input_text" as const, text: "Welk product staat op deze foto?" },
+          { type: "input_text" as const, text: question },
           { type: "input_image" as const, image_url: dataUrl, detail: config.detail },
         ],
       },
@@ -96,9 +100,9 @@ export function errorCode(error: unknown): RecognizeErrorCode {
   return "unavailable";
 }
 
-export async function recognizePhoto(client: ResponsesClient, config: RecognizeConfig, dataUrl: string): Promise<RecognizeResult> {
+export async function recognizePhoto(client: ResponsesClient, config: RecognizeConfig, dataUrl: string, scannedEan?: string): Promise<RecognizeResult> {
   try {
-    const response = (await client.responses.create(requestBody(config, dataUrl) as never)) as RawResponse;
+    const response = (await client.responses.create(requestBody(config, dataUrl, scannedEan) as never)) as RawResponse;
     return interpret(response);
   } catch (error) {
     return { ok: false, code: errorCode(error) };

@@ -64,3 +64,15 @@ services:
         value: "300"
       - key: DAILY_BUDGET_USD
         value: "1"
+      - key: OFF_USER_AGENT
+        value: Karrie/1.0 (https://karrieapp.onrender.com)
+      - key: BARCODE_WEB_SEARCH
+        value: "on"
+      - key: BARCODE_DAILY_BUDGET_USD
+        value: "0.5"
+      - key: BARCODE_LIMIT_PER_IP_HOUR
+        value: "60"
+      - key: BARCODE_LIMIT_PER_IP_DAY
+        value: "200"
+      - key: BARCODE_LIMIT_DAILY_REQUESTS
+        value: "1000"

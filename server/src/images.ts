@@ -331,9 +331,9 @@ export function leadsFromBrave(body: { results?: BraveImage[] }): Lead[] {
 
 // ---------------------------------------------------------------- resolving leads to real, valid images
 
-type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
+export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-async function readLimited(response: Response, limit: number): Promise<Buffer | null> {
+export async function readLimited(response: Response, limit: number): Promise<Buffer | null> {
   const declared = Number(response.headers.get("content-length") ?? 0);
   if (declared > limit || !response.body) return null;
   const reader = response.body.getReader();
@@ -353,7 +353,7 @@ async function readLimited(response: Response, limit: number): Promise<Buffer | 
 }
 
 /** Every redirect hop is checked again, so a search result cannot steer the server to a private address. */
-async function get(fetchImpl: Fetch, url: string, accept: string, timeoutMs = IMAGE_RULES.fetchTimeoutMs): Promise<Response | null> {
+export async function get(fetchImpl: Fetch, url: string, accept: string, timeoutMs = IMAGE_RULES.fetchTimeoutMs): Promise<Response | null> {
   let target = cleanUrl(url);
   for (let hop = 0; target && hop < 4; hop += 1) {
     const response = await fetchImpl(target.href, { headers: { "User-Agent": USER_AGENT, Accept: accept }, redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });

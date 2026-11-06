@@ -4,7 +4,11 @@ import { Karrie } from "../../components/mascot/Karrie";
 import { PressButton } from "../../components/ui/PressButton";
 import { buzz } from "../../feedback/haptics";
 import { capturePhoto, type ProcessedPhoto } from "./imageProcessing";
+import { useBarcode } from "./useBarcode";
 import { useCamera, type CameraProblem } from "./useCamera";
+
+/** looking: a code was read and is being looked up; unknown: nobody knows it; failed: the lookup did not work. */
+export type BarcodeStatus = "looking" | "unknown" | "failed" | null;
 
 type PhotoCameraProps = {
   title: string;
@@ -13,9 +17,21 @@ type PhotoCameraProps = {
   busy: boolean;
   slow: boolean;
   preview: string | null;
+  /** Read barcodes from the live preview; off for a photo of a product already on the list. */
+  scanBarcodes: boolean;
+  barcodeStatus: BarcodeStatus;
+  onBarcode: (ean: string) => void;
+  /** Fill it in by hand, keeping the scanned code. */
+  onManual: () => void;
   onCapture: (photo: ProcessedPhoto) => void;
   onGallery: () => void;
   onClose: () => void;
+};
+
+const BARCODE_TEXT: Record<Exclude<BarcodeStatus, null>, string> = {
+  looking: "Streepjescode gevonden…",
+  unknown: "Onbekende streepjescode. Maak een foto van de voorkant.",
+  failed: "Opzoeken lukt nu niet. Maak een foto van de voorkant.",
 };
 
 type CameraStatus = "opening" | "live" | "capturing" | CameraProblem;
@@ -24,7 +40,7 @@ function finePointer() {
   return typeof window !== "undefined" && window.matchMedia?.("(pointer: fine)").matches;
 }
 
-export function PhotoCamera({ title, localOnly, busy, slow, preview, onCapture, onGallery, onClose }: PhotoCameraProps) {
+export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcodes, barcodeStatus, onBarcode, onManual, onCapture, onGallery, onClose }: PhotoCameraProps) {
   const reduced = useReducedMotion() ?? false;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<CameraStatus>("opening");
@@ -38,6 +54,8 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, onCapture, 
     onReady: () => setStatus((current) => (current === "capturing" ? current : "live")),
     onProblem: setStatus,
   });
+
+  useBarcode({ videoRef, active: scanBarcodes && status === "live" && !busy, session: attempt, onDetect: onBarcode });
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -110,7 +128,21 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, onCapture, 
       </div>
 
       <div className="scanner-message" aria-live="polite">
-        {!problem && !busy && <p className="scanner-hint">Zet één product in het kader</p>}
+        {!problem && !busy && (
+          <p className="scanner-hint" data-testid="camera-hint">
+            {scanBarcodes ? "Scan een streepjescode of maak een foto." : "Zet één product in het kader"}
+          </p>
+        )}
+        {!problem && !busy && scanBarcodes && barcodeStatus && (
+          <p className="camera-barcode" data-testid="camera-barcode">
+            {BARCODE_TEXT[barcodeStatus]}
+            {barcodeStatus !== "looking" && (
+              <button type="button" className="text-button" data-testid="camera-manual" onClick={onManual}>
+                Zelf invullen
+              </button>
+            )}
+          </p>
+        )}
       </div>
 
       {!problem && (
@@ -128,7 +160,11 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, onCapture, 
       )}
 
       <p className="camera-note">
-        {localOnly ? "De foto blijft alleen op dit apparaat." : "De foto gaat naar OpenAI om het product te herkennen. Zet er geen mensen op."}
+        {localOnly
+          ? "De foto blijft alleen op dit apparaat."
+          : scanBarcodes
+            ? "De foto gaat naar OpenAI; zet er geen mensen op. Streepjescodes worden alleen als nummer opgezocht."
+            : "De foto gaat naar OpenAI om het product te herkennen. Zet er geen mensen op."}
       </p>
       {!problem && finePointer() && (
         <button type="button" className="text-button scanner-type" data-testid="camera-gallery" disabled={busy} onClick={onGallery}>

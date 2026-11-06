@@ -10,9 +10,11 @@ export function mineKey(item: { name: string; brand?: string }): string {
   return `mine:${normalize(item.name)}|${normalize(item.brand ?? "")}`;
 }
 
-/** Worth remembering: a branded pack, or anything the catalog does not already have a tile for. */
+/** Worth remembering: a scanned barcode, a branded pack, or anything the catalog does not already have a tile for. */
 export function worthRemembering(item: AdventureItem): boolean {
-  return item.source === "vision" && (Boolean(item.brand) || !productById(item.productId));
+  if (item.ean) return true;
+  const identified = item.source === "vision" || item.source === "off" || item.source === "barcode";
+  return identified && (Boolean(item.brand) || !productById(item.productId));
 }
 
 export function mineEntry(item: AdventureItem): SavedItem {

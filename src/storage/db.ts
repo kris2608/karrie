@@ -80,6 +80,23 @@ export async function deletePhotos(ids: string[]): Promise<void> {
   }
 }
 
+/** Barcode lookups by EAN, so a known code needs no request. */
+export async function readProductCache<T>(ean: string): Promise<T | undefined> {
+  try {
+    return (await (await database()).get("products", ean)) as T | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function writeProductCache(ean: string, value: unknown): Promise<void> {
+  try {
+    await (await database()).put("products", value, ean);
+  } catch {
+    // Without the cache the next scan simply asks again.
+  }
+}
+
 export async function readKv<T>(key: string): Promise<T | undefined> {
   try {
     return (await (await database()).get("kv", key)) as T | undefined;

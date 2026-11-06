@@ -50,7 +50,8 @@ export function createVisionClient(deps: VisionDeps) {
 
     busy: () => inFlight,
 
-    async recognize(dataUrl: string, options: { signal?: AbortSignal; onSlow?: () => void } = {}): Promise<VisionResult> {
+    /** scannedEan: a barcode the phone decoded on this pack, sent as context only. */
+    async recognize(dataUrl: string, options: { signal?: AbortSignal; onSlow?: () => void; scannedEan?: string } = {}): Promise<VisionResult> {
       if (!deps.online()) return { status: "offline" };
       if (inFlight) return { status: "limit", code: "in-flight" };
       const used = usedToday();
@@ -67,7 +68,7 @@ export function createVisionClient(deps: VisionDeps) {
         const response = await deps.fetch(url("/api/products/recognize-photo"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: dataUrl }),
+          body: JSON.stringify(options.scannedEan ? { image: dataUrl, scannedEan: options.scannedEan } : { image: dataUrl }),
           credentials: "omit",
           referrerPolicy: "no-referrer",
           signal: controller.signal,

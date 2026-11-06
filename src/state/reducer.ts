@@ -364,7 +364,8 @@ export function reducer(state: AppState, action: Action): AppState {
     case "apply-recognition": {
       const next = updateItem(state, action.itemId, (item) => {
         if (item.ean) return action.photoId ? withParentPhoto(item, action.photoId) : item;
-        const keep = action.photoId ? {} : packOf({ photoId: item.photoId, imageUrl: item.imageUrl, imageKind: item.imageKind, imageSource: item.imageSource });
+        const hadImage = Boolean(item.photoId || item.imageUrl);
+        const keep = action.photoId || !hadImage ? {} : packOf({ photoId: item.photoId, imageUrl: item.imageUrl, imageKind: item.imageKind, imageSource: item.imageSource });
         return { ...stripPack(item), ...packFromVision(action.pack, action.photoId), ...keep };
       });
       const updated = next.adventure?.items.find((item) => item.id === action.itemId);

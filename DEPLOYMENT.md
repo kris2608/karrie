@@ -94,7 +94,7 @@ Gebruik het HTTPS-adres, niet een lokaal IP-adres zonder certificaat.
 
 Een ouder fotografeert een product. Karrie stuurt die foto naar OpenAI, krijgt naam, merk, afdeling en soort terug en laat de ouder alles bevestigen of aanpassen. Zonder bevestiging komt er niets op de lijst.
 
-Er is geen barcodescanner meer en Karrie gebruikt Open Food Facts niet meer. Oude lijstjes met gescande producten blijven werken; hun foto's en de vermelding **Gegevens: Open Food Facts (ODbL)** blijven staan.
+De camera leest ook streepjescodes (zie **Streepjescode in de camera**). Een herkende streepjescode gaat voor; de foto blijft altijd mogelijk.
 
 **De camera**
 
@@ -116,8 +116,8 @@ Er is geen barcodescanner meer en Karrie gebruikt Open Food Facts niet meer. Oud
 
 **Opbouw**
 
-- `server/` is een kleine Node-server (`karrie-api`) met één route: `POST /api/products/recognize-photo`. `GET /api/health` geeft status en tellers, zonder geheimen.
-- De server roept de OpenAI Responses API aan met model `gpt-5.4-mini`, een strikt JSON-schema (`server/src/schema.ts`) en `store: false`. Geen web search, geen beeldgeneratie.
+- `server/` is een kleine Node-server (`karrie-api`) met de routes `POST /api/products/recognize-photo`, `POST /api/products/barcode` en `POST /api/images/discover`. `GET /api/health` geeft status en tellers, zonder geheimen.
+- Herkennen roept de OpenAI Responses API aan met model `gpt-5.4-mini`, een strikt JSON-schema (`server/src/schema.ts`) en `store: false`. Geen web search, geen beeldgeneratie.
 - De OpenAI-sleutel staat alleen in de omgeving van de server. De app kent hem niet; `VITE_API_ORIGIN` is alleen het openbare adres van de server.
 - Lokaal: zet de sleutel in `server/.env` (kopie van `server/.env.example`, staat in `.gitignore`). Start `npm run build --prefix server` en `npm start --prefix server` (poort 8787). `npm run dev` en `npm run preview` sturen `/api` daarheen door.
 
@@ -152,9 +152,51 @@ De gratis web service slaapt na ongeveer 15 minuten zonder verkeer. De eerste he
 
 **Wat Karrie wel en niet doet**
 
-- Een barcode die op de foto leesbaar is, wordt nooit als echte EAN opgeslagen. Hij blijft hoogstens een onbevestigde aanwijzing en telt nergens voor.
+- Alleen de streepjescodelezer van de telefoon levert een EAN op. Cijfers die het model op de foto leest, worden nooit als echte EAN opgeslagen; ze blijven hoogstens een onbevestigde aanwijzing en tellen nergens voor.
 - Een product hoort alleen bij een catalogussoort als het precies die soort is. Chocopasta wordt geen jam, havermelk geen melk.
 - Merk of inhoud die het model alleen gokt, worden niet overgenomen. In het resultaat staat **gelezen op de verpakking** of **geschat**.
+
+## Streepjescode in de camera
+
+Het camerascherm zegt **Scan een streepjescode of maak een foto.** Er is geen apart scanscherm: dezelfde camera leest streepjescodes terwijl de ontspanknop gewoon werkt.
+
+**Zo werkt het**
+
+- De telefoon leest de streepjescode zelf (EAN-13, EAN-8, UPC-A en UPC-E). Chrome op Android heeft daar een ingebouwde lezer voor (`BarcodeDetector`); Safari op de iPhone niet, dan laadt Karrie de lezer ZXing (ongeveer 160 kB, alleen als de camera opengaat).
+- Karrie kijkt hoogstens drie keer per seconde naar een band in het midden van het beeld, en alleen als de app op de voorgrond staat. Een code telt pas als hij twee keer achter elkaar gelezen is en de controlecijfers kloppen. Beelden verlaten de telefoon daarbij nooit; alleen het nummer gaat naar de server.
+- Opzoeken gaat in deze volgorde: **Mijn producten** op dit toestel, dan het geheugen van dit toestel (gevonden: 30 dagen, onbekend: 1 dag), dan de server. De server kijkt in zijn eigen geheugen, dan bij **Open Food Facts**, en daarna met één OpenAI-webzoekopdracht.
+- Gevonden? Dan stopt het lezen en opent meteen het bevestigingsscherm met naam, merk, inhoud en foto, en per veld waar het vandaan komt (**Open Food Facts**, **gevonden op …**, **gelezen op de verpakking**, **geschat** of **door jou ingevuld**). Dezelfde code wordt per cameragebruik maar één keer opgezocht.
+- Onbekend of opzoeken lukt niet? De camera blijft open met **Onbekende streepjescode. Maak een foto van de voorkant.** of **Opzoeken lukt nu niet. …**, en **Zelf invullen**. De foto die je dan maakt, gaat met de gelezen code als hint naar OpenAI. Het model mag die code niet zomaar overnemen.
+- Een galerijfoto wordt eerst op het toestel op een streepjescode gecontroleerd. Staat er een bekende code op, dan gaat de foto niet naar OpenAI.
+- Wat de ouder eerder bevestigde (in **Mijn producten**), wint altijd van Open Food Facts, webzoeken en de foto. Een gelezen streepjescode wordt bij het product bewaard, zodat Karrie het product de volgende keer meteen herkent.
+- Tijdens het avontuur in de winkel wordt er geen streepjescode gevraagd; tijdens **Een foto voor deze missie** leest de camera geen codes.
+
+**Open Food Facts**
+
+- Open en gratis, zonder sleutel. Karrie vraagt het via de server op (`/api/v3/product/{ean}`, Nederlandse namen voorop) met een eigen User-Agent (`OFF_USER_AGENT`, standaard `Karrie/1.0 (https://karrieapp.onrender.com)`), zoals Open Food Facts vraagt.
+- Open Food Facts staat 100 productopvragingen per minuut per IP-adres toe. De server houdt minstens 0,7 seconde tussen twee opvragingen, probeert na een `429` of `5xx` hoogstens twee keer opnieuw (na 1 en 3 seconden, of na `Retry-After`) en vraagt dezelfde code nooit twee keer tegelijk op.
+- Het geheugen van de server: gevonden 30 dagen, onbekend 7 dagen, fout 5 minuten. Het is leeg na een herstart of slaapstand.
+- Een record telt alleen als het een echte naam heeft en bij dezelfde code hoort. Naam en merk: **exact**. Alleen een naam of alleen een foto: **gedeeltelijk**, dan vraagt Karrie de ouder om te controleren. Foto's worden alleen van `images.openfoodfacts.org` overgenomen; ingrediënten alleen in het Nederlands.
+- Licenties: de gegevens vallen onder **ODbL**, de foto's onder **CC BY-SA**. Karrie toont beide apart (**Gegevens: Open Food Facts (ODbL), foto CC BY-SA**) en bewaart bij het product dat het van Open Food Facts komt.
+- Heeft het product een foto van Open Food Facts, dan zoekt Karrie geen voorbeeldfoto meer. In het productvenster kan de ouder kiezen tussen **Open Food Facts-foto**, **Voorbeeldfoto** en **Tekening**. Zonder Open Food Facts-foto gaat het zoeken naar een voorbeeldfoto zoals voorheen.
+
+**Webzoeken voor onbekende codes**
+
+- Kent Open Food Facts de code niet, dan zoekt de server één keer met OpenAI-webzoeken (`max_tool_calls: 1`, `store: false`) naar de code. De server haalt daarna zelf de gevonden pagina op en neemt het antwoord alleen over als die pagina de code én het grootste deel van de productnaam echt vermeldt. Een foto van zo'n winkelpagina wordt niet overgenomen; dan zoekt Karrie later een voorbeeldfoto.
+- Zo'n antwoord heet **gevonden op …** en vraagt altijd om controle.
+- Kosten: zie **Kosten**. Een onbekende code wordt per 7 dagen hoogstens één keer gezocht. Het dagbudget (`BARCODE_DAILY_BUDGET_USD`, standaard $0,50) geldt alleen voor webzoeken; daarboven werkt Open Food Facts gewoon door. `BARCODE_WEB_SEARCH=off` zet webzoeken helemaal uit.
+
+**Instellingen op Render (`karrie-api`)**
+
+| Variabele | Standaard | Betekenis |
+|---|---|---|
+| `OFF_USER_AGENT` | `Karrie/1.0 (https://karrieapp.onrender.com)` | Naam en contactadres voor Open Food Facts |
+| `BARCODE_WEB_SEARCH` | `on` | `off` = nooit webzoeken voor onbekende codes |
+| `BARCODE_DAILY_BUDGET_USD` | 0,5 | Webzoeken stopt boven dit bedrag per dag |
+| `BARCODE_LIMIT_PER_IP_HOUR` / `BARCODE_LIMIT_PER_IP_DAY` | 60 / 200 | Opzoekingen per IP-adres die niet uit het geheugen komen |
+| `BARCODE_LIMIT_DAILY_REQUESTS` | 1000 | Alle gebruikers samen, per UTC-dag |
+
+`/api/health` toont onder `barcode` of webzoeken aan staat, de tellers van vandaag, de uitkomsten (`off-exact`, `off-partial`, `web-page`, `none`) en de fouten (`off:http-429`, `web:not-on-page`, …). Het nummer zelf wordt niet gelogd.
 
 ## Bonusmissies (slimme ontdekking)
 
@@ -262,12 +304,15 @@ Reken op ongeveer $0,004 per foto: 100 foto's per maand kosten zo'n $0,40. Het d
 
 **Voorbeeldfoto's** kosten per nieuw product ongeveer $0,017: $0,01 voor de webzoekaanroep plus zo'n 9.000 invoertokens (zoekresultaten en kleine versies van de foto's). Een merkproduct kost met productinformatie ongeveer $0,021; met Brave in plaats van OpenAI-webzoeken naar verwachting ongeveer $0,016 ($0,005 voor Brave, zonder de webzoekaanroep van $0,01; nog niet gemeten). Een product dat al bekend is, kost niets. Een gezin dat 50 verschillende producten gebruikt, kost dus eenmalig ongeveer $0,85. Een open-licentiefoto die de server al kent, is voor andere gezinnen gratis. Voorbeeldfoto's hebben een eigen dagbudget (`IMAGE_DAILY_BUDGET_USD`, standaard $1, ongeveer 60 nieuwe producten per dag). `/api/health` toont onder `images` het aantal zoekopdrachten en de kosten van vandaag.
 
+**Streepjescodes**: Open Food Facts kost niets. Alleen een code die Open Food Facts niet kent, kost geld: één OpenAI-webzoekaanroep ($0,01) plus de tokens van de zoekresultaten, samen ongeveer $0,02 per onbekende code, hoogstens één keer per 7 dagen (en daarna niets zolang de server wakker blijft). Met het dagbudget van $0,50 zijn dat ongeveer 25 onbekende codes per dag. Een code uit **Mijn producten** of uit het geheugen van het toestel gaat niet eens naar de server.
+
 ## Limieten en misbruik
 
 - De server accepteert alleen JPEG, PNG of WebP als data-URL, controleert de bestandskop en weigert aanvragen boven 2 MB (`413`).
 - Alleen aanvragen vanaf `ALLOWED_ORIGINS` worden geaccepteerd. Per IP-adres loopt er hoogstens één herkenning tegelijk.
 - De app staat per toestel 25 herkenningen per dag toe.
 - Voorbeeldfoto's: per toestel 40 zoekopdrachten per dag; op de server per IP 30 per uur en 80 per dag (`IMAGE_LIMIT_PER_IP_HOUR`, `IMAGE_LIMIT_PER_IP_DAY`), 200 per dag in totaal (`IMAGE_LIMIT_DAILY_REQUESTS`) en hoogstens 3 tegelijk (`IMAGE_MAX_CONCURRENT`, daarboven `503`). Antwoorden uit het geheugen van de server tellen niet mee. Optioneel: `OPENAI_IMAGE_SEARCH_MODEL` (standaard het herkenningsmodel) en `BRAVE_SEARCH_API_KEY` (zet Brave aan voor merkproducten; standaardproducten blijven via OpenAI-webzoeken en Openverse gaan). `IMAGE_OPENVERSE=off` zet Openverse uit.
+- Streepjescodes: op de server per IP 60 per uur en 200 per dag, 1000 per dag in totaal (zie **Streepjescode in de camera**). Antwoorden uit het geheugen tellen niet mee. Per toestel loopt er hoogstens één opzoeking per code tegelijk.
 - De tellers op de server staan in het geheugen. Ze beginnen opnieuw na een herstart of slaapstand, en per-IP-limieten zijn te omzeilen door een ander IP-adres. **Stel daarom ook een maandlimiet in bij OpenAI** (platform.openai.com → Settings → Limits). Dat is de harde grens.
 
 ## Checklist camera en bonusmissies (op een echte telefoon)
@@ -294,6 +339,17 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - Start het avontuur, zet vliegtuigmodus aan en ververs `/winkel`. De foto's en de missie staan er nog.
 - Open de app na een kwartier niets doen. De eerste foto toont **Karrie wordt even wakker** en lukt daarna alsnog.
 
+**Streepjescode (op beide toestellen)**
+
+- Open de camera en houd de streepjescode van een bekend merkproduct (bijvoorbeeld Nutella 400 g, 3017620422003) in de band in het midden. Binnen ongeveer een seconde verschijnt **Streepjescode gevonden…** en daarna het bevestigingsscherm met **Open Food Facts** bij naam en merk, de foto van Open Food Facts en **Gegevens: Open Food Facts (ODbL), foto CC BY-SA**.
+- Houd dezelfde code nog eens voor de camera nadat je **Terug naar camera** tikte: er komt geen tweede aanvraag (zie `/api/health` → `barcode.stats`).
+- Scan een zelfgemaakte of onbekende code. De camera blijft open met **Onbekende streepjescode. Maak een foto van de voorkant.** Tik op de ontspanknop: het resultaat komt van de foto en de gelezen code staat erbij.
+- Tik op de ontspanknop terwijl er een streepjescode in beeld is, en ook als er geen enkele code in beeld is. Beide keren wordt de foto gewoon gemaakt.
+- Houd de camera twee minuten open en richt op van alles. Let op batterij, warmte en of het beeld blijft lopen. Zet de app op de achtergrond en weer terug: de camera en het lezen gaan weer aan.
+- Weiger de camera. **Kies uit galerij** met een foto van een streepjescode vindt het product zonder OpenAI.
+- Scan een product dat al in **Mijn producten** staat. Naam en merk komen van jou (**uit Mijn producten**), niet van Open Food Facts.
+- Zet vliegtuigmodus aan en scan een code die je eerder scande: het product komt uit het geheugen van het toestel. Een nieuwe code geeft **Opzoeken lukt nu niet** en **Zelf invullen**.
+
 ## Bekende beperkingen
 
 - Camera, foto herkennen en bonusmissies zijn niet getest op een echte iPhone of Android-telefoon. Ze zijn getest in een desktopbrowser (met een nagebootste camera en met de galerijknop), met echte productfoto's en echte OpenAI-aanroepen.
@@ -305,7 +361,10 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - OpenAI levert bij de webzoekfunctie geen `image_result` (zie Voorbeeldfoto's). Als dat verandert, leest de code ze automatisch als eerste.
 - **Unsplash en Pixabay blokkeren de servers van Render.** Lokaal werken ze; op Render geeft elke pagina een fout (`/api/health` → `images.failures` toonde `unsplash.com:page-unavailable` en `pixabay.com:page-unavailable`). Op Render komen open-licentiefoto's daarom van Wikimedia Commons en Openverse. Merkproducten werken op Render wel (live getest met Hak bruine bonen).
 - Openverse kent alleen Engelse zoektermen en geeft soms iets anders dan bedoeld (iPhones bij "apple", augurken bij "cucumber"). De controle met OpenAI-vision gooit het meeste weg, maar niet alles. Openverse is zonder sleutel beperkt tot ongeveer 20 zoekopdrachten per minuut voor de hele server.
-- Brave Image Search is ingebouwd en getest met nagebootste antwoorden, maar nog niet met een echte sleutel. Zet de sleutel op Render en kijk daarna in `/api/health` naar `images.failures` (`brave:…`) en naar een merkproduct met **Opnieuw zoeken**.
+- Brave Image Search draait op Render met een echte sleutel (`/api/health` → `images.provider` is `brave`); live getest met drie merkproducten.
+- Het lezen van streepjescodes is niet getest op een echte iPhone of Android-telefoon, ook niet hoe snel het is bij weinig licht, op gebogen verpakkingen of hoeveel batterij het kost. Getest zijn de code (unit tests), de opzoekroute met echte Open Food Facts-aanroepen en een galerijfoto in een desktopbrowser.
+- Open Food Facts wordt door vrijwilligers gevuld. Nederlandse namen ontbreken soms, het merk is soms de fabrikant ("COCA-COLA SERVICES SA/NV") en niet elk product heeft een foto of Nederlandse ingrediënten. Daarom bevestigt de ouder altijd.
+- Webzoeken op een streepjescode vindt kleine of nieuwe producten vaak niet. Dan blijft de foto over.
 - Productinformatie is zo goed als de bronpagina: een fout op de pagina (Optimel "Zout 8 g") wordt overgenomen. Winkelpagina's die de server van Render weigeren, leveren niets op (`facts:page-unavailable`).
 - Voorbeeldfoto's van merkproducten komen bijna altijd van winkelsites met onbekende rechten. Ze worden alleen op het eigen toestel bewaard en getoond; of dat voor jouw gebruik mag, is aan de eigenaar van de app.
 - De zoekresultaten verschillen per keer: hetzelfde product vond de ene keer wel en de andere keer geen foto. **Opnieuw zoeken** helpt soms.

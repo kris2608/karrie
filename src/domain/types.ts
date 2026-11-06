@@ -17,8 +17,15 @@ export type ImageKind = "generic" | "photo";
 /** The parent's choice of picture; undefined lets a found reference picture win over the photo, then the drawing. */
 export type ImageChoice = "reference" | "photo" | "drawing";
 
-/** How the product itself was identified. "off" only appears on lists saved before barcode scanning was removed. */
-export type ItemSource = "catalog" | "manual" | "off" | "vision";
+/** How the product itself was identified. "off": Open Food Facts by barcode; "barcode": a web page that prints the barcode. */
+export type ItemSource = "catalog" | "manual" | "off" | "barcode" | "vision";
+
+/** Where one field came from: the parent, Open Food Facts, a web page, read on the photo, or guessed from it. */
+export type FieldSource = "parent" | "off" | "web" | "photo" | "guess";
+export type FieldSources = Partial<Record<"name" | "brand" | "variant" | "packageSize" | "image" | "nutrition", FieldSource>>;
+
+/** The barcode lookup behind an item. None of these is verified; off-exact only means name and brand were present. */
+export type BarcodeInfo = { status: "off-exact" | "off-partial" | "web-page"; sourceName: string; sourceUrl: string; at: number };
 
 /** Where the shown photo came from, independent of how the product was identified. */
 export type ImageSource = "off" | "parent";
@@ -76,6 +83,7 @@ export type Nutrition = {
 };
 
 export type PackInfo = {
+  /** Only a code the phone's barcode reader decoded (checksum-valid); a model reading stays in recognition.eanCandidate. */
   ean?: string;
   brand?: string;
   packageSize?: string;
@@ -88,6 +96,8 @@ export type PackInfo = {
   source?: ItemSource;
   nutrition?: Nutrition;
   offAttribution?: boolean;
+  barcode?: BarcodeInfo;
+  fieldSources?: FieldSources;
   recognition?: Recognition;
   alternative?: AlternativeAssessment;
   /** The parent's choice for the bonus mission; undefined means the evidence-based default. */
