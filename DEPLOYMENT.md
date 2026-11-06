@@ -275,6 +275,7 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - De tekst van een missie komt van het model en kan soms wat stroef Nederlands zijn ("zonder toegevoegd suiker").
 - Hoe `X-Forwarded-For` er op Render precies uitziet, is niet gecontroleerd; de per-IP-limieten zijn daarom een extra rem, niet de hoofdbeveiliging.
 - OpenAI levert bij de webzoekfunctie geen `image_result` (zie Voorbeeldfoto's). Als dat verandert, leest de code ze automatisch als eerste.
+- **Unsplash en Pixabay blokkeren de servers van Render.** Lokaal werken ze; op Render geeft elke pagina een fout (`/api/health` → `images.failures` toonde `unsplash.com:page-unavailable` en `pixabay.com:page-unavailable`). Op Render komen open-licentiefoto's daarom alleen van Wikimedia Commons, en krijgen algemene producten minder vaak automatisch een foto (in de live test: banaan niets, komkommer alleen ter keuze). Merkproducten werken op Render wel (live getest met Hak bruine bonen).
 - Voorbeeldfoto's van merkproducten komen bijna altijd van winkelsites met onbekende rechten. Ze worden alleen op het eigen toestel bewaard en getoond; of dat voor jouw gebruik mag, is aan de eigenaar van de app.
 - De zoekresultaten verschillen per keer: hetzelfde product vond de ene keer wel en de andere keer geen foto. **Opnieuw zoeken** helpt soms.
 - Het geheugen van de server met open-licentiefoto's is leeg na een herstart of slaapstand; dan wordt opnieuw (betaald) gezocht.
