@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { productById } from "../data/catalog";
 import type { VisionPack } from "../data/sample";
+import { wantedReferences } from "../domain/referenceTargets";
 import { starTotal } from "../domain/scoring";
 import { activeItem } from "../domain/shopQueue";
 import type { Adventure, PackInfo } from "../domain/types";
@@ -126,6 +127,16 @@ describe("foto herkennen", () => {
     const plain = reducer(state, { type: "found" });
     expect(starTotal(items(plain))).toBe(1);
     expect(items(plain)[0]).toMatchObject({ photoId: "p8", imageSource: "parent", status: "found" });
+  });
+
+  it("a catalog banana keeps its drawing until a parent asks for a picture", () => {
+    let state = withProducts("banaan");
+    const id = items(state)[0].id;
+    expect(wantedReferences(state.adventure)).toEqual([]);
+    state = reducer(state, { type: "set-image-choice", itemId: id, choice: "reference" });
+    expect(wantedReferences(state.adventure)).toEqual([{ name: "Banaan", generic: true }]);
+    state = reducer(state, { type: "set-image-choice", itemId: id, choice: undefined });
+    expect(wantedReferences(state.adventure)).toEqual([]);
   });
 
   it("photos stay referenced through history and saved lists", () => {

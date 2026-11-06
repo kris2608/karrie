@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pickArt } from "../components/ItemArt";
 import { identityKey, identityOf, type ImageIdentity } from "../domain/imageIdentity";
+import { cleanFacts, factsFor } from "../domain/productFacts";
 import { wantedReferences } from "../domain/referenceTargets";
 import type { Adventure, AdventureItem } from "../domain/types";
 import type { DiscoverOutcome, Discovery, ImageClient, ReferenceImage } from "../services/images/client";
@@ -41,8 +42,9 @@ describe("identity", () => {
     expect(identityOf({ name: "x".repeat(80) })?.name).toHaveLength(60);
   });
 
-  it("asks for list items and mission targets, not for products pinned to a photo or drawing", () => {
+  it("searches branded packs and pictures a parent asked for; standard products keep their drawing", () => {
     const item = (overrides: Partial<AdventureItem>): AdventureItem => ({ id: "1", productId: "p", name: "Banaan", icon: "banaan", category: "produce", quantity: 1, status: "pending", ...overrides });
+    const terra = { name: "AH Terra Pindakaas", brand: "AH Terra", source: "vision" as const, recognition: { specific: true, confidence: "high" as const } };
     const adventure = {
       phase: "draft",
       items: [
@@ -50,18 +52,24 @@ describe("identity", () => {
         item({ id: "2", name: "Melk", imageChoice: "photo" }),
         item({ id: "3", name: "Brood", imageChoice: "drawing" }),
         item({ id: "4", name: "Pindakaas", alternative: { status: "possible", evidence: "label", criteria: [], targetType: "pindakaas", source: "photo", assessedAt: 1 } }),
+        item({ id: "5", ...terra }),
+        item({ id: "6", name: "Komkommer", imageChoice: "reference" }),
+        item({ id: "7", ...terra, name: "Calvé", brand: "Calvé", imageChoice: "drawing" }),
       ],
     } as unknown as Adventure;
-    expect(wantedReferences(adventure).map(identityKey)).toEqual(["g|banaan", "g|pindakaas"]);
+    expect(wantedReferences(adventure).map(identityKey)).toEqual(["p|ah terra|ah terra pindakaas||", "g|komkommer", "p|calve|calve||"]);
     expect(wantedReferences({ ...adventure, phase: "done" })).toEqual([]);
   });
 
-  it("shows the parent's choice first, then the reference picture, then the photo", () => {
-    expect(pickArt(undefined, "ref", "photo")).toBe("ref");
-    expect(pickArt(undefined, null, "photo")).toBe("photo");
-    expect(pickArt("photo", "ref", "photo")).toBe("photo");
-    expect(pickArt("drawing", "ref", "photo")).toBeNull();
-    expect(pickArt("reference", null, "photo")).toBe("photo");
+  it("shows the parent's choice first, then a branded pack's reference picture, then the photo", () => {
+    expect(pickArt(undefined, "ref", "photo", true)).toBe("ref");
+    expect(pickArt(undefined, "ref", "photo", false)).toBe("photo");
+    expect(pickArt(undefined, "ref", null, false)).toBeNull();
+    expect(pickArt(undefined, null, "photo", true)).toBe("photo");
+    expect(pickArt("photo", "ref", "photo", true)).toBe("photo");
+    expect(pickArt("drawing", "ref", "photo", true)).toBeNull();
+    expect(pickArt("reference", null, "photo", true)).toBe("photo");
+    expect(pickArt("reference", "ref", null, true)).toBe("ref");
   });
 });
 
@@ -80,6 +88,19 @@ describe("retry policy", () => {
     expect(limited).toMatchObject({ state: "limit", retryAt: now + REFERENCE_RULES.limitRetryMs });
     expect(afterOutcome(found, BANAAN, { status: "offline" }, now)).toBe(found);
     expect(afterOutcome(found, BANAAN, { status: "error", code: "x" }, now)?.discovery).toEqual(found.discovery);
+  });
+
+  it("keeps the facts it already had when a new search finds none, and accepts only clean facts", () => {
+    const facts = cleanFacts({ nutriScore: "B", per100: { unit: "g", sugars: 5.2, salt: "veel" }, claims: ["Vegan", 3], sourceUrl: "https://www.ah.nl/p", sourceName: "ah.nl", readAt: 1 })!;
+    expect(facts).toEqual({ nutriScore: "B", per100: { unit: "g", sugars: 5.2 }, claims: ["Vegan"], sourceUrl: "https://www.ah.nl/p", sourceName: "ah.nl", readAt: 1 });
+    expect(cleanFacts({ nutriScore: "F", sourceUrl: "javascript:alert(1)", sourceName: "x" })).toBeUndefined();
+    const terra: ImageIdentity = { name: "AH Terra Pindakaas", brand: "AH Terra", generic: false };
+    const first = afterOutcome(undefined, terra, { status: "ok", discovery: { ...discovery("personal"), facts } }, 1)!;
+    const again = afterOutcome(first, terra, ok("review"), 2)!;
+    expect(again.discovery?.facts).toEqual(facts);
+    const item = { name: "AH Terra Pindakaas", brand: "AH Terra", source: "vision" as const, recognition: { specific: true, confidence: "high" as const } };
+    expect(factsFor(item, (identity) => (identityKey(identity) === identityKey(terra) ? again : undefined))).toEqual(facts);
+    expect(factsFor({ name: "Banaan" }, () => again)).toBeUndefined();
   });
 
   it("shows found and personal pictures, review pictures only once a parent picked one", () => {

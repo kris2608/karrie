@@ -1,0 +1,68 @@
+import type { ProductFacts } from "../../domain/productFacts";
+import type { AdventureItem } from "../../domain/types";
+import { useFacts } from "../../storage/references";
+
+const VALUES: { key: keyof Omit<NonNullable<ProductFacts["per100"]>, "unit">; label: string; unit: string }[] = [
+  { key: "energyKcal", label: "Energie", unit: "kcal" },
+  { key: "sugars", label: "Suikers", unit: "g" },
+  { key: "saturatedFat", label: "Verzadigd vet", unit: "g" },
+  { key: "salt", label: "Zout", unit: "g" },
+  { key: "fibre", label: "Vezels", unit: "g" },
+];
+
+const amount = (value: number) => value.toLocaleString("nl-NL", { maximumFractionDigits: 2 });
+
+/** Parent-only: what the product page says about this pack, with its source. */
+export function ProductInfo({ item }: { item: AdventureItem }) {
+  const facts = useFacts(item);
+  if (!facts) return null;
+  const rows = VALUES.filter((row) => facts.per100?.[row.key] !== undefined);
+
+  return (
+    <section className="product-info" data-testid="product-info">
+      <header>
+        <strong>Productinformatie</strong>
+        {facts.nutriScore && (
+          <span className={`nutri-score nutri-${facts.nutriScore.toLowerCase()}`} aria-label={`Nutri-Score ${facts.nutriScore}`} data-testid="nutri-score">
+            Nutri-Score {facts.nutriScore}
+          </span>
+        )}
+      </header>
+      {rows.length > 0 && (
+        <dl className="product-values">
+          {rows.map((row) => (
+            <div key={row.key}>
+              <dt>{row.label}</dt>
+              <dd>
+                {amount(facts.per100![row.key]!)} {row.unit}
+              </dd>
+            </div>
+          ))}
+          <small>per 100 {facts.per100?.unit ?? "g"}</small>
+        </dl>
+      )}
+      {facts.claims && (
+        <div className="chips">
+          {facts.claims.map((claim) => (
+            <span key={claim} className="chip">
+              {claim}
+            </span>
+          ))}
+        </div>
+      )}
+      {facts.ingredients && (
+        <details>
+          <summary>Ingrediënten</summary>
+          <p>{facts.ingredients}</p>
+          {facts.allergens && <p>Allergenen: {facts.allergens.join(", ")}</p>}
+        </details>
+      )}
+      <small className="picture-source">
+        Van {facts.sourceName}.{" "}
+        <a href={facts.sourceUrl} target="_blank" rel="noreferrer noopener">
+          Bron
+        </a>
+      </small>
+    </section>
+  );
+}

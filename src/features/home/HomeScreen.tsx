@@ -10,16 +10,45 @@ import { ReferenceSwitch } from "../../components/ui/ReferenceSwitch";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
+import { Toast, useNotice } from "../../components/ui/Toast";
+import { useLongPress } from "../../components/ui/useLongPress";
 import { softSpring } from "../../motion/variants";
 import { stickerLabel } from "../../domain/stickers";
 import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
+
+function ListCard({ list, label, onOpen, onForget }: { list: SavedList; label: string; onOpen: () => void; onForget: () => void }) {
+  const { pressing, handlers } = useLongPress(onForget);
+  return (
+    <motion.button
+      type="button"
+      className={pressing ? "list-card is-pressing" : "list-card"}
+      aria-label={`${label}, ${list.items.length} producten. Lang drukken om te wissen`}
+      data-testid="list-card"
+      whileTap={{ scale: 0.96 }}
+      onClick={onOpen}
+      {...handlers}
+    >
+      <span className="list-card-art">
+        {list.items.slice(0, 3).map((item, index) => (
+          <ItemArt key={`${item.productId}-${index}`} item={item} />
+        ))}
+      </span>
+      <span className="list-card-text">
+        <strong>{label}</strong>
+        <small>{list.items.length} producten</small>
+      </span>
+    </motion.button>
+  );
+}
 
 export function HomeScreen() {
   const { adventure, saved, stickers, dispatch } = useAdventure();
   const navigate = useNavigate();
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const undo = useNotice();
   const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null);
 
   useEffect(() => {
@@ -37,6 +66,12 @@ export function HomeScreen() {
   function openList(list: SavedList) {
     dispatch({ type: "open-saved", id: list.id });
     navigate("/controleren");
+  }
+
+  function forgetList(list: SavedList) {
+    const index = saved.findIndex((entry) => entry.id === list.id);
+    dispatch({ type: "forget-saved", id: list.id });
+    undo.show("Lijstje gewist", { label: "Ongedaan maken", run: () => dispatch({ type: "restore-saved", list, index }) });
   }
 
   return (
@@ -109,17 +144,7 @@ export function HomeScreen() {
           <ul>
             {shelf.map(({ list, label }) => (
               <li key={list.id}>
-                <motion.button type="button" className="list-card" whileTap={{ scale: 0.96 }} onClick={() => openList(list)}>
-                  <span className="list-card-art">
-                    {list.items.slice(0, 3).map((item, index) => (
-                      <ItemArt key={`${item.productId}-${index}`} item={item} />
-                    ))}
-                  </span>
-                  <span className="list-card-text">
-                    <strong>{label}</strong>
-                    <small>{list.items.length} producten</small>
-                  </span>
-                </motion.button>
+                <ListCard list={list} label={label} onOpen={() => openList(list)} onForget={() => forgetList(list)} />
               </li>
             ))}
           </ul>
@@ -155,13 +180,56 @@ export function HomeScreen() {
         )}
       </AnimatePresence>
 
-      <Sheet open={parentOpen} onClose={() => setParentOpen(false)} label="Instellingen voor ouders">
+      <Toast notice={undo.notice} onDismiss={undo.dismiss} />
+
+      <Sheet
+        open={parentOpen}
+        onClose={() => {
+          setParentOpen(false);
+          setConfirmClear(false);
+        }}
+        label="Instellingen voor ouders"
+      >
         <h2>Voor ouders</h2>
         <SoundSwitch />
         <DiscoverySwitch />
         <ReferenceSwitch />
-        <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome.</p>
-        <PressButton variant="secondary" wide onClick={() => setParentOpen(false)}>
+        {saved.length > 0 &&
+          (confirmClear ? (
+            <div className="clear-saved" data-testid="clear-saved-confirm">
+              <p>
+                Alle {saved.length} bewaarde {saved.length === 1 ? "lijstje" : "lijstjes"} wissen?
+              </p>
+              <div className="clear-saved-actions">
+                <PressButton variant="quiet" onClick={() => setConfirmClear(false)}>
+                  Annuleer
+                </PressButton>
+                <PressButton
+                  variant="secondary"
+                  data-testid="clear-saved-yes"
+                  onClick={() => {
+                    dispatch({ type: "clear-saved" });
+                    setConfirmClear(false);
+                  }}
+                >
+                  Wissen
+                </PressButton>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="text-button" data-testid="clear-saved" onClick={() => setConfirmClear(true)}>
+              Bewaarde lijstjes wissen
+            </button>
+          ))}
+        <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome. Lang drukken op een lijstje wist het.</p>
+        <PressButton
+          variant="secondary"
+          wide
+          onClick={() => {
+            setParentOpen(false);
+            setConfirmClear(false);
+          }}
+        >
           Klaar
         </PressButton>
       </Sheet>

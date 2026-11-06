@@ -1,5 +1,6 @@
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import { FACT_RULES, factsOf, factsRequest, guardFacts, pageEvidence, worthReading, type ProductFacts } from "./facts.js";
 import type { Usage } from "./limits.js";
 import { errorCode } from "./recognize.js";
 import { matchesMagic, type ImageType } from "./validate.js";
@@ -47,6 +48,8 @@ export type Discovery = {
   candidates: ReferenceImage[];
   provider: Provider;
   searchedAt: number;
+  /** Read from a candidate's product page. Facts are not pictures, so they travel with every shareable answer. */
+  facts?: ProductFacts;
 };
 
 export type DiscoverResult =
@@ -79,7 +82,7 @@ const USER_AGENT = "KarrieImageCheck/1.0 (https://karrieapp.onrender.com; family
 
 export const IMAGE_RULES = {
   maxCandidates: 3,
-  maxLeads: 6,
+  maxLeads: 8,
   pageBytes: 900_000,
   imageBytes: 4_000_000,
   fetchTimeoutMs: 6_000,
@@ -478,9 +481,10 @@ async function resolveOpenImage(fetchImpl: Fetch, lead: Extract<Lead, { kind: "o
   };
 }
 
+/** The shop's own picture first; when the shop refuses Render, the search service's thumbnail of it. */
 async function resolveImage(fetchImpl: Fetch, lead: Extract<Lead, { kind: "image" }>): Promise<Resolved | Failure> {
-  const thumb = lead.thumbnailUrl ? await fetchImage(fetchImpl, lead.thumbnailUrl) : "image-unavailable";
-  const image = typeof thumb === "string" ? await fetchImage(fetchImpl, lead.imageUrl) : thumb;
+  const original = await fetchImage(fetchImpl, lead.imageUrl);
+  const image = typeof original === "string" && lead.thumbnailUrl ? await fetchImage(fetchImpl, lead.thumbnailUrl, undefined, "*/*") : original;
   if (typeof image === "string") return image;
   return {
     imageUrl: lead.imageUrl,
@@ -676,25 +680,62 @@ type ResponsesClient = { responses: { create: (body: never, options?: { signal?:
 
 export type DiscoveryConfig = { model: string; maxConcurrent: number; braveKey?: string; openverse?: boolean };
 
-export type SearchReport = { leads: Lead[]; usage?: Usage; searchCalls: number; providerCalls: number; imageResults: number; term?: string };
+export type SearchReport = {
+  leads: Lead[];
+  usage?: Usage;
+  searchCalls: number;
+  providerCalls: number;
+  imageResults: number;
+  term?: string;
+  provider: Provider;
+  failures: string[];
+};
+
+export function braveFailure(status: number | undefined): string {
+  if (status === 401 || status === 403) return "brave:unauthorized";
+  if (status === 429) return "brave:rate-limited";
+  return "brave:unavailable";
+}
 
 export function createImageDiscovery(client: ResponsesClient, config: DiscoveryConfig, fetchImpl: Fetch = fetch, now: () => number = Date.now) {
   const cache = new Map<string, { discovery: Discovery; until: number }>();
   const pending = new Map<string, Promise<DiscoverResult>>();
+  const facts = new Map<string, { facts: ProductFacts; until: number }>();
   let running = 0;
+  /** The provider for branded packs; standard products always go through OpenAI web search and Openverse. */
   const provider: Provider = config.braveKey ? "brave" : "openai-web";
 
+  async function braveLeads(identity: ImageIdentity, key: string): Promise<{ leads: Lead[] } | { failure: string }> {
+    const url = new URL("https://api.search.brave.com/res/v1/images/search");
+    for (const [name, value] of Object.entries({ q: braveQuery(identity), country: "NL", search_lang: "nl", count: "12", safesearch: "strict" })) url.searchParams.set(name, value);
+    const response = await fetchImpl(url.href, { headers: { Accept: "application/json", "X-Subscription-Token": key }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
+    if (!response?.ok) return { failure: braveFailure(response?.status) };
+    const body = (await response.json().catch(() => ({}))) as { results?: BraveImage[] };
+    return { leads: leadsFromBrave(body) };
+  }
+
+  /** Brave for a branded pack when a key is set; if Brave fails, OpenAI web search still runs. */
   async function findLeads(identity: ImageIdentity): Promise<SearchReport> {
-    if (config.braveKey) {
-      const url = new URL("https://api.search.brave.com/res/v1/images/search");
-      for (const [key, value] of Object.entries({ q: braveQuery(identity), country: "NL", search_lang: "nl", count: "12", safesearch: "strict" })) url.searchParams.set(key, value);
-      const response = await fetchImpl(url.href, { headers: { Accept: "application/json", "X-Subscription-Token": config.braveKey }, signal: AbortSignal.timeout(10_000) });
-      if (!response.ok) throw Object.assign(new Error(`brave ${response.status}`), { status: response.status });
-      return { leads: leadsFromBrave((await response.json()) as { results?: BraveImage[] }), searchCalls: 0, providerCalls: 1, imageResults: 0 };
+    const failures: string[] = [];
+    let providerCalls = 0;
+    if (config.braveKey && !identity.generic) {
+      const brave = await braveLeads(identity, config.braveKey);
+      providerCalls = 1;
+      if ("leads" in brave) return { leads: brave.leads, searchCalls: 0, providerCalls, imageResults: 0, provider: "brave", failures };
+      failures.push(brave.failure);
     }
     const search = (await client.responses.create(openAiSearchRequest(config.model, identity) as never)) as RawResponse;
     const found = leadsFromOpenAi(search);
-    return { leads: found.leads, usage: usageOf(search), searchCalls: found.searchCalls, providerCalls: 0, imageResults: found.imageResults, term: englishTerm(search) };
+    return {
+      leads: found.leads,
+      usage: usageOf(search),
+      searchCalls: found.searchCalls,
+      providerCalls,
+      imageResults: found.imageResults,
+      term: englishTerm(search),
+      provider: "openai-web",
+      failures,
+    };
   }
 
   /** Openverse's index is English; the term comes from the query the model already wrote, so this costs no extra model call. */
@@ -707,23 +748,71 @@ export function createImageDiscovery(client: ResponsesClient, config: DiscoveryC
     return leads.length ? { leads } : { leads, failure: "openverse:no-results" };
   }
 
+  /**
+   * Branded packs only: the facts on the shop or brand page of the chosen picture, else the next matching one.
+   * Kept per product, so a later search for the same pack (another family, a refresh) pays nothing for them.
+   */
+  async function productFacts(identity: ImageIdentity, discovery: Discovery): Promise<{ facts?: ProductFacts; usage?: Usage; failures: string[] }> {
+    if (identity.generic) return { failures: [] };
+    const key = identityKey(identity);
+    const known = facts.get(key);
+    if (known && known.until > now()) return { facts: known.facts, failures: [] };
+    const order = discovery.selected === undefined ? discovery.candidates : [discovery.candidates[discovery.selected], ...discovery.candidates];
+    const pages = [...new Set(order.filter((image) => image.usageRightsStatus === "unknown").map((image) => image.sourcePageUrl))].slice(0, FACT_RULES.pages);
+    const failures: string[] = [];
+    let usage: Usage | undefined;
+    for (const page of pages) {
+      const response = await get(fetchImpl, page, "text/html").catch(() => null);
+      const bytes = response?.ok ? await readLimited(response, IMAGE_RULES.pageBytes).catch(() => null) : null;
+      if (!bytes) {
+        failures.push("facts:page-unavailable");
+        continue;
+      }
+      const evidence = pageEvidence(bytes.toString("utf8"));
+      if (!worthReading(evidence)) {
+        failures.push("facts:not-on-page");
+        continue;
+      }
+      const answer = (await client.responses.create(factsRequest(config.model, describe(identity), evidence) as never).catch(() => null)) as RawResponse | null;
+      if (!answer) {
+        failures.push("facts:error");
+        break;
+      }
+      usage = addUsage(usage, usageOf(answer));
+      const raw = factsOf(answer);
+      const found = raw && guardFacts(raw, evidence, { url: page, name: new URL(page).hostname.replace(/^www\./, ""), at: now() });
+      if (found) {
+        if (facts.size >= IMAGE_RULES.cacheEntries) facts.delete(facts.keys().next().value as string);
+        facts.set(key, { facts: found, until: now() + IMAGE_RULES.foundTtlMs });
+        return { facts: found, usage, failures };
+      }
+      failures.push("facts:not-on-page");
+    }
+    return { usage, failures };
+  }
+
   /** The one entry point for finding pictures of a product. Switching provider changes nothing else. */
   async function searchProductReferenceImages(identity: ImageIdentity): Promise<DiscoverResult & { failures?: string[] }> {
-    let report: SearchReport = { leads: [], searchCalls: 0, providerCalls: 0, imageResults: 0 };
+    let report: SearchReport = { leads: [], searchCalls: 0, providerCalls: 0, imageResults: 0, provider, failures: [] };
     try {
       report = await findLeads(identity);
       const open = await openverseLeads(identity, report.term);
-      const { resolved, failures } = await resolveLeads(fetchImpl, [...report.leads, ...open.leads]);
+      const resolution = await resolveLeads(fetchImpl, [...report.leads, ...open.leads]);
+      const { resolved } = resolution;
+      const failures = [...report.failures, ...resolution.failures];
       if (!report.leads.length) failures.push("search:no-results");
       if (open.failure) failures.push(open.failure);
       const base = { usage: report.usage, searchCalls: report.searchCalls, providerCalls: report.providerCalls, failures };
-      if (!resolved.length) return { ok: true, discovery: { status: "none", candidates: [], provider, searchedAt: now() }, ...base };
+      if (!resolved.length) return { ok: true, discovery: { status: "none", candidates: [], provider: report.provider, searchedAt: now() }, ...base };
       const check = (await client.responses.create(verifyRequest(config.model, identity, resolved) as never)) as RawResponse;
-      const discovery = decide(identity, resolved, verdictsOf(check, resolved.length), provider, now());
+      const decided = decide(identity, resolved, verdictsOf(check, resolved.length), report.provider, now());
+      const read = await productFacts(identity, decided);
+      failures.push(...read.failures);
+      const discovery = read.facts ? { ...decided, facts: read.facts } : decided;
       const chosen = discovery.selected === undefined ? undefined : discovery.candidates[discovery.selected];
       const data = chosen && resolved.find((entry) => entry.imageUrl === chosen.imageUrl)?.dataUrl;
       const selectedData = data && data.length <= IMAGE_RULES.selectedDataChars ? data : undefined;
-      return { ok: true, discovery, selectedData, ...base, usage: addUsage(report.usage, usageOf(check)) };
+      return { ok: true, discovery, selectedData, ...base, usage: addUsage(addUsage(report.usage, usageOf(check)), read.usage) };
     } catch (error) {
       const status = (error as { status?: number }).status;
       return { ok: false, code: status === 429 ? "busy" : errorCode(error), usage: report.usage, searchCalls: report.searchCalls, providerCalls: report.providerCalls };

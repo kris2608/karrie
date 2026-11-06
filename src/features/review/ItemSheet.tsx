@@ -11,6 +11,7 @@ import { productById } from "../../data/catalog";
 import { useAdventure } from "../../state/AdventureContext";
 import { DrawingPicker } from "./DrawingPicker";
 import { PictureBlock } from "./PictureBlock";
+import { ProductInfo } from "./ProductInfo";
 
 type ItemSheetProps = {
   item: AdventureItem | null;
@@ -96,6 +97,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
       </div>
       {item.offAttribution && <p className="scan-attribution">Gegevens: Open Food Facts (ODbL){item.imageSource === "off" ? ", foto's CC BY-SA" : ""}</p>}
       <PictureBlock item={item} />
+      <ProductInfo item={item} />
       <MissionBlock item={item} />
 
       {editing ? (

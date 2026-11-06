@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { identityKey, type ImageIdentity } from "../domain/imageIdentity";
+import { factsFor, type ProductFacts } from "../domain/productFacts";
 import { images as defaultClient, type DiscoverOutcome, type Discovery, type ImageClient, type ReferenceImage } from "../services/images/client";
 import { readKv, writeKv } from "./db";
 import { savePhoto, usePhotoUrl } from "./photos";
@@ -53,7 +54,7 @@ export function afterOutcome(previous: ReferenceEntry | undefined, identity: Ima
       return {
         ...base,
         state: outcome.discovery.status,
-        discovery: outcome.discovery,
+        discovery: outcome.discovery.facts || !previous?.discovery?.facts ? outcome.discovery : { ...outcome.discovery, facts: previous.discovery.facts },
         attempts: 0,
         retryAt: outcome.discovery.status === "none" ? now + REFERENCE_RULES.noneRetryMs : undefined,
       };
@@ -223,6 +224,11 @@ export const references = createReferenceStore({
 
 export function useReference(identity: ImageIdentity | null): ReferenceEntry | undefined {
   return useSyncExternalStore(references.subscribe, () => references.entry(identity));
+}
+
+/** What the product page said about a branded pack; standard products have none. */
+export function useFacts(item: Parameters<typeof factsFor>[0]): ProductFacts | undefined {
+  return useSyncExternalStore(references.subscribe, () => factsFor(item, references.entry));
 }
 
 export function useSearching(identity: ImageIdentity | null): boolean {

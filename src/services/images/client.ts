@@ -1,4 +1,5 @@
 import type { ImageIdentity } from "../../domain/imageIdentity";
+import { cleanFacts, type ProductFacts } from "../../domain/productFacts";
 
 /** Mirrors ReferenceImage on the server. Every URL was returned by a search service and checked to be a real picture. */
 export type ReferenceImage = {
@@ -22,6 +23,7 @@ export type Discovery = {
   candidates: ReferenceImage[];
   provider: string;
   searchedAt: number;
+  facts?: ProductFacts;
 };
 
 export type DiscoverOutcome =
@@ -82,7 +84,9 @@ export function createImageClient(deps: ImageClientDeps) {
         const body = (await response.json().catch(() => null)) as { status?: string; code?: string; discovery?: unknown; selectedData?: unknown } | null;
         if (response.ok && body?.status === "ok" && isDiscovery(body.discovery)) {
           const data = typeof body.selectedData === "string" && /^data:image\/(jpeg|png|webp);base64,/.test(body.selectedData) ? body.selectedData : undefined;
-          return { status: "ok", discovery: body.discovery, selectedData: data };
+          const { facts, ...discovery } = body.discovery;
+          const clean = cleanFacts(facts);
+          return { status: "ok", discovery: clean ? { ...discovery, facts: clean } : discovery, selectedData: data };
         }
         const code = body?.code ?? `http-${response.status}`;
         return LIMIT_CODES.has(code) || response.status === 429 ? { status: "limit", code } : { status: "error", code };

@@ -64,6 +64,46 @@ it("bewaart een nieuw lijstje voor later zonder het avontuur te starten", () => 
   expect(state.saved[0].items.map((item) => item.productId)).toEqual(["banaan"]);
 });
 
+it("wist een bewaard lijstje, zet het terug op zijn plek en wist alles", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  let state = initialState;
+  for (let i = 0; i < 3; i += 1) {
+    state = reducer(state, { type: "new-draft" });
+    state = reducer(state, { type: "add-product", product: banaan });
+    state = reducer(state, { type: "save-favorite" });
+  }
+  const ids = state.saved.map((list) => list.id);
+  expect(ids).toHaveLength(3);
+  const middle = state.saved[1];
+  state = reducer(state, { type: "forget-saved", id: middle.id });
+  expect(state.saved.map((list) => list.id)).toEqual([ids[0], ids[2]]);
+  state = reducer(state, { type: "restore-saved", list: middle, index: 1 });
+  expect(state.saved.map((list) => list.id)).toEqual(ids);
+  state = reducer(state, { type: "clear-saved" });
+  expect(state.saved).toEqual([]);
+  expect(state.adventure?.items).toHaveLength(1);
+});
+
+it("wist een bewaard lijstje, zet het terug op zijn plek en wist alles", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  let state = initialState;
+  for (let i = 0; i < 3; i += 1) {
+    state = reducer(state, { type: "new-draft" });
+    state = reducer(state, { type: "add-product", product: banaan });
+    state = reducer(state, { type: "save-favorite" });
+  }
+  const ids = state.saved.map((list) => list.id);
+  expect(ids).toHaveLength(3);
+  const middle = state.saved[1];
+  state = reducer(state, { type: "forget-saved", id: middle.id });
+  expect(state.saved.map((list) => list.id)).toEqual([ids[0], ids[2]]);
+  state = reducer(state, { type: "restore-saved", list: middle, index: 1 });
+  expect(state.saved.map((list) => list.id)).toEqual(ids);
+  state = reducer(state, { type: "clear-saved" });
+  expect(state.saved).toEqual([]);
+  expect(state.adventure?.items).toHaveLength(1);
+});
+
 it("maakt van een geplakte lijst een avontuur en bewaart een favoriet", () => {
   const lines = recognizeList("banaan\n2 pakken yoghurt").flatMap((line) =>
     line.product ? [{ product: line.product, quantity: line.quantity }] : [],

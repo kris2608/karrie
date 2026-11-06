@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { hasPhoto } from "../../components/ItemArt";
-import { identityKey, identityOf } from "../../domain/imageIdentity";
+import { identityKey, identityOf, wantsReference } from "../../domain/imageIdentity";
 import type { AdventureItem, ImageChoice } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { references, shownImage, useReference, useSearching } from "../../storage/references";
@@ -18,22 +18,29 @@ const STATUS: Record<string, string> = {
 export function PictureBlock({ item }: { item: AdventureItem }) {
   const { settings, dispatch } = useAdventure();
   const identity = identityOf(item);
+  const wanted = wantsReference(identity, item.imageChoice);
   const entry = useReference(identity);
-  const shown = shownImage(entry);
+  const shown = wanted ? shownImage(entry) : null;
   const searching = useSearching(identity);
   const key = identity ? identityKey(identity) : null;
 
   useEffect(() => {
-    if (settings.referenceImages && identity) references.request(identity);
-  }, [key, settings.referenceImages]);
-  const candidates = entry?.discovery?.candidates ?? [];
+    if (settings.referenceImages && wanted) references.request(identity);
+  }, [key, wanted, settings.referenceImages]);
+  const candidates = wanted ? (entry?.discovery?.candidates ?? []) : [];
   const photo = hasPhoto(item);
   const active: ImageChoice = item.imageChoice ?? (shown ? "reference" : photo ? "photo" : "drawing");
-  const status = searching ? "searching" : entry?.chosen === null ? "removed" : shown ? null : entry?.state;
+  const status = !wanted ? null : searching ? "searching" : entry?.chosen === null ? "removed" : shown ? null : entry?.state;
+  /** A standard product only searches when the parent asks for a picture. */
+  const optIn = Boolean(identity?.generic && settings.referenceImages);
 
-  const choose = (choice: ImageChoice) => dispatch({ type: "set-image-choice", itemId: item.id, choice });
+  const choose = (choice: ImageChoice | undefined) => dispatch({ type: "set-image-choice", itemId: item.id, choice });
+  const pick = (choice: ImageChoice) => {
+    if (choice === "reference" && identity && entry?.chosen === null) references.choose(identity, undefined);
+    choose(choice);
+  };
   const choices: { id: ImageChoice; label: string; show: boolean }[] = [
-    { id: "reference", label: "Voorbeeldfoto", show: Boolean(shown) },
+    { id: "reference", label: "Voorbeeldfoto", show: Boolean(shown) || optIn },
     { id: "photo", label: "Eigen foto", show: photo },
     { id: "drawing", label: "Tekening", show: true },
   ];
@@ -54,7 +61,7 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
                 className={choice.id === active ? "chip is-active" : "chip"}
                 aria-pressed={choice.id === active}
                 data-testid={`picture-${choice.id}`}
-                onClick={() => choose(choice.id)}
+                onClick={() => pick(choice.id)}
               >
                 {choice.label}
               </button>
@@ -96,7 +103,7 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
       )}
 
       <div className="picture-actions">
-        {settings.referenceImages && (
+        {settings.referenceImages && wanted && (
           <button type="button" className="text-button" data-testid="picture-refresh" disabled={searching} onClick={() => references.request(identity, { refresh: true })}>
             Opnieuw zoeken
           </button>
@@ -107,8 +114,9 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
             className="text-button"
             data-testid="picture-remove"
             onClick={() => {
+              if (identity.generic) return choose(undefined);
               references.choose(identity, null);
-              if (item.imageChoice === "reference") dispatch({ type: "set-image-choice", itemId: item.id, choice: undefined });
+              if (item.imageChoice === "reference") choose(undefined);
             }}
           >
             Geen voorbeeldfoto

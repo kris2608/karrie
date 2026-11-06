@@ -27,6 +27,15 @@ export function identityOf(item: Identifiable): ImageIdentity | null {
   return { name, generic: true };
 }
 
+/**
+ * Only a recognised branded pack gets a reference picture without asking. Standard products keep their drawing
+ * unless a parent picks "Voorbeeldfoto".
+ */
+export function wantsReference(identity: ImageIdentity | null, choice: PackInfo["imageChoice"]): boolean {
+  if (!identity || choice === "photo" || choice === "drawing") return false;
+  return choice === "reference" || !identity.generic;
+}
+
 function part(value?: string) {
   return (value ?? "")
     .toLowerCase()

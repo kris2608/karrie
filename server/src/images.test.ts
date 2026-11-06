@@ -21,6 +21,7 @@ import {
   type Resolved,
   type Verdict,
 } from "./images.js";
+import { raw, SHOP_PAGE } from "../test/fixtures.js";
 import { createLimits } from "./limits.js";
 
 const TERRA: ImageIdentity = { name: "Pindakaas", brand: "AH Terra", variant: "100% naturel", size: "350 g", generic: false };
@@ -189,6 +190,8 @@ describe("matching", () => {
     expect(shareable(personal)).toBeNull();
     const mixed: Discovery = { ...personal, status: "found", candidates: [{ ...resolved({ usageRightsStatus: "permitted" }), matchingStatus: "same-type" }, ...personal.candidates] };
     expect(shareable(mixed)?.candidates).toHaveLength(1);
+    const facts = { nutriScore: "B" as const, sourceUrl: "https://shop.example/terra", sourceName: "shop.example", readAt: 1 };
+    expect(shareable({ ...mixed, facts })?.facts).toEqual(facts);
     expect(shareable({ status: "none", candidates: [], provider: "openai-web", searchedAt: 1 })?.status).toBe("none");
   });
 });
@@ -278,6 +281,66 @@ describe("image discovery service", () => {
     expect(service.cached(BANAAN)?.status).toBe("found");
     await service.discover(TERRA);
     expect(web.filter((url) => url.includes("?q="))).toHaveLength(1);
+  });
+
+  it("uses Brave for branded packs, falls back to the thumbnail when the shop refuses, and keeps standard products on OpenAI", async () => {
+    const web: string[] = [];
+    const openai = fakeOpenAi(["https://unsplash.com/photos/banana"], [{}]);
+    const brave = async (url: string, init?: RequestInit) => {
+      web.push(url);
+      if (url.startsWith("https://api.search.brave.com/")) {
+        expect((init?.headers as Record<string, string>)["X-Subscription-Token"]).toBe("k");
+        return Response.json({
+          results: [{ title: "AH Terra", url: "https://www.ah.nl/producten/terra", thumbnail: { src: "https://imgs.search.brave.com/t" }, properties: { url: "https://static.ah.nl/terra.jpg" } }],
+        });
+      }
+      if (url === "https://static.ah.nl/terra.jpg") return new Response("", { status: 403 });
+      if (url === "https://imgs.search.brave.com/t") return new Response(JPEG, { headers: { "content-type": "image/jpeg" } });
+      return fakeWeb([])(url);
+    };
+    const service = createImageDiscovery(openai.client, { model: "m", maxConcurrent: 2, braveKey: "k" }, brave);
+    const terra = await service.searchProductReferenceImages(TERRA);
+    expect(terra).toMatchObject({ ok: true, providerCalls: 1, searchCalls: 0, discovery: { status: "personal", provider: "brave", candidates: [{ imageUrl: "https://static.ah.nl/terra.jpg", sourceName: "ah.nl" }] } });
+    expect(openai.bodies.filter((body) => body.tools)).toHaveLength(0);
+    const banaan = await service.searchProductReferenceImages(BANAAN);
+    expect(banaan).toMatchObject({ ok: true, providerCalls: 0, searchCalls: 1, discovery: { provider: "openai-web" } });
+  });
+
+  it("falls back to OpenAI web search when Brave refuses and records why", async () => {
+    const openai = fakeOpenAi(["https://shop.example/terra"], [{}]);
+    const web = fakeWeb([]);
+    const fetchImpl = async (url: string) => (url.startsWith("https://api.search.brave.com/") ? new Response("", { status: 429 }) : web(url));
+    const service = createImageDiscovery(openai.client, { model: "m", maxConcurrent: 2, braveKey: "k" }, fetchImpl);
+    const result = await service.searchProductReferenceImages(TERRA);
+    expect(result).toMatchObject({ ok: true, providerCalls: 1, searchCalls: 1, discovery: { status: "personal", provider: "openai-web" } });
+    expect(result.failures).toContain("brave:rate-limited");
+  });
+
+  it("stores the facts from a branded pack's page once, checked against the page", async () => {
+    const bodies: { text?: { format?: { name?: string } }; tools?: unknown }[] = [];
+    const client = {
+      responses: {
+        create: async (body: never) => {
+          const request = body as (typeof bodies)[number];
+          bodies.push(request);
+          if (request.tools) return { output: [{ type: "web_search_call", action: { type: "search" }, results: [{ type: "text_result", url: "https://shop.example/terra" }] }] };
+          if (request.text?.format?.name === "product_facts")
+            return { output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(raw({ sugars: 9.9 })) }] }], usage: { input_tokens: 2500, output_tokens: 120 } };
+          return { output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ images: [verdict({ index: 0 })] }) }] }] };
+        },
+      },
+    };
+    const web = fakeWeb([]);
+    const page = async (url: string) =>
+      url === "https://shop.example/terra" ? new Response(`<meta property="og:image" content="https://shop.example/terra.jpg">${SHOP_PAGE}`, { headers: { "content-type": "text/html" } }) : web(url);
+    const service = createImageDiscovery(client, { model: "m", maxConcurrent: 2 }, page);
+    const first = await service.searchProductReferenceImages(TERRA);
+    expect(first.ok && first.discovery.facts).toMatchObject({ nutriScore: "B", per100: { fat: 51.3 }, sourceName: "shop.example" });
+    expect(first.ok && first.discovery.facts?.per100?.sugars).toBeUndefined();
+    await service.searchProductReferenceImages(TERRA);
+    expect(bodies.filter((body) => body.text?.format?.name === "product_facts")).toHaveLength(1);
+    await service.searchProductReferenceImages(BANAAN);
+    expect(bodies.filter((body) => body.text?.format?.name === "product_facts")).toHaveLength(1);
   });
 
   it("treats an Openverse outage as one more failed source", async () => {

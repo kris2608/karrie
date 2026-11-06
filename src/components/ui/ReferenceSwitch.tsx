@@ -15,7 +15,7 @@ export function ReferenceSwitch() {
     >
       <span className="switch-label">
         <strong>Voorbeeldfoto's</strong>
-        <small>{on ? "Aan: Karrie zoekt een echte foto bij elk product (alleen de productnaam gaat mee)" : "Uit: tekeningen en eigen foto's"}</small>
+        <small>{on ? "Echte foto bij merkproducten" : "Alleen tekeningen en eigen foto's"}</small>
       </span>
       <span className="switch-track" aria-hidden="true">
         <span className="switch-thumb" />

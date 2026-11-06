@@ -94,7 +94,10 @@ export type Action =
   | { type: "skip" }
   | { type: "undo" }
   | { type: "save-favorite" }
-  | { type: "open-saved"; id: string };
+  | { type: "open-saved"; id: string }
+  | { type: "forget-saved"; id: string }
+  | { type: "restore-saved"; list: SavedList; index: number }
+  | { type: "clear-saved" };
 
 function touch(adventure: Adventure, patch: Partial<Adventure>): Adventure {
   return { ...adventure, ...patch, updatedAt: Date.now() };
@@ -434,6 +437,14 @@ export function reducer(state: AppState, action: Action): AppState {
       const items = sortByCategory(list.items.map(itemFromSaved), state.categoryOrder);
       return { ...state, adventure: { ...adventure, items } };
     }
+    case "forget-saved":
+      return { ...state, saved: state.saved.filter((list) => list.id !== action.id) };
+    case "restore-saved": {
+      const saved = state.saved.filter((list) => list.id !== action.list.id);
+      return { ...state, saved: [...saved.slice(0, action.index), action.list, ...saved.slice(action.index)] };
+    }
+    case "clear-saved":
+      return { ...state, saved: [] };
     default:
       return state;
   }

@@ -1,5 +1,5 @@
 // Runs the real reference-image pipeline (dist/images.js) on Dutch supermarket products.
-// Usage (from server/, after npm run build): node scripts/validate-image-search.mjs [--generic] [--like-render] [out.html]
+// Usage (from server/, after npm run build): node scripts/validate-image-search.mjs [--generic|--branded] [--like-render] [out.html]
 // --like-render refuses Unsplash and Pixabay, which block Render's servers. Writes a contact sheet so the chosen
 // pictures can be checked by eye. Prints no secrets.
 import { existsSync, writeFileSync } from "node:fs";
@@ -37,7 +37,10 @@ const PRODUCTS = [
 ];
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((arg) => arg.startsWith("--")));
-const wanted = flags.has("--generic") ? PRODUCTS.filter((product) => product.generic) : PRODUCTS;
+const only = process.env.ONLY?.split(",").map((name) => name.trim().toLowerCase());
+const wanted = (flags.has("--generic") ? PRODUCTS.filter((product) => product.generic) : flags.has("--branded") ? PRODUCTS.filter((product) => !product.generic) : PRODUCTS).filter(
+  (product) => !only || only.some((name) => describe(product).toLowerCase().includes(name)),
+);
 const renderBlocks = /^https:\/\/([a-z0-9-]+\.)*(unsplash\.com|pixabay\.com)\//;
 const web = flags.has("--like-render") ? (url, init) => (renderBlocks.test(url) ? Promise.resolve(new Response("", { status: 403 })) : fetch(url, init)) : fetch;
 
@@ -59,12 +62,15 @@ async function one(identity) {
   const result = await discovery.discover(identity);
   const ms = Date.now() - started;
   const row = { identity, ms, ok: result.ok, code: result.ok ? undefined : result.code, cost: cost(result.usage, result.searchCalls), searchCalls: result.searchCalls, failures: result.failures ?? [] };
-  if (result.ok) Object.assign(row, { status: result.discovery.status, candidates: result.discovery.candidates, selected: result.discovery.selected });
+  if (result.ok) Object.assign(row, { status: result.discovery.status, candidates: result.discovery.candidates, selected: result.discovery.selected, facts: result.discovery.facts });
   rows.push(row);
   const top = row.candidates?.[0];
   console.log(
     `${describe(identity).padEnd(44)} ${String(ms).padStart(6)} ms  ${(row.status ?? `ERROR ${row.code}`).padEnd(7)} cand ${row.candidates?.length ?? 0}  $${row.cost.toFixed(4)}  fail [${row.failures.join(",")}]` +
-      (top ? `\n    top: ${top.matchingStatus}/${top.usageRightsStatus} ${top.sourceName} ${top.imageUrl.slice(0, 90)}` : ""),
+      (top ? `\n    top: ${top.matchingStatus}/${top.usageRightsStatus} ${top.sourceName} ${top.imageUrl.slice(0, 90)}` : "") +
+      (row.facts
+        ? `\n    facts (${row.facts.sourceUrl.slice(0, 100)}): nutri ${row.facts.nutriScore ?? "-"}, per100 ${JSON.stringify(row.facts.per100 ?? {})}, claims ${JSON.stringify(row.facts.claims ?? [])}, ingredients ${row.facts.ingredients ? "yes" : "no"}`
+        : ""),
   );
 }
 
@@ -108,6 +114,10 @@ console.log(`review only: ${ok.filter((row) => row.status === "review").length},
 console.log(`median time ${median} ms, total cost $${totalCost.toFixed(3)}, per product $${(totalCost / rows.length).toFixed(4)}, per applied image $${found.length ? (totalCost / found.length).toFixed(4) : "-"}`);
 console.log(`cache reuse without API calls: ${reused}/${shareableCount} shareable answers; personal pictures shared through the cache: ${leaked}`);
 console.log(`lead failures: ${JSON.stringify(failures)}`);
+const withFacts = rows.filter((row) => row.facts);
+console.log(
+  `product facts: ${withFacts.length}/${rows.length}; Nutri-Score ${withFacts.filter((row) => row.facts.nutriScore).length}, nutrition ${withFacts.filter((row) => row.facts.per100).length}, ingredients ${withFacts.filter((row) => row.facts.ingredients).length}, claims ${withFacts.filter((row) => row.facts.claims).length}`,
+);
 
 const out = args.find((arg) => !arg.startsWith("--"));
 if (out) {
