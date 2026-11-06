@@ -78,6 +78,9 @@ export function clientIp(req: IncomingMessage): string {
 export function createHandler(deps: AppDeps) {
   const now = deps.now ?? Date.now;
   const inFlight = new Set<string>();
+  /** Why picture leads failed, by type only; shown on /api/health so a blocked host is visible without logs. */
+  const imageFailures: Record<string, number> = {};
+  const imageOutcomes: Record<string, number> = {};
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     const id = randomUUID().slice(0, 8);
@@ -117,7 +120,7 @@ export function createHandler(deps: AppDeps) {
         configured: deps.configured,
         model: deps.model,
         stats: deps.limits.stats(),
-        images: deps.images ? { provider: deps.images.discovery.provider, stats: deps.images.limits.stats() } : undefined,
+        images: deps.images ? { provider: deps.images.discovery.provider, stats: deps.images.limits.stats(), outcomes: imageOutcomes, failures: imageFailures } : undefined,
       });
     }
 
@@ -190,6 +193,9 @@ export function createHandler(deps: AppDeps) {
       const extraUsd = result.searchCalls * images.searchCallUsd + result.providerCalls * images.providerCallUsd;
       images.limits.record({ ok: result.ok, latencyMs, usage: result.usage, extraUsd });
       Object.assign(entry, { provider: images.discovery.provider, openaiMs: latencyMs, usage: result.usage, searchCalls: result.searchCalls, cached: result.ok ? result.cached : undefined });
+      for (const failure of (result as { failures?: string[] }).failures ?? []) imageFailures[failure] = (imageFailures[failure] ?? 0) + 1;
+      const outcome = result.ok ? `${identity.generic ? "generic" : "branded"}-${result.discovery.status}` : `error-${result.code}`;
+      imageOutcomes[outcome] = (imageOutcomes[outcome] ?? 0) + 1;
       if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
       entry.found = result.discovery.status;
       return send(200, { status: "ok", discovery: result.discovery, selectedData: result.selectedData });

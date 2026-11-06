@@ -394,7 +394,8 @@ async function resolveImage(fetchImpl: Fetch, lead: Extract<Lead, { kind: "image
   };
 }
 
-export async function resolveLeads(fetchImpl: Fetch, leads: Lead[]): Promise<{ resolved: Resolved[]; failures: Failure[] }> {
+/** failures are "<source>:<failure>", e.g. "unsplash.com:page-unavailable" or "other:no-image-on-page". */
+export async function resolveLeads(fetchImpl: Fetch, leads: Lead[]): Promise<{ resolved: Resolved[]; failures: string[] }> {
   const open = (lead: Lead) => lead.kind === "commons" || (lead.kind === "page" && lead.open);
   const ordered = [...leads.filter(open), ...leads.filter((lead) => !open(lead))].slice(0, IMAGE_RULES.maxLeads);
   const settled = await Promise.all(
@@ -406,15 +407,21 @@ export async function resolveLeads(fetchImpl: Fetch, leads: Lead[]): Promise<{ r
   );
   const seen = new Set<string>();
   const resolved: Resolved[] = [];
-  const failures: Failure[] = [];
-  for (const outcome of settled) {
-    if (typeof outcome === "string") failures.push(outcome);
+  const failures: string[] = [];
+  settled.forEach((outcome, index) => {
+    if (typeof outcome === "string") failures.push(`${sourceClass(ordered[index])}:${outcome}`);
     else if (!seen.has(outcome.imageUrl)) {
       seen.add(outcome.imageUrl);
       resolved.push(outcome);
     }
-  }
+  });
   return { resolved: resolved.slice(0, IMAGE_RULES.maxCandidates), failures };
+}
+
+/** Names only the open sources; every other site is "other", so monitoring never records which shops were visited. */
+function sourceClass(lead: Lead): string {
+  const host = new URL(lead.sourcePageUrl).hostname;
+  return OPEN_SOURCES.find((domain) => host === domain || host.endsWith(`.${domain}`)) ?? "other";
 }
 
 // ---------------------------------------------------------------- matching with OpenAI vision
@@ -584,11 +591,12 @@ export function createImageDiscovery(client: ResponsesClient, config: DiscoveryC
   }
 
   /** The one entry point for finding pictures of a product. Switching provider changes nothing else. */
-  async function searchProductReferenceImages(identity: ImageIdentity): Promise<DiscoverResult & { failures?: Failure[] }> {
+  async function searchProductReferenceImages(identity: ImageIdentity): Promise<DiscoverResult & { failures?: string[] }> {
     let report: SearchReport = { leads: [], searchCalls: 0, providerCalls: 0, imageResults: 0 };
     try {
       report = await findLeads(identity);
       const { resolved, failures } = await resolveLeads(fetchImpl, report.leads);
+      if (!report.leads.length) failures.push("search:no-results");
       const base = { usage: report.usage, searchCalls: report.searchCalls, providerCalls: report.providerCalls, failures };
       if (!resolved.length) return { ok: true, discovery: { status: "none", candidates: [], provider, searchedAt: now() }, ...base };
       const check = (await client.responses.create(verifyRequest(config.model, identity, resolved) as never)) as RawResponse;
