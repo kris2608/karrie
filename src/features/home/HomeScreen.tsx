@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Karrie } from "../../components/mascot/Karrie";
-import { ProductArt } from "../../components/ProductArt";
+import { ItemArt } from "../../components/ItemArt";
 import { HomeScene } from "../../components/scenery/HomeScene";
 import { StickerBadge } from "../../components/StickerBadge";
 import { PressButton } from "../../components/ui/PressButton";
@@ -109,8 +109,8 @@ export function HomeScreen() {
               <li key={list.id}>
                 <motion.button type="button" className="list-card" whileTap={{ scale: 0.96 }} onClick={() => openList(list)}>
                   <span className="list-card-art">
-                    {list.items.slice(0, 3).map((item) => (
-                      <ProductArt key={item.productId} id={item.icon} />
+                    {list.items.slice(0, 3).map((item, index) => (
+                      <ItemArt key={`${item.productId}-${index}`} item={item} />
                     ))}
                   </span>
                   <span className="list-card-text">

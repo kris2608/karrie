@@ -8,6 +8,7 @@ import { StickerBadge } from "../../components/StickerBadge";
 import { PressButton } from "../../components/ui/PressButton";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { foundCount } from "../../domain/shopQueue";
+import { starTotal } from "../../domain/scoring";
 import { stickerLabel } from "../../domain/stickers";
 import { buzz } from "../../feedback/haptics";
 import { playFanfare } from "../../feedback/sound";
@@ -20,7 +21,8 @@ export function CompleteScreen() {
   const { adventure, saved, dispatch } = useAdventure();
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
-  const stars = adventure ? foundCount(adventure.items) : 0;
+  const stars = adventure ? starTotal(adventure.items) : 0;
+  const bonus = adventure ? stars - foundCount(adventure.items) : 0;
   const [shown, setShown] = useState(reduced ? stars : 0);
   const fired = useRef(false);
 
@@ -81,6 +83,7 @@ export function CompleteScreen() {
         <StarIcon />
         <strong>{shown}</strong> {stars === 1 ? "ster" : "sterren"}
       </p>
+      {bonus > 0 && <p className="bonus-line">Waarvan {bonus} bonussterren voor goed scannen!</p>}
 
       <motion.div
         className="sticker-prize"

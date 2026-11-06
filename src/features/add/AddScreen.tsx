@@ -8,7 +8,10 @@ import { products } from "../../data/catalog";
 import { ProductArt } from "../../components/ProductArt";
 import { TopBar } from "../../components/TopBar";
 import { PressButton } from "../../components/ui/PressButton";
+import { ScanButton } from "../../components/ui/ScanButton";
 import { Sheet } from "../../components/ui/Sheet";
+import { Toast, useNotice } from "../../components/ui/Toast";
+import { ScanFlow } from "../scanner/ScanFlow";
 import { buzz } from "../../feedback/haptics";
 import { playPop } from "../../feedback/sound";
 import { badgeSpring, spring } from "../../motion/variants";
@@ -44,6 +47,8 @@ export function AddScreen() {
   const [pasteText, setPasteText] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [burst, setBurst] = useState<{ id: string; token: number } | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const { notice, show, dismiss } = useNotice();
 
   const count = adventure && adventure.phase !== "done" ? adventure.items.length : 0;
   const onList = useMemo(() => {
@@ -107,21 +112,24 @@ export function AddScreen() {
     <main className="screen screen-add">
       <div className="add-head">
         <TopBar title="Wat nemen we mee?" />
-        <label className="search">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.4" />
-            <path d="M15.5 15.5L20 20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-          </svg>
-          <span className="sr-only">Zoek een product</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Zoek brood, melk, appel…"
-            enterKeyHint="search"
-            autoComplete="off"
-            type="search"
-          />
-        </label>
+        <div className="search-row">
+          <label className="search">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.4" />
+              <path d="M15.5 15.5L20 20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+            </svg>
+            <span className="sr-only">Zoek een product</span>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Zoek brood, melk, appel…"
+              enterKeyHint="search"
+              autoComplete="off"
+              type="search"
+            />
+          </label>
+          <ScanButton onClick={() => setScanOpen(true)} />
+        </div>
         <div className="tabs" role="tablist" aria-label="Categorieën">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -257,6 +265,19 @@ export function AddScreen() {
           </PressButton>
         </div>
       </Sheet>
+
+      <ScanFlow
+        open={scanOpen}
+        items={adventure && adventure.phase !== "done" ? adventure.items : []}
+        onClose={() => setScanOpen(false)}
+        onDone={(message) => {
+          show(message);
+          playPop();
+          buzz(8);
+        }}
+        onEdit={(itemId) => navigate("/controleren", { state: { editItem: itemId } })}
+      />
+      <Toast notice={notice} onDismiss={dismiss} />
     </main>
   );
 }

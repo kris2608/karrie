@@ -11,10 +11,21 @@ import {
   skipItem,
   sortByCategory,
 } from "../domain/shopQueue";
+import { sameEan } from "../domain/ean";
+import { awardedStars } from "../domain/scoring";
 import { nextSticker } from "../domain/stickers";
-import type { Adventure, AdventureItem, CategoryId, Product, SavedList } from "../domain/types";
+import type {
+  Adventure,
+  AdventureItem,
+  CategoryId,
+  PackInfo,
+  Product,
+  SavedList,
+  ScannedProduct,
+  ScanResult,
+} from "../domain/types";
 import { products } from "../data/catalog";
-import { createAdventure, createItem, createSampleAdventure } from "../data/sample";
+import { createAdventure, createItem, createSampleAdventure, itemFromSaved, packOf, packFromScan, stripPack } from "../data/sample";
 
 export type Settings = {
   soundEnabled: boolean;
@@ -50,8 +61,12 @@ export type Action =
   | { type: "move-item"; itemId: string; direction: -1 | 1 }
   | { type: "move-category"; category: CategoryId; direction: -1 | 1 }
   | { type: "set-category-order"; order: CategoryId[] }
+  | { type: "add-scanned"; product: ScannedProduct; name: string; category: CategoryId; icon: string; source: "off" | "manual" }
+  | { type: "attach-pack"; itemId: string; product: ScannedProduct; source?: "off" | "manual" }
+  | { type: "restore-generic"; itemId: string }
+  | { type: "insert-item"; item: AdventureItem; index: number }
   | { type: "start-shopping" }
-  | { type: "found" }
+  | { type: "found"; bonus?: ScanResult; pack?: ScannedProduct }
   | { type: "skip" }
   | { type: "undo" }
   | { type: "save-favorite" }
@@ -85,12 +100,13 @@ function upsertSaved(saved: SavedList[], adventure: Adventure, favorite?: boolea
   const entry: SavedList = {
     id: adventure.id,
     name: adventure.name,
-    items: adventure.items.map(({ productId, name, icon, category, quantity }) => ({
-      productId,
-      name,
-      icon,
-      category,
-      quantity,
+    items: adventure.items.map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      icon: item.icon,
+      category: item.category,
+      quantity: item.quantity,
+      ...packOf(item),
     })),
     favorite: favorite ?? existing?.favorite ?? false,
     updatedAt: Date.now(),
@@ -111,6 +127,17 @@ function mergeLines(items: AdventureItem[], lines: { product: Product; quantity:
     }
   }
   return next;
+}
+
+function updateItem(state: AppState, itemId: string, change: (item: AdventureItem) => AdventureItem): AppState {
+  if (!state.adventure) return state;
+  let changed = false;
+  const items = state.adventure.items.map((item) => {
+    if (item.id !== itemId) return item;
+    changed = true;
+    return change(item);
+  });
+  return changed ? { ...state, adventure: touch(state.adventure, { items }) } : state;
 }
 
 function ensureDraft(state: AppState): Adventure {
@@ -198,10 +225,41 @@ export function reducer(state: AppState, action: Action): AppState {
         categoryOrder: action.order,
         adventure: state.adventure ? touch(state.adventure, { categoryOrder: action.order }) : null,
       };
+    case "add-scanned": {
+      const adventure = ensureDraft(state);
+      const existing = adventure.items.find((item) => item.status !== "found" && sameEan(item.ean, action.product.ean));
+      if (existing) {
+        const items = adventure.items.map((item) =>
+          item.id === existing.id ? { ...item, quantity: Math.min(24, item.quantity + 1) } : item,
+        );
+        return { ...state, adventure: touch(adventure, { items }) };
+      }
+      const item: AdventureItem = {
+        id: crypto.randomUUID(),
+        productId: action.product.matchProductId ?? `ean:${action.product.ean}`,
+        name: action.name.trim() || action.product.name || "Product",
+        icon: action.icon,
+        category: action.category,
+        quantity: 1,
+        status: "pending",
+        ...packFromScan(action.product, action.source),
+      };
+      return { ...state, adventure: touch(adventure, { items: [...adventure.items, item] }) };
+    }
+    case "attach-pack":
+      return updateItem(state, action.itemId, (item) => ({ ...stripPack(item), ...packFromScan(action.product, action.source ?? "off") }));
+    case "restore-generic":
+      return updateItem(state, action.itemId, (item) => stripPack(item));
+    case "insert-item": {
+      if (!state.adventure || state.adventure.items.some((item) => item.id === action.item.id)) return state;
+      const items = [...state.adventure.items];
+      items.splice(Math.max(0, Math.min(action.index, items.length)), 0, action.item);
+      return { ...state, adventure: touch(state.adventure, { items }) };
+    }
     case "start-shopping": {
       if (!state.adventure?.items.length || state.adventure.phase === "shopping") return state;
       const items = sortByCategory(
-        state.adventure.items.map((item) => ({ ...item, status: "pending" as const })),
+        state.adventure.items.map(({ stars: _stars, scan: _scan, ...item }) => ({ ...item, status: "pending" as const })),
         state.adventure.categoryOrder,
       );
       const adventure = touch(state.adventure, { items, phase: "shopping", history: [] });
@@ -211,7 +269,12 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!state.adventure) return state;
       const current = activeItem(state.adventure.items);
       if (!current) return state;
-      const items = markFound(state.adventure.items, current.id);
+      const pack: PackInfo = action.pack && action.bonus === "confirmed" ? packFromScan(action.pack, "off") : {};
+      const items = markFound(state.adventure.items, current.id).map((item) =>
+        item.id === current.id
+          ? { ...(action.pack ? stripPack(item) : item), ...pack, stars: awardedStars(action.bonus), scan: action.bonus }
+          : item,
+      );
       const history = withHistory(state, state.adventure);
       if (isComplete(items)) {
         const stickerId = state.adventure.stickerId ?? nextSticker(state.stickers);
@@ -253,19 +316,9 @@ export function reducer(state: AppState, action: Action): AppState {
     case "open-saved": {
       const list = state.saved.find((entry) => entry.id === action.id);
       if (!list) return state;
-      const source = list.items.flatMap((item) => {
-        const product = products.find((entry) => entry.id === item.productId) ?? {
-          id: item.productId,
-          name: item.name,
-          aliases: [],
-          category: item.category,
-          groupId: item.productId,
-        };
-        return [product];
-      });
-      const quantities = list.items.map((item) => item.quantity);
-      const adventure = createAdventure(list.name, source, state.categoryOrder, "draft", quantities);
-      return { ...state, adventure };
+      const adventure = createAdventure(list.name, [], state.categoryOrder, "draft");
+      const items = sortByCategory(list.items.map(itemFromSaved), state.categoryOrder);
+      return { ...state, adventure: { ...adventure, items } };
     }
     default:
       return state;

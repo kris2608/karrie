@@ -28,6 +28,17 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/images\.openfoodfacts\.org\//,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "off-images",
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 300, maxAgeSeconds: 90 * 24 * 60 * 60, purgeOnQuotaError: true },
+            },
+          },
+        ],
       },
       devOptions: { enabled: false },
     }),

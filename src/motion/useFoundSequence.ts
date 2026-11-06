@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { Mood } from "../components/mascot/Karrie";
-import type { AdventureItem } from "../domain/types";
+import { awardedStars, scanBonus } from "../domain/scoring";
+import type { AdventureItem, ScannedProduct, ScanResult } from "../domain/types";
 import { buzz } from "../feedback/haptics";
 import { playPop, playStar } from "../feedback/sound";
 
@@ -12,7 +13,10 @@ export type Flight = {
   from: Box;
   basket: Box;
   star: Box;
+  bonus: number;
 };
+
+export type CollectOptions = { bonus?: ScanResult; pack?: ScannedProduct };
 
 export type ExitKind = "found" | "skip" | "fade";
 
@@ -21,7 +25,7 @@ type Options = {
   artRef: RefObject<HTMLElement | null>;
   basketRef: RefObject<SVGRectElement | null>;
   starRef: RefObject<HTMLElement | null>;
-  onFound: () => void;
+  onFound: (options: CollectOptions) => void;
   onSkip: () => void;
   onUndo: () => void;
   onFinished: () => void;
@@ -51,7 +55,7 @@ export function useFoundSequence(options: Options) {
   const [flight, setFlight] = useState<Flight | null>(null);
   const [exitKind, setExitKind] = useState<ExitKind>("fade");
   const [enterDelay, setEnterDelay] = useState(0);
-  const [starPending, setStarPending] = useState(false);
+  const [starPending, setStarPending] = useState(0);
   const [finishing, setFinishing] = useState(false);
 
   useEffect(
@@ -83,7 +87,7 @@ export function useFoundSequence(options: Options) {
   }, []);
 
   const collect = useCallback(
-    (item: AdventureItem, isLast: boolean) => {
+    (item: AdventureItem, isLast: boolean, collectOptions: CollectOptions = {}) => {
       if (lock.current) return;
       lock.current = true;
       setLocked(true);
@@ -98,17 +102,18 @@ export function useFoundSequence(options: Options) {
 
       setExitKind(flies ? "found" : "fade");
       setEnterDelay(timing.enterDelay);
-      if (flies) setFlight({ token, item, from, basket, star });
-      setStarPending(true);
+      if (flies) setFlight({ token, item, from, basket, star, bonus: scanBonus(collectOptions.bonus) });
+      setStarPending(awardedStars(collectOptions.bonus));
       if (isLast) setFinishing(true);
 
-      onFound();
+      onFound(collectOptions);
       playPop();
       buzz(15);
 
-      later(timing.happyAt, () => (isLast ? react("celebrating", 4000) : react("happy", timing.calmAt)));
+      const cheer = isLast || collectOptions.bonus ? "celebrating" : "happy";
+      later(timing.happyAt, () => react(cheer, isLast ? 4000 : timing.calmAt));
       later(timing.starAt, () => {
-        setStarPending(false);
+        setStarPending(0);
         playStar();
       });
       later(timing.unlockAt, () => {

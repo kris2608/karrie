@@ -1,14 +1,18 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Karrie } from "../../components/mascot/Karrie";
-import { ProductArt } from "../../components/ProductArt";
+import { ItemArt } from "../../components/ItemArt";
 import { ShopScene } from "../../components/scenery/ShopScene";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
+import { BarcodeIcon } from "../../components/ui/ScanButton";
 import { StarIcon } from "../../components/ui/StarIcon";
+import { starTotal } from "../../domain/scoring";
 import { activeItem, foundCount } from "../../domain/shopQueue";
+import type { ScanOutcome } from "../scanner/BarcodeScanner";
+import { LazyScanner } from "../scanner/ScanFlow";
 import { productEnter, productExit, spring } from "../../motion/variants";
 import { useFoundSequence, type Flight } from "../../motion/useFoundSequence";
 import { useAdventure } from "../../state/AdventureContext";
@@ -21,6 +25,7 @@ export function ShopScreen() {
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const [parentOpen, setParentOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const artRef = useRef<HTMLSpanElement>(null);
   const basketRef = useRef<SVGRectElement>(null);
   const starRef = useRef<HTMLSpanElement>(null);
@@ -31,7 +36,7 @@ export function ShopScreen() {
     artRef,
     basketRef,
     starRef,
-    onFound: () => dispatch({ type: "found" }),
+    onFound: ({ bonus, pack }) => dispatch({ type: "found", bonus, pack }),
     onSkip: () => dispatch({ type: "skip" }),
     onUndo: () => dispatch({ type: "undo" }),
     onFinished: () => navigate("/klaar", { replace: true }),
@@ -44,12 +49,28 @@ export function ShopScreen() {
   const current = activeItem(adventure.items);
   const total = adventure.items.length;
   const found = foundCount(adventure.items) - (sequence.starPending ? 1 : 0);
+  const stars = starTotal(adventure.items) - sequence.starPending;
   const openItems = adventure.items.filter((item) => item.status !== "found");
   const canSkip = openItems.length > 1 && !sequence.locked;
+
+  const canScan = Boolean(current && !current.scan && !sequence.locked && (current.ean || current.category !== "produce"));
 
   function collect() {
     if (!current) return;
     sequence.collect(current, openItems.length === 1);
+  }
+
+  function scanned(outcome: ScanOutcome) {
+    setScanOpen(false);
+    if (!current || outcome.kind === "lookup") return;
+    const isLast = openItems.length === 1;
+    if (outcome.kind === "confirmed") {
+      const photo = outcome.product.imageUrl;
+      const flying = photo ? { ...current, imageUrl: photo, imageKind: "photo" as const } : current;
+      sequence.collect(flying, isLast, { bonus: "confirmed", pack: outcome.product });
+    } else {
+      sequence.collect(current, isLast, { bonus: "verified" });
+    }
   }
 
   return (
@@ -72,11 +93,11 @@ export function ShopScreen() {
             </span>
           )}
         </div>
-        <span className="star-pill" ref={starRef} aria-label={`${found} sterren`}>
-          <motion.span key={found} className="star-pill-icon" initial={{ scale: found ? 1.5 : 1, rotate: found ? -20 : 0 }} animate={{ scale: 1, rotate: 0 }} transition={spring}>
+        <span className="star-pill" ref={starRef} aria-label={`${stars} sterren`} data-testid="star-count">
+          <motion.span key={stars} className="star-pill-icon" initial={{ scale: stars ? 1.5 : 1, rotate: stars ? -20 : 0 }} animate={{ scale: 1, rotate: 0 }} transition={spring}>
             <StarIcon />
           </motion.span>
-          <span className="star-pill-count">{found}</span>
+          <span className="star-pill-count">{stars}</span>
         </span>
       </header>
 
@@ -134,7 +155,7 @@ export function ShopScreen() {
             >
               <span className="stage-glow" aria-hidden="true" />
               <span ref={artRef} className="stage-art">
-                <ProductArt id={current.icon} />
+                <ItemArt item={current} />
               </span>
             </motion.button>
           )}
@@ -153,6 +174,27 @@ export function ShopScreen() {
               {current.quantity > 1 && <span className="qty">{current.quantity}×</span>}
               {current.name}
             </motion.h1>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="scan-mission">
+        <AnimatePresence>
+          {canScan && current && (
+            <motion.button
+              key={current.id}
+              type="button"
+              className="scan-pill"
+              data-testid="scan-mission"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1, transition: { ...spring, delay: sequence.enterDelay + 0.1 } }}
+              exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
+              whileTap={{ scale: 0.94 }}
+              onClick={() => setScanOpen(true)}
+            >
+              <BarcodeIcon />
+              Scan de barcode
+            </motion.button>
           )}
         </AnimatePresence>
       </div>
@@ -185,12 +227,20 @@ export function ShopScreen() {
 
       {sequence.flight && <FlightLayer flight={sequence.flight} />}
 
+      <AnimatePresence>
+        {scanOpen && current && (
+          <Suspense fallback={<div className="scanner" aria-busy="true" />}>
+            <LazyScanner mode="verify-adventure-item" target={current} onResult={scanned} onClose={() => setScanOpen(false)} />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
       <Sheet open={parentOpen} onClose={() => setParentOpen(false)} label="Overzicht voor ouders">
         <h2>Nog te vinden</h2>
         <ul className="parent-list">
           {openItems.map((item, index) => (
             <li key={item.id}>
-              <ProductArt id={item.icon} />
+              <ItemArt item={item} />
               <span>
                 {item.quantity > 1 ? `${item.quantity}× ` : ""}
                 {item.name}
@@ -250,7 +300,7 @@ function FlightLayer({ flight }: { flight: Flight }) {
         animate={{ x: [0, 0, dx], y: [0, -18, dy], scale: [1, 1.12, 0.16], rotate: [0, -5, 16], opacity: [1, 1, 0.9] }}
         transition={{ duration: 0.46, times: [0, 0.3, 1], ease: ["easeOut", "easeIn"] }}
       >
-        <ProductArt id={flight.item.icon} />
+        <ItemArt item={flight.item} />
       </motion.div>
       <motion.div
         key={`s-${flight.token}`}
@@ -267,6 +317,35 @@ function FlightLayer({ flight }: { flight: Flight }) {
       >
         <StarIcon />
       </motion.div>
+      {Array.from({ length: flight.bonus }, (_, index) => (
+        <motion.div
+          key={`b-${flight.token}-${index}`}
+          className="flight-star flight-bonus"
+          style={{ left: from.x - 22 + (index ? 34 : -34), top: from.y - 22 }}
+          initial={{ x: 0, y: 0, scale: 0.3, opacity: 0 }}
+          animate={{
+            x: [0, (star.x - from.x) * 0.4, star.x - from.x - (index ? 34 : -34)],
+            y: [0, -60, star.y - from.y],
+            scale: [0.3, 1.2, 0.6],
+            opacity: [0, 1, 1],
+          }}
+          transition={{ delay: 0.08 + index * 0.08, duration: 0.55, times: [0, 0.4, 1], ease: "easeInOut" }}
+        >
+          <StarIcon />
+        </motion.div>
+      ))}
+      {flight.bonus > 0 && (
+        <motion.span
+          key={`plus-${flight.token}`}
+          className="flight-plus"
+          style={{ left: star.x - 20, top: star.y + 26 }}
+          initial={{ y: 8, scale: 0.4, opacity: 0 }}
+          animate={{ y: [8, 0, -6], scale: [0.4, 1.15, 1], opacity: [0, 1, 0] }}
+          transition={{ delay: 0.45, duration: 0.9, times: [0, 0.3, 1] }}
+        >
+          +{flight.bonus}
+        </motion.span>
+      )}
     </div>
   );
 }

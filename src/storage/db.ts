@@ -4,7 +4,7 @@ import type { Adventure, CategoryId, SavedList } from "../domain/types";
 import { defaultSettings, type Settings } from "../state/reducer";
 
 const DB_NAME = "karrie";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export type Persisted = {
   adventure: Adventure | null;
@@ -22,12 +22,43 @@ export const emptyPersisted = (): Persisted => ({
   settings: { ...defaultSettings },
 });
 
-async function database() {
-  return openDB(DB_NAME, DB_VERSION, {
+let connection: ReturnType<typeof openDB> | null = null;
+
+function database() {
+  connection ??= openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
       if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
+      if (!db.objectStoreNames.contains("products")) db.createObjectStore("products");
     },
+    blocking(_current, _next, event) {
+      // A newer Karrie in another tab needs to upgrade; let it.
+      (event.target as IDBDatabase).close();
+      connection = null;
+    },
+    terminated() {
+      connection = null;
+    },
+  }).catch((error: unknown) => {
+    connection = null;
+    throw error;
   });
+  return connection;
+}
+
+export async function readProductCache<T>(ean: string): Promise<T | undefined> {
+  try {
+    return (await (await database()).get("products", ean)) as T | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function writeProductCache<T>(ean: string, value: T): Promise<void> {
+  try {
+    await (await database()).put("products", value, ean);
+  } catch {
+    // A full or blocked database only costs a repeat lookup later.
+  }
 }
 
 export async function loadPersisted(): Promise<Persisted> {
