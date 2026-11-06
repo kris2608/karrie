@@ -10,8 +10,8 @@ export default defineConfig({
       injectRegister: "auto",
       includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: {
-        name: "Karrrie",
-        short_name: "Karrrie",
+        name: "Karrie",
+        short_name: "Karrie",
         description: "Speur, vind en vink af!",
         lang: "nl",
         start_url: "/",

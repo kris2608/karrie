@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Karrrie } from "../../components/mascot/Karrrie";
+import { Karrie } from "../../components/mascot/Karrie";
 import { ProductArt } from "../../components/ProductArt";
 import { HomeScene } from "../../components/scenery/HomeScene";
 import { StickerBadge } from "../../components/StickerBadge";
@@ -54,14 +54,14 @@ export function HomeScreen() {
       </button>
 
       <section className="home-hero">
-        <Karrrie mood="greeting" enter="roll" className="home-mascot" />
+        <Karrie mood="greeting" enter="roll" className="home-mascot" />
         <motion.div
           className="wordmark"
           initial={{ y: 18, opacity: 0, scale: 0.92 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           transition={{ ...softSpring, delay: 0.35 }}
         >
-          <h1>Karrrie</h1>
+          <h1>Karrie</h1>
           <p>Speur, vind en vink af!</p>
         </motion.div>
       </section>
@@ -156,7 +156,7 @@ export function HomeScreen() {
       <Sheet open={parentOpen} onClose={() => setParentOpen(false)} label="Instellingen voor ouders">
         <h2>Voor ouders</h2>
         <SoundSwitch />
-        <p className="sheet-note">Zet Karrrie op je beginscherm: deel-knop in Safari, of het menu in Chrome.</p>
+        <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome.</p>
         <PressButton variant="secondary" wide onClick={() => setParentOpen(false)}>
           Klaar
         </PressButton>

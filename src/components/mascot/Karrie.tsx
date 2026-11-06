@@ -3,7 +3,7 @@ import { useId, type Ref } from "react";
 
 export type Mood = "idle" | "greeting" | "searching" | "happy" | "celebrating" | "surprised" | "complete";
 
-type KarrrieProps = {
+type KarrieProps = {
   mood?: Mood;
   beat?: number;
   enter?: "roll" | "pop" | "none";
@@ -45,7 +45,7 @@ const bodyMotion: Record<Mood, { animate: TargetAndTransition; transition: Trans
 
 const hops: Mood[] = ["happy", "celebrating", "complete"];
 
-export function Karrrie({ mood = "idle", beat = 0, enter = "none", className, basketRef }: KarrrieProps) {
+export function Karrie({ mood = "idle", beat = 0, enter = "none", className, basketRef }: KarrieProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const clip = `k-basket-${uid}`;
   const rolling = enter === "roll";
@@ -55,7 +55,7 @@ export function Karrrie({ mood = "idle", beat = 0, enter = "none", className, ba
 
   return (
     <motion.svg
-      className={className ? `karrrie ${className}` : "karrrie"}
+      className={className ? `karrie ${className}` : "karrie"}
       viewBox="0 0 260 230"
       aria-hidden="true"
       initial={rolling ? { x: -320 } : enter === "pop" ? { scale: 0.6, opacity: 0 } : false}

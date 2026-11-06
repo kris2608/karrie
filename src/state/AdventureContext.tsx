@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { setSoundEnabled } from "../feedback/sound";
 import { loadPersisted, savePersisted } from "../storage/db";
-import { Karrrie } from "../components/mascot/Karrrie";
+import { Karrie } from "../components/mascot/Karrie";
 import { initialState, reducer, type Action, type AppState } from "./reducer";
 
 type AdventureContextValue = AppState & {
@@ -41,7 +41,7 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   if (!ready) {
     return (
       <div className="splash">
-        <Karrrie mood="idle" className="splash-mascot" />
+        <Karrie mood="idle" className="splash-mascot" />
       </div>
     );
   }

@@ -1,6 +1,6 @@
-# Karrrie op Render zetten
+# Karrie op Render zetten
 
-Karrrie is een statische Progressive Web App. Na de eerste online opening blijven boodschappenlijstjes in de browser staan en werkt de winkelmodus zonder internet.
+Karrie is een statische Progressive Web App. Na de eerste online opening blijven boodschappenlijstjes in de browser staan en werkt de winkelmodus zonder internet.
 
 Render geeft het vaste HTTPS-adres. Dat adres is ook het veilige origin voor latere camera- en barcodeherkenning. De app vraagt nu geen cameratoegang. `localhost` is tijdens ontwikkeling eveneens een secure context. Een los `file://`-bestand is dat niet.
 
@@ -28,11 +28,11 @@ Commit ook `package-lock.json`. Zonder dat bestand faalt `npm ci` op Render.
 1. Open [dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**.
 2. Koppel de GitHub-repository.
 3. Render leest [`render.yaml`](render.yaml):
-   - static site `karrrie`
+   - static site `karrieapp`
    - build: `npm ci && npm run build`
    - publish-map: `dist`
    - rewrite van `/*` naar `/index.html`, zodat `/winkel` bij verversen de app blijft
-4. Bevestig het blueprint. Render bouwt en geeft één adres, bijvoorbeeld `https://karrrie.onrender.com`.
+4. Bevestig het blueprint. Render bouwt en geeft één adres, `https://karrieapp.onrender.com`.
 5. Elke push naar de gekoppelde branch publiceert opnieuw naar datzelfde adres.
 
 Bestaande bestanden (JavaScript, iconen, service worker) worden rechtstreeks geserveerd. Alleen paden zonder bestand vallen terug op `index.html`.
@@ -55,19 +55,19 @@ Gebruik het HTTPS-adres, niet een lokaal IP-adres zonder certificaat.
 
 1. Open het adres in Safari.
 2. Deel → **Zet op beginscherm**.
-3. Open Karrrie vanaf het icoon. De app draait dan schermvullend.
+3. Open Karrie vanaf het icoon. De app draait dan schermvullend.
 
 **Android Chrome**
 
 1. Open het adres in Chrome.
 2. Menu → **App installeren** of **Toevoegen aan startscherm**.
-3. Open Karrrie vanaf het icoon.
+3. Open Karrie vanaf het icoon.
 
 ## Checklist op iPhone en Android
 
-- Het startscherm toont Karrrie en **Speur, vind en vink af!**
+- Het startscherm toont Karrie en **Speur, vind en vink af!**
 - **Probeer het voorbeeld** opent de winkelmodus met één groot product, zonder toetsenbord.
-- Karrrie kijkt door een grote verrekijker zolang hij zoekt.
+- Karrie kijkt door een grote verrekijker zolang hij zoekt.
 - **Gevonden!** laat het product naar het mandje vliegen en een ster naar de teller. Dubbel tikken telt maar één keer.
 - **Terug** zet de laatste tik terug. **Later** bewaart het product voor straks. Het product naar links vegen doet hetzelfde als **Later**.
 - Op Android trilt de telefoon kort bij **Gevonden!**. Safari op iPhone ondersteunt trillen niet.

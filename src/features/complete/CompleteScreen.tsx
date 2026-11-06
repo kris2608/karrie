@@ -1,7 +1,7 @@
 import { animate, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Karrrie } from "../../components/mascot/Karrrie";
+import { Karrie } from "../../components/mascot/Karrie";
 import { Chest } from "../../components/rewards/Chest";
 import { celebrate } from "../../components/rewards/confetti";
 import { StickerBadge } from "../../components/StickerBadge";
@@ -56,7 +56,7 @@ export function CompleteScreen() {
     <main className="screen complete">
       <div className="complete-sky" aria-hidden="true" />
       <section className="complete-stage">
-        <Karrrie mood="complete" enter="pop" className="complete-mascot" />
+        <Karrie mood="complete" enter="pop" className="complete-mascot" />
         <div className="chest-wrap">
           <Chest open delay={CHEST_AT} />
           {Array.from({ length: flyers }, (_, index) => (

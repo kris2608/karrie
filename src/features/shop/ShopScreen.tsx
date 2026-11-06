@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Karrrie } from "../../components/mascot/Karrrie";
+import { Karrie } from "../../components/mascot/Karrie";
 import { ProductArt } from "../../components/ProductArt";
 import { ShopScene } from "../../components/scenery/ShopScene";
 import { PressButton } from "../../components/ui/PressButton";
@@ -81,7 +81,7 @@ export function ShopScreen() {
       </header>
 
       <section className="shop-guide">
-        <Karrrie mood={sequence.mood} beat={sequence.beat} basketRef={basketRef} className="shop-mascot" />
+        <Karrie mood={sequence.mood} beat={sequence.beat} basketRef={basketRef} className="shop-mascot" />
         <AnimatePresence mode="wait">
           <motion.p
             key={current ? "search" : "done"}

@@ -4,7 +4,7 @@ export const STICKERS = [
   { id: "banaan", label: "Banaan" },
   { id: "brood", label: "Brood" },
   { id: "melk", label: "Melk" },
-  { id: "kar", label: "Karrrie" },
+  { id: "kar", label: "Karrie" },
 ] as const;
 
 export type StickerId = (typeof STICKERS)[number]["id"];

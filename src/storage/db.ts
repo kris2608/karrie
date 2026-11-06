@@ -3,7 +3,7 @@ import { DEFAULT_CATEGORY_ORDER } from "../domain/categories";
 import type { Adventure, CategoryId, SavedList } from "../domain/types";
 import { defaultSettings, type Settings } from "../state/reducer";
 
-const DB_NAME = "karrrie";
+const DB_NAME = "karrie";
 const DB_VERSION = 1;
 
 export type Persisted = {

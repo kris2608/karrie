@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import type { Mood } from "../components/mascot/Karrrie";
+import type { Mood } from "../components/mascot/Karrie";
 import type { AdventureItem } from "../domain/types";
 import { buzz } from "../feedback/haptics";
 import { playPop, playStar } from "../feedback/sound";

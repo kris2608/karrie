@@ -65,7 +65,7 @@ h1, h2, p { margin: 0; }
 
 /* Art */
 
-.karrrie { display: block; height: auto; overflow: visible; }
+.karrie { display: block; height: auto; overflow: visible; }
 .k-blink {
   transform-box: fill-box;
   transform-origin: center;
