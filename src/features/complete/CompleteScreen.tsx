@@ -14,6 +14,7 @@ import { buzz } from "../../feedback/haptics";
 import { playFanfare } from "../../feedback/sound";
 import { softSpring } from "../../motion/variants";
 import { useAdventure } from "../../state/AdventureContext";
+import { SaveListSheet } from "../review/SaveListSheet";
 
 const CHEST_AT = 0.5;
 
@@ -24,6 +25,7 @@ export function CompleteScreen() {
   const stars = adventure ? starTotal(adventure.items) : 0;
   const bonus = adventure ? stars - foundCount(adventure.items) : 0;
   const [shown, setShown] = useState(reduced ? stars : 0);
+  const [saving, setSaving] = useState(false);
   const fired = useRef(false);
 
   useEffect(() => {
@@ -111,13 +113,22 @@ export function CompleteScreen() {
         >
           Nieuw avontuur
         </PressButton>
-        <PressButton variant="secondary" wide data-testid="save-list" disabled={favorite} onClick={() => dispatch({ type: "save-favorite" })}>
+        <PressButton variant="secondary" wide data-testid="save-list" disabled={favorite} onClick={() => setSaving(true)}>
           {favorite ? "Bewaard" : "Bewaar lijstje"}
         </PressButton>
         <button type="button" className="text-button" onClick={() => navigate("/")}>
           Naar het begin
         </button>
       </div>
+      <SaveListSheet
+        open={saving}
+        adventure={adventure}
+        onClose={() => setSaving(false)}
+        onSave={(name, store) => {
+          dispatch({ type: "save-favorite", name, store });
+          setSaving(false);
+        }}
+      />
     </main>
   );
 }

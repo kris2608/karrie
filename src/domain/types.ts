@@ -135,6 +135,8 @@ export type HistoryEntry = {
 export type Adventure = {
   id: string;
   name: string;
+  /** The supermarket the parent typed when saving; not used for anything else yet. */
+  store?: string;
   phase: AdventurePhase;
   items: AdventureItem[];
   categoryOrder: CategoryId[];
@@ -155,6 +157,7 @@ export type SavedItem = PackInfo & {
 export type SavedList = {
   id: string;
   name: string;
+  store?: string;
   items: SavedItem[];
   favorite: boolean;
   updatedAt: number;

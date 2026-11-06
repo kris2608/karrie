@@ -12,8 +12,10 @@ import { useLongPress } from "../../components/ui/useLongPress";
 import { missionOn } from "../../domain/discovery";
 import { spring } from "../../motion/variants";
 import { useAdventure } from "../../state/AdventureContext";
+import { listName } from "../../state/reducer";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ItemSheet } from "./ItemSheet";
+import { SaveListSheet } from "./SaveListSheet";
 
 function Arrow({ up }: { up?: boolean }) {
   return (
@@ -28,6 +30,7 @@ export function ReviewScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
+  const [saving, setSaving] = useState(false);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
 
@@ -45,10 +48,11 @@ export function ReviewScreen() {
     .filter((group) => group.items.length);
 
   const hasOpen = adventure.items.some((item) => item.status !== "found");
+  const named = listName(adventure);
   const editing = adventure.items.find((item) => item.id === editId) ?? null;
 
-  function saveForLater() {
-    dispatch({ type: "save-favorite" });
+  function saveForLater(name: string, store: string) {
+    dispatch({ type: "save-favorite", name, store });
     navigate("/", { state: { notice: "Lijstje bewaard" } });
   }
 
@@ -80,7 +84,12 @@ export function ReviewScreen() {
 
   return (
     <main className="screen screen-review">
-      <TopBar title="Klopt het lijstje?" to="/toevoegen" />
+      <TopBar title={named ?? "Klopt het lijstje?"} to="/toevoegen" />
+      {adventure.store && (
+        <p className="list-name" data-testid="list-store">
+          {adventure.store}
+        </p>
+      )}
       {groups.length === 0 && (
         <p className="empty">
           Nog geen producten. <Link to="/toevoegen">Voeg er een paar toe.</Link>
@@ -123,7 +132,7 @@ export function ReviewScreen() {
       ))}
       <div className="dock dock-fixed">
         {adventure.phase === "draft" && (
-          <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={saveForLater}>
+          <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={() => setSaving(true)}>
             Bewaren
           </PressButton>
         )}
@@ -147,6 +156,7 @@ export function ReviewScreen() {
         }}
         onRemove={() => editing && remove(editing)}
       />
+      <SaveListSheet open={saving} adventure={adventure} onClose={() => setSaving(false)} onSave={saveForLater} />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <Toast notice={notice} onDismiss={dismiss} />
     </main>

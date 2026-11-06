@@ -16,14 +16,17 @@ import { softSpring } from "../../motion/variants";
 import { stickerLabel } from "../../domain/stickers";
 import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
+import { listName } from "../../state/reducer";
 
-function ListCard({ list, label, onOpen, onForget }: { list: SavedList; label: string; onOpen: () => void; onForget: () => void }) {
+function ListCard({ list, label: fallback, onOpen, onForget }: { list: SavedList; label: string; onOpen: () => void; onForget: () => void }) {
   const { pressing, handlers } = useLongPress(onForget);
+  const label = listName(list) ?? fallback;
+  const detail = [`${list.items.length} producten`, list.store].filter(Boolean).join(" · ");
   return (
     <motion.button
       type="button"
       className={pressing ? "list-card is-pressing" : "list-card"}
-      aria-label={`${label}, ${list.items.length} producten. Lang drukken om te wissen`}
+      aria-label={`${label}, ${detail}. Lang drukken om te wissen`}
       data-testid="list-card"
       whileTap={{ scale: 0.96 }}
       onClick={onOpen}
@@ -36,7 +39,7 @@ function ListCard({ list, label, onOpen, onForget }: { list: SavedList; label: s
       </span>
       <span className="list-card-text">
         <strong>{label}</strong>
-        <small>{list.items.length} producten</small>
+        <small>{detail}</small>
       </span>
     </motion.button>
   );
@@ -126,17 +129,6 @@ export function HomeScreen() {
             {shopping ? "Verder speuren" : "Verder met lijstje"}
           </PressButton>
         )}
-        <PressButton
-          variant="quiet"
-          wide
-          data-testid="sample-adventure"
-          onClick={() => {
-            dispatch({ type: "start-sample" });
-            navigate("/winkel");
-          }}
-        >
-          Probeer het voorbeeld
-        </PressButton>
       </motion.div>
 
       {shelf.length > 0 && (

@@ -39,6 +39,9 @@ const TINT: Record<CategoryId, string> = {
 
 type OnList = { item: AdventureItem; quantity: number };
 
+/** The green check rises out of the tile, slow enough for a child to follow. */
+const BURST_MS = 1100;
+
 type GridTileProps = {
   name: string;
   category: CategoryId;
@@ -103,8 +106,8 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, mine = 
           className="card-burst"
           aria-hidden="true"
           initial={{ scale: 0.2, opacity: 0, y: 0 }}
-          animate={{ scale: [0.2, 1.15, 0.7], opacity: [0, 1, 0], y: [0, -4, -26] }}
-          transition={{ duration: 0.6, times: [0, 0.35, 1], ease: "easeOut" }}
+          animate={{ scale: [0.2, 1.2, 1, 0.8], opacity: [0, 1, 1, 0], y: [0, -10, -60, -110] }}
+          transition={{ duration: BURST_MS / 1000, times: [0, 0.2, 0.65, 1], ease: "easeOut" }}
         >
           <svg viewBox="0 0 24 24">
             <path d="M6 12.5l4 4 8-9" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -207,7 +210,7 @@ export function AddScreen() {
 
   useEffect(() => {
     if (!burst) return;
-    const timer = window.setTimeout(() => setBurst(null), 620);
+    const timer = window.setTimeout(() => setBurst(null), BURST_MS + 20);
     return () => window.clearTimeout(timer);
   }, [burst]);
 
@@ -345,8 +348,12 @@ export function AddScreen() {
         <PressButton variant="quiet" data-testid="paste" onClick={() => setPasteOpen(true)}>
           Lijst plakken
         </PressButton>
-        <PressButton variant="primary" disabled={count === 0} onClick={() => navigate("/controleren")}>
-          Controleer
+        <PressButton variant="primary" data-testid="to-list" disabled={count === 0} onClick={() => navigate("/controleren")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="dock-icon">
+            <rect x="5" y="3.5" width="14" height="17" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" />
+            <path d="M9 9h6M9 13h6M9 17h3" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+          Lijstje
           {count > 0 && (
             <motion.span key={count} className="dock-count" initial={{ scale: 1.6 }} animate={{ scale: 1 }} transition={spring}>
               {count}

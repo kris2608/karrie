@@ -55,7 +55,8 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcode
     onProblem: setStatus,
   });
 
-  useBarcode({ videoRef, active: scanBarcodes && status === "live" && !busy, session: attempt, onDetect: onBarcode });
+  const scanning = scanBarcodes && status === "live" && !busy;
+  useBarcode({ videoRef, active: scanning, session: attempt, onDetect: onBarcode });
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -96,7 +97,7 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcode
       transition={{ duration: 0.18 }}
     >
       <header className="scanner-bar">
-        <h2>{title}</h2>
+        <h2 className={scanBarcodes ? "sr-only" : undefined}>{title}</h2>
         <button type="button" className="round-button round-s scanner-close" aria-label="Sluit camera" data-testid="camera-close" disabled={busy} onClick={onClose}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
@@ -112,6 +113,11 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcode
             <video ref={videoRef} className="scanner-video" playsInline muted autoPlay aria-hidden="true" />
             {preview && busy && <img className="camera-still" src={preview} alt="" />}
             <span className="scanner-corners" aria-hidden="true" />
+            {scanning && (
+              <span className={barcodeStatus === "looking" ? "camera-band is-found" : "camera-band"} aria-hidden="true" data-testid="camera-scanline">
+                <i />
+              </span>
+            )}
           </>
         )}
         {busy && (
@@ -128,7 +134,7 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcode
       </div>
 
       <div className="scanner-message" aria-live="polite">
-        {!problem && !busy && (
+        {!problem && !busy && !(scanBarcodes && barcodeStatus) && (
           <p className="scanner-hint" data-testid="camera-hint">
             {scanBarcodes ? "Scan een streepjescode of maak een foto." : "Zet één product in het kader"}
           </p>
@@ -159,13 +165,7 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcode
         </motion.button>
       )}
 
-      <p className="camera-note">
-        {localOnly
-          ? "De foto blijft alleen op dit apparaat."
-          : scanBarcodes
-            ? "De foto gaat naar OpenAI; zet er geen mensen op. Streepjescodes worden alleen als nummer opgezocht."
-            : "De foto gaat naar OpenAI om het product te herkennen. Zet er geen mensen op."}
-      </p>
+      <p className="camera-note">{localOnly ? "De foto blijft alleen op dit apparaat." : "Een foto gaat naar OpenAI. Zet er geen mensen op."}</p>
       {!problem && finePointer() && (
         <button type="button" className="text-button scanner-type" data-testid="camera-gallery" disabled={busy} onClick={onGallery}>
           Kies uit galerij

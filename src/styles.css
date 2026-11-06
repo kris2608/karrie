@@ -607,6 +607,7 @@ h1, h2, p { margin: 0; }
 .card-mine svg { display: block; width: 100%; height: 100%; }
 .card-burst {
   position: absolute;
+  z-index: 3;
   top: 30px;
   left: 50%;
   display: grid;
@@ -620,6 +621,7 @@ h1, h2, p { margin: 0; }
   pointer-events: none;
 }
 .card-burst svg { width: 24px; height: 24px; }
+.dock-icon { width: 22px; height: 22px; flex: none; }
 
 .dock { display: flex; gap: var(--space-3); }
 .dock-fixed {
@@ -839,7 +841,10 @@ h1, h2, p { margin: 0; }
 }
 .stepper button:disabled { opacity: 0.4; cursor: default; }
 .stepper span { min-width: 22px; text-align: center; font-weight: 900; }
-.row-actions { display: grid; grid-template-columns: repeat(2, 36px); gap: var(--space-1); flex: none; }
+.row-actions { display: grid; grid-template-columns: repeat(2, 36px); grid-template-rows: repeat(2, 36px); grid-auto-flow: column; align-items: center; gap: var(--space-1); flex: none; }
+.row-actions .round-danger { grid-row: 1 / span 2; }
+.list-name { margin: calc(var(--space-2) * -1) 0 var(--space-3); padding-left: 60px; color: var(--ink-mute); font-weight: 800; }
+.save-list { display: grid; gap: var(--space-4); }
 .row-actions .round-s { width: 36px; height: 36px; box-shadow: var(--outline-soft); }
 
 /* Shop game */
@@ -1198,7 +1203,7 @@ h1, h2, p { margin: 0; }
   width: min(100%, 440px);
 }
 .scanner-bar h2 { font-size: var(--text-title); font-weight: 900; }
-.scanner-close { color: var(--ink); background: rgba(255, 255, 255, 0.92); }
+.scanner-close { margin-left: auto; color: var(--ink); background: rgba(255, 255, 255, 0.92); }
 .scanner-frame {
   position: relative;
   flex: none;
@@ -1293,6 +1298,29 @@ h1, h2, p { margin: 0; }
 .camera-frame { width: min(100%, 360px, 52dvh); aspect-ratio: 3 / 4; }
 .camera-frame .scanner-corners { inset: 7% 8%; }
 .camera-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The band the barcode reader looks at (READER_RULES: 85% wide, 50% high, centred). */
+.camera-band { position: absolute; inset: 25% 7.5%; pointer-events: none; }
+.camera-band i { position: absolute; inset: 0; animation: scan-sweep 2.2s ease-in-out infinite alternate; }
+.camera-band i::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1.5px;
+  height: 3px;
+  border-radius: 2px;
+  background: #ff5a4e;
+  box-shadow: 0 0 10px 2px rgba(255, 90, 78, 0.7);
+}
+.camera-band.is-found i { animation: none; transform: translateY(50%); }
+.camera-band.is-found i::before { background: var(--green); box-shadow: 0 0 12px 3px rgba(60, 196, 107, 0.75); }
+@keyframes scan-sweep {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .camera-band i { animation: none; transform: translateY(50%); }
+}
 .camera-slow { max-width: 260px; font-size: 0.9rem; font-weight: 700; text-align: center; }
 .shutter {
   display: grid;

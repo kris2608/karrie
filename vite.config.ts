@@ -29,6 +29,7 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2}"],
+        globIgnores: ["og-image.png"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/images\.openfoodfacts\.org\//,

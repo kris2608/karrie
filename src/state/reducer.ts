@@ -93,7 +93,7 @@ export type Action =
   | { type: "found" }
   | { type: "skip" }
   | { type: "undo" }
-  | { type: "save-favorite" }
+  | { type: "save-favorite"; name?: string; store?: string }
   | { type: "open-saved"; id: string }
   | { type: "forget-saved"; id: string }
   | { type: "restore-saved"; list: SavedList; index: number }
@@ -103,8 +103,15 @@ function touch(adventure: Adventure, patch: Partial<Adventure>): Adventure {
   return { ...adventure, ...patch, updatedAt: Date.now() };
 }
 
+export const DEFAULT_LIST_NAME = "Boodschappenlijst";
+
+/** The name a parent gave the list, or nothing for the built-in names. */
+export function listName(list: Pick<SavedList, "name">): string | undefined {
+  return list.name && list.name !== DEFAULT_LIST_NAME && list.name !== "Voorbeeldlijst" ? list.name : undefined;
+}
+
 function blankDraft(order: CategoryId[]): Adventure {
-  return createAdventure("Boodschappenlijst", [], order, "draft");
+  return createAdventure(DEFAULT_LIST_NAME, [], order, "draft");
 }
 
 function remember(adventure: Adventure): { items: AdventureItem[]; phase: Adventure["phase"]; stickerId?: string; stickers: string[] } {
@@ -127,6 +134,7 @@ function upsertSaved(saved: SavedList[], adventure: Adventure, favorite?: boolea
   const entry: SavedList = {
     id: adventure.id,
     name: adventure.name,
+    ...(adventure.store && { store: adventure.store }),
     items: adventure.items.map((item) => ({
       productId: item.productId,
       name: item.name,
@@ -429,14 +437,20 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "save-favorite": {
       if (!state.adventure?.items.length) return state;
-      return { ...state, saved: upsertSaved(state.saved, state.adventure, true) };
+      const name = action.name?.trim().slice(0, 40);
+      const store = action.store?.trim().slice(0, 40);
+      const adventure =
+        action.name === undefined && action.store === undefined
+          ? state.adventure
+          : { ...state.adventure, name: name || DEFAULT_LIST_NAME, store: store || undefined };
+      return { ...state, adventure, saved: upsertSaved(state.saved, adventure, true) };
     }
     case "open-saved": {
       const list = state.saved.find((entry) => entry.id === action.id);
       if (!list) return state;
       const adventure = createAdventure(list.name, [], state.categoryOrder, "draft");
       const items = sortByCategory(list.items.map(itemFromSaved), state.categoryOrder);
-      return { ...state, adventure: { ...adventure, items } };
+      return { ...state, adventure: { ...adventure, ...(list.store && { store: list.store }), items } };
     }
     case "forget-saved":
       return { ...state, saved: state.saved.filter((list) => list.id !== action.id) };

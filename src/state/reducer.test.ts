@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { initialState, recognizeList, reducer } from "./reducer";
+import { DEFAULT_LIST_NAME, initialState, listName, recognizeList, reducer } from "./reducer";
 
 function shop() {
   return reducer(initialState, { type: "start-sample" });
@@ -102,6 +102,25 @@ it("wist een bewaard lijstje, zet het terug op zijn plek en wist alles", () => {
   state = reducer(state, { type: "clear-saved" });
   expect(state.saved).toEqual([]);
   expect(state.adventure?.items).toHaveLength(1);
+});
+
+it("bewaart een lijstje met een naam en supermarkt en neemt die mee bij openen", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  let state = reducer(initialState, { type: "add-product", product: banaan });
+  expect(listName(state.adventure!)).toBeUndefined();
+  state = reducer(state, { type: "save-favorite", name: "  Weekboodschappen ", store: "Albert Heijn" });
+  expect(state.saved[0]).toMatchObject({ name: "Weekboodschappen", store: "Albert Heijn", favorite: true });
+  expect(state.adventure).toMatchObject({ name: "Weekboodschappen", store: "Albert Heijn" });
+
+  state = reducer(state, { type: "new-draft" });
+  state = reducer(state, { type: "open-saved", id: state.saved[0].id });
+  expect(listName(state.adventure!)).toBe("Weekboodschappen");
+  expect(state.adventure?.store).toBe("Albert Heijn");
+
+  state = reducer(state, { type: "save-favorite", name: "", store: " " });
+  expect(state.saved[0].name).toBe(DEFAULT_LIST_NAME);
+  expect(state.saved[0].store).toBeUndefined();
+  expect(listName(state.saved[0])).toBeUndefined();
 });
 
 it("maakt van een geplakte lijst een avontuur en bewaart een favoriet", () => {

@@ -313,6 +313,10 @@ export function ShopScreen() {
             Verder speuren
           </PressButton>
         </div>
+        <button type="button" className="text-button" data-testid="shop-home" onClick={() => navigate("/")}>
+          Naar het beginscherm
+        </button>
+        <p className="sheet-note">Het avontuur blijft staan; op het beginscherm ga je verder.</p>
       </Sheet>
     </main>
   );
