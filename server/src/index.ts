@@ -55,6 +55,7 @@ const discovery = client
       model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model,
       maxConcurrent: number("IMAGE_MAX_CONCURRENT", 3),
       braveKey: env.BRAVE_SEARCH_API_KEY || undefined,
+      openverse: env.IMAGE_OPENVERSE !== "off",
     })
   : null;
 

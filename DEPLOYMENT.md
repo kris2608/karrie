@@ -192,6 +192,10 @@ Karrie zoekt bij elk product op de lijst een echte foto, en ook bij de producten
 
 **Waarom niet de beeldzoekfunctie van OpenAI.** Die is eerst los getest (`server/scripts/diagnose-image-search.mjs`) met de gedocumenteerde instellingen (`search_content_types: ["image","text"]`, `image_settings`, `include: ["web_search_call.results"]`, verplichte zoekaanroep) op vijf producten en twee modellen. Uitkomst: **0 van 10 aanvragen gaf een `image_result`**, zonder foutmelding, terwijl de server de instellingen wel terugmeldde. Elke aanvraag duurde 13 tot 20 seconden en kostte $0,03 tot $0,04. Daarom gebruikt Karrie de webzoekfunctie alleen om productpagina's te vinden. De server haalt de foto zelf van die pagina's: van Wikimedia Commons via de Commons-API (met licentie), van Unsplash en Pixabay, en anders de `og:image` van de pagina.
 
+**Openverse voor algemene producten.** Bij een algemeen product (banaan, brood, eieren) vraagt de server daarnaast [Openverse](https://api.openverse.org/) om foto's met een open licentie (CC0, publiek domein, CC BY, CC BY-SA), alleen van de fotobanken StockSnap en Rawpixel. Openverse is gratis en werkt zonder sleutel. De Engelse zoekterm komt uit de zoekopdracht die het model al schreef ("site:unsplash.com banana isolated" wordt "banana"), dus dit kost geen extra modelaanroep. Alleen foto's waarvan de titel het product noemt, tellen mee, hoogstens drie. De server haalt de verkleinde kopie bij Openverse zelf op, niet bij de fotobank. Daarna volgt dezelfde controle met OpenAI-vision als bij elke andere foto. Uitzetten kan met `IMAGE_OPENVERSE=off`.
+
+Zonder sleutel geeft Openverse ongeveer 20 zoekopdrachten per minuut en enkele honderden per dag per IP-adres; alle gezinnen delen het IP-adres van de server. Wie meer nodig heeft, kan gratis een sleutel aanvragen bij Openverse (nog niet ingebouwd). Openverse is soms traag (6 tot 14 seconden) en geeft af en toe een `504`. Dan gaat het zoeken zonder Openverse verder, en staat `openverse:unavailable` in `/api/health` → `images.failures`.
+
 **Hoe een foto gekozen wordt.** Elke foto wordt gedownload en gecontroleerd: alleen HTTPS, geen interne adressen (ook niet via een doorverwijzing), echte JPEG, PNG of WebP en hoogstens 4 MB. Daarna vergelijkt OpenAI-vision de foto's met het product: soort, merk, variant, inhoud, vooraanzicht, scherpte, het hele product zoals in de winkel (geen plakje, geen close-up), en bij een algemeen product geen merk in beeld. Een ander merk, een andere variant of inhoud, of een persoon in beeld valt af. Een vergelijkbaar product wordt nooit gebruikt als het exacte product.
 
 **Gebruiksrechten.**
@@ -218,6 +222,19 @@ Karrie zoekt bij elk product op de lijst een echte foto, en ook bij de producten
 
 Niets gevonden: Unox rookworst, Lay's paprika, Verkade chocolade, Heinz ketchup en appel. De uitkomst verschilt per keer: in een eerdere ronde vonden Lay's en Heinz wel iets en Almhof niet. Oorzaken bij het ophalen: pagina niet bereikbaar (43 keer), geen foto op de pagina (23 keer), geen afbeelding (4 keer). Merkfoto's komen bijna altijd van winkels (Jumbo, Hoogvliet, ingredientenlijst.nl, mijn-boodschappen.nl), dus met onbekende rechten.
 
+**Gemeten op 10 algemene producten met Openverse** (banaan, appel, volkorenbrood, komkommer, eieren, tomaat, wortel, aardappelen, kaas, melk; `validate-image-search.mjs --generic --like-render`, dus met Unsplash en Pixabay geblokkeerd zoals op Render):
+
+| Meting | Zonder Openverse | Met Openverse |
+|---|---|---|
+| Met een passende foto (na controle) | 3 van 10 | 9 van 10 |
+| Automatisch gebruikt (open licentie, voor iedereen) | 2 van 10 | 7 van 10 |
+| Aan de ouder voorgelegd | 1 | 2 (aardappelen, melk) |
+| Niets gevonden | 7 | 1 (appel: "apple" geeft vooral iPhones) |
+| Mediaan zoektijd | 3 s | 8 s |
+| Kosten per product | $0,015 | $0,018 |
+
+Met het oog nagekeken zijn vijf van de zeven goed: bananen, brood, tomaten, eieren, wortels. De komkommer is een vergiet met augurkjes. Kaas (van Wikimedia Commons, niet van Openverse) is een plak smeltkaas in plastic. Openverse kost zelf niets; het kleine verschil in kosten komt van de extra foto's die OpenAI-vision bekijkt.
+
 Een eerdere ronde liet zien waarom de controle op "het hele product" nodig is: zonder die controle koos Karrie een plakje komkommer, een gepelde banaan en een eierdoos met merk.
 
 **Andere zoekdiensten** (niet actief). De code heeft een adapter voor **Brave Image Search** (`BRAVE_SEARCH_API_KEY`): $5 per 1.000 zoekopdrachten met vooraf betaald tegoed; resultaten bewaren mag alleen met een abonnement met opslagrechten. **SerpApi** (Google Images): 250 zoekopdrachten per maand gratis, $25 per maand voor 1.000. Geen van beide is aangezet.
@@ -241,7 +258,7 @@ Reken op ongeveer $0,004 per foto: 100 foto's per maand kosten zo'n $0,40. Het d
 - De server accepteert alleen JPEG, PNG of WebP als data-URL, controleert de bestandskop en weigert aanvragen boven 2 MB (`413`).
 - Alleen aanvragen vanaf `ALLOWED_ORIGINS` worden geaccepteerd. Per IP-adres loopt er hoogstens één herkenning tegelijk.
 - De app staat per toestel 25 herkenningen per dag toe.
-- Voorbeeldfoto's: per toestel 40 zoekopdrachten per dag; op de server per IP 30 per uur en 80 per dag (`IMAGE_LIMIT_PER_IP_HOUR`, `IMAGE_LIMIT_PER_IP_DAY`), 200 per dag in totaal (`IMAGE_LIMIT_DAILY_REQUESTS`) en hoogstens 3 tegelijk (`IMAGE_MAX_CONCURRENT`, daarboven `503`). Antwoorden uit het geheugen van de server tellen niet mee. Optioneel: `OPENAI_IMAGE_SEARCH_MODEL` (standaard het herkenningsmodel) en `BRAVE_SEARCH_API_KEY` (zet Brave aan in plaats van OpenAI-webzoeken).
+- Voorbeeldfoto's: per toestel 40 zoekopdrachten per dag; op de server per IP 30 per uur en 80 per dag (`IMAGE_LIMIT_PER_IP_HOUR`, `IMAGE_LIMIT_PER_IP_DAY`), 200 per dag in totaal (`IMAGE_LIMIT_DAILY_REQUESTS`) en hoogstens 3 tegelijk (`IMAGE_MAX_CONCURRENT`, daarboven `503`). Antwoorden uit het geheugen van de server tellen niet mee. Optioneel: `OPENAI_IMAGE_SEARCH_MODEL` (standaard het herkenningsmodel) en `BRAVE_SEARCH_API_KEY` (zet Brave aan in plaats van OpenAI-webzoeken). `IMAGE_OPENVERSE=off` zet Openverse uit.
 - De tellers op de server staan in het geheugen. Ze beginnen opnieuw na een herstart of slaapstand, en per-IP-limieten zijn te omzeilen door een ander IP-adres. **Stel daarom ook een maandlimiet in bij OpenAI** (platform.openai.com → Settings → Limits). Dat is de harde grens.
 
 ## Checklist camera en bonusmissies (op een echte telefoon)
@@ -275,7 +292,8 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - De tekst van een missie komt van het model en kan soms wat stroef Nederlands zijn ("zonder toegevoegd suiker").
 - Hoe `X-Forwarded-For` er op Render precies uitziet, is niet gecontroleerd; de per-IP-limieten zijn daarom een extra rem, niet de hoofdbeveiliging.
 - OpenAI levert bij de webzoekfunctie geen `image_result` (zie Voorbeeldfoto's). Als dat verandert, leest de code ze automatisch als eerste.
-- **Unsplash en Pixabay blokkeren de servers van Render.** Lokaal werken ze; op Render geeft elke pagina een fout (`/api/health` → `images.failures` toonde `unsplash.com:page-unavailable` en `pixabay.com:page-unavailable`). Op Render komen open-licentiefoto's daarom alleen van Wikimedia Commons, en krijgen algemene producten minder vaak automatisch een foto (in de live test: banaan niets, komkommer alleen ter keuze). Merkproducten werken op Render wel (live getest met Hak bruine bonen).
+- **Unsplash en Pixabay blokkeren de servers van Render.** Lokaal werken ze; op Render geeft elke pagina een fout (`/api/health` → `images.failures` toonde `unsplash.com:page-unavailable` en `pixabay.com:page-unavailable`). Op Render komen open-licentiefoto's daarom van Wikimedia Commons en Openverse. Merkproducten werken op Render wel (live getest met Hak bruine bonen).
+- Openverse kent alleen Engelse zoektermen en geeft soms iets anders dan bedoeld (iPhones bij "apple", augurken bij "cucumber"). De controle met OpenAI-vision gooit het meeste weg, maar niet alles. Openverse is zonder sleutel beperkt tot ongeveer 20 zoekopdrachten per minuut voor de hele server.
 - Voorbeeldfoto's van merkproducten komen bijna altijd van winkelsites met onbekende rechten. Ze worden alleen op het eigen toestel bewaard en getoond; of dat voor jouw gebruik mag, is aan de eigenaar van de app.
 - De zoekresultaten verschillen per keer: hetzelfde product vond de ene keer wel en de andere keer geen foto. **Opnieuw zoeken** helpt soms.
 - Het geheugen van de server met open-licentiefoto's is leeg na een herstart of slaapstand; dan wordt opnieuw (betaald) gezocht.

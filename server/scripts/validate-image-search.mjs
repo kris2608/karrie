@@ -1,6 +1,7 @@
 // Runs the real reference-image pipeline (dist/images.js) on Dutch supermarket products.
-// Usage (from server/, after npm run build): node scripts/validate-image-search.mjs [out.html]
-// Writes a contact sheet so the chosen pictures can be checked by eye. Prints no secrets.
+// Usage (from server/, after npm run build): node scripts/validate-image-search.mjs [--generic] [--like-render] [out.html]
+// --like-render refuses Unsplash and Pixabay, which block Render's servers. Writes a contact sheet so the chosen
+// pictures can be checked by eye. Prints no secrets.
 import { existsSync, writeFileSync } from "node:fs";
 import OpenAI from "openai";
 import { createImageDiscovery, describe } from "../dist/images.js";
@@ -28,14 +29,28 @@ const PRODUCTS = [
   { name: "Volkorenbrood", generic: true },
   { name: "Komkommer", generic: true },
   { name: "Eieren", generic: true },
+  { name: "Tomaat", generic: true },
+  { name: "Wortel", generic: true },
+  { name: "Aardappelen", generic: true },
+  { name: "Kaas", generic: true },
+  { name: "Melk", generic: true },
 ];
+const args = process.argv.slice(2);
+const flags = new Set(args.filter((arg) => arg.startsWith("--")));
+const wanted = flags.has("--generic") ? PRODUCTS.filter((product) => product.generic) : PRODUCTS;
+const renderBlocks = /^https:\/\/([a-z0-9-]+\.)*(unsplash\.com|pixabay\.com)\//;
+const web = flags.has("--like-render") ? (url, init) => (renderBlocks.test(url) ? Promise.resolve(new Response("", { status: 403 })) : fetch(url, init)) : fetch;
 
 const PRICE = { input: 0.75, cached: 0.075, output: 4.5, searchCall: 0.01 };
 const cost = (usage, searchCalls) =>
   (usage ? ((usage.inputTokens - usage.cachedInputTokens) * PRICE.input + usage.cachedInputTokens * PRICE.cached + usage.outputTokens * PRICE.output) / 1e6 : 0) + searchCalls * PRICE.searchCall;
 
 const client = new OpenAI({ timeout: 60_000, maxRetries: 1 });
-const discovery = createImageDiscovery(client, { model: process.env.OPENAI_VISION_MODEL || "gpt-5.4-mini", maxConcurrent: 4 });
+const discovery = createImageDiscovery(
+  client,
+  { model: process.env.OPENAI_VISION_MODEL || "gpt-5.4-mini", maxConcurrent: 4, openverse: process.env.IMAGE_OPENVERSE !== "off" },
+  web,
+);
 console.log(`provider: ${discovery.provider}`);
 
 const rows = [];
@@ -53,7 +68,7 @@ async function one(identity) {
   );
 }
 
-const queue = [...PRODUCTS];
+const queue = [...wanted];
 await Promise.all(Array.from({ length: 3 }, async () => { while (queue.length) await one(queue.shift()); }));
 
 // Second pass through the cached entry point: must not call any API.
@@ -94,7 +109,7 @@ console.log(`median time ${median} ms, total cost $${totalCost.toFixed(3)}, per 
 console.log(`cache reuse without API calls: ${reused}/${shareableCount} shareable answers; personal pictures shared through the cache: ${leaked}`);
 console.log(`lead failures: ${JSON.stringify(failures)}`);
 
-const out = process.argv[2];
+const out = args.find((arg) => !arg.startsWith("--"));
 if (out) {
   const cells = rows
     .map((row) => {

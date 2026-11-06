@@ -5,10 +5,13 @@ import { createHandler } from "./app.js";
 import {
   createImageDiscovery,
   decide,
+  englishTerm,
   identityKey,
   leadForPage,
   leadsFromBrave,
   leadsFromOpenAi,
+  leadsFromOpenverse,
+  openverseUrl,
   matchOf,
   ogImage,
   plainUnsplash,
@@ -113,6 +116,34 @@ describe("leads", () => {
     ]);
   });
 
+  it("takes the plain English term from the model's own search queries", () => {
+    const action = { type: "search", queries: ["site:commons.wikimedia.org cucumber isolated", "site:unsplash.com cucumber isolated"], query: "site:commons.wikimedia.org cucumber isolated" };
+    expect(englishTerm({ output: [{ type: "web_search_call", action }] })).toBe("cucumber");
+    expect(englishTerm({ output: [{ type: "web_search_call", action: { type: "search", query: "whole wheat bread white background" } }] })).toBe("whole wheat bread");
+    expect(englishTerm({ output: [{ type: "message" }] })).toBeUndefined();
+  });
+
+  it("keeps only open-licence Openverse photos whose title names the product, served by Openverse itself", () => {
+    const url = new URL(openverseUrl("banana"));
+    expect(url.searchParams.get("license")).toBe("cc0,pdm,by,by-sa");
+    expect(url.searchParams.get("source")).toBe("stocksnap,rawpixel");
+    const leads = leadsFromOpenverse(
+      {
+        results: [
+          { title: "Banana Foliage", foreign_landing_url: "https://stocksnap.io/photo/a", thumbnail: "https://api.openverse.org/v1/images/a/thumb/", license: "cc0", source: "stocksnap" },
+          { title: "Beach", foreign_landing_url: "https://stocksnap.io/photo/b", thumbnail: "https://api.openverse.org/v1/images/b/thumb/", license: "cc0", source: "stocksnap" },
+          { title: "Bananas Fruits", foreign_landing_url: "https://www.rawpixel.com/image/c", thumbnail: "https://api.openverse.org/v1/images/c/thumb/", license: "by", license_version: "4.0", creator: "<b>Ann</b>", source: "rawpixel" },
+          { title: "Banana", foreign_landing_url: "https://x.example/d", thumbnail: "https://x.example/d.jpg", license: "cc0" },
+          { title: "Banana", foreign_landing_url: "https://x.example/e", thumbnail: "https://api.openverse.org/v1/images/e/thumb/", license: "by-nc" },
+        ],
+      },
+      "bananas",
+      "openai-web",
+    );
+    expect(leads.map((lead) => lead.sourcePageUrl)).toEqual(["https://stocksnap.io/photo/a", "https://www.rawpixel.com/image/c"]);
+    expect(leads[1]).toMatchObject({ kind: "open-image", license: "CC BY 4.0", sourceName: "Rawpixel", attribution: "Ann · CC BY 4.0 · Rawpixel via Openverse" });
+  });
+
   it("finds og:image in either attribute order and strips the Unsplash overlay", () => {
     expect(ogImage('<meta property="og:image" content="https://a.example/x.jpg?a=1&amp;b=2">')).toBe("https://a.example/x.jpg?a=1&b=2");
     expect(ogImage('<meta content="https://a.example/y.jpg" name="twitter:image">')).toBe("https://a.example/y.jpg");
@@ -175,7 +206,7 @@ function fakeWeb(calls: string[]) {
   };
 }
 
-function fakeOpenAi(pages: string[], verdicts: Partial<Verdict>[]) {
+function fakeOpenAi(pages: string[], verdicts: Partial<Verdict>[], queries?: string[]) {
   const bodies: { tools?: unknown }[] = [];
   return {
     bodies,
@@ -185,7 +216,7 @@ function fakeOpenAi(pages: string[], verdicts: Partial<Verdict>[]) {
           bodies.push(body);
           if ((body as { tools?: unknown }).tools)
             return {
-              output: [{ type: "web_search_call", action: { type: "search" }, results: pages.map((url) => ({ type: "text_result", url })) }],
+              output: [{ type: "web_search_call", action: { type: "search", queries }, results: pages.map((url) => ({ type: "text_result", url })) }],
               usage: { input_tokens: 8000, output_tokens: 20 },
             };
           const text = JSON.stringify({ images: verdicts.map((overrides, index) => verdict({ index, ...overrides })) });
@@ -226,6 +257,34 @@ describe("image discovery service", () => {
     expect(a.ok && b.ok).toBe(true);
     expect(b).toMatchObject({ cached: true, searchCalls: 0 });
     expect(openai.bodies).toHaveLength(2);
+  });
+
+  it("adds Openverse photos for generic products and shares the open-licence result", async () => {
+    const web: string[] = [];
+    const openai = fakeOpenAi([], [{ brand: "not-visible", brandVisible: false }], ["site:unsplash.com banana isolated"]);
+    const openverse = async (url: string) => {
+      web.push(url);
+      if (url.startsWith("https://api.openverse.org/v1/images/?"))
+        return Response.json({
+          results: [{ title: "Bananas Fruits", foreign_landing_url: "https://stocksnap.io/photo/a", thumbnail: "https://api.openverse.org/v1/images/a/thumb/", license: "cc0", source: "stocksnap" }],
+        });
+      if (url === "https://api.openverse.org/v1/images/a/thumb/") return new Response(JPEG, { headers: { "content-type": "image/jpeg", "access-control-allow-origin": "*" } });
+      return new Response("nope", { status: 404 });
+    };
+    const service = createImageDiscovery(openai.client, { model: "m", maxConcurrent: 2, openverse: true }, openverse);
+    const result = await service.discover(BANAAN);
+    expect(result).toMatchObject({ ok: true, discovery: { status: "found", candidates: [{ usageRightsStatus: "permitted", license: "CC0", sourceName: "Stocksnap" }] } });
+    expect(new URL(web[0]).searchParams.get("q")).toBe("banana");
+    expect(service.cached(BANAAN)?.status).toBe("found");
+    await service.discover(TERRA);
+    expect(web.filter((url) => url.includes("?q="))).toHaveLength(1);
+  });
+
+  it("treats an Openverse outage as one more failed source", async () => {
+    const openai = fakeOpenAi([], [], ["site:unsplash.com banana isolated"]);
+    const service = createImageDiscovery(openai.client, { model: "m", maxConcurrent: 2, openverse: true }, async () => new Response("", { status: 504 }));
+    const result = await service.searchProductReferenceImages(BANAAN);
+    expect(result).toMatchObject({ ok: true, discovery: { status: "none" }, failures: ["search:no-results", "openverse:unavailable"] });
   });
 
   it("does not follow a redirect to a private address", async () => {

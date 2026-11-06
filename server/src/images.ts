@@ -83,6 +83,9 @@ export const IMAGE_RULES = {
   pageBytes: 900_000,
   imageBytes: 4_000_000,
   fetchTimeoutMs: 6_000,
+  /** Openverse answers in 8-14 s and makes some thumbnails on first request. */
+  openverseTimeoutMs: 16_000,
+  openverseLeads: 3,
   thumbWidth: 640,
   foundTtlMs: 30 * 24 * 60 * 60 * 1000,
   noneTtlMs: 3 * 24 * 60 * 60 * 1000,
@@ -115,6 +118,7 @@ export function describe(identity: ImageIdentity): string {
 /** Where a picture might be found. Every URL here was returned by a search service, never written by a model. */
 export type Lead =
   | { kind: "image"; imageUrl: string; thumbnailUrl?: string; sourcePageUrl: string; title?: string; provider: Provider }
+  | { kind: "open-image"; imageUrl: string; sourcePageUrl: string; title?: string; sourceName: string; license: string; attribution: string; provider: Provider }
   | { kind: "commons"; fileTitle: string; sourcePageUrl: string; provider: Provider }
   | { kind: "page"; sourcePageUrl: string; title?: string; open: boolean; provider: Provider };
 
@@ -190,7 +194,7 @@ export function openAiSearchRequest(model: string, identity: ImageIdentity) {
 type RawResult = { type?: string; url?: string; title?: string; image_url?: string; thumbnail_url?: string; source_website_url?: string; caption?: string };
 export type RawResponse = {
   status?: string;
-  output?: { type: string; action?: { type?: string }; results?: RawResult[]; content?: { type: string; text?: string }[] }[];
+  output?: { type: string; action?: { type?: string; query?: string; queries?: string[] }; results?: RawResult[]; content?: { type: string; text?: string }[] }[];
   usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number } };
 };
 
@@ -220,6 +224,85 @@ export function leadsFromOpenAi(response: RawResponse): { leads: Lead[]; searchC
     }
   }
   return { leads, searchCalls, imageResults };
+}
+
+/** The plain English product term the model searched with ("site:unsplash.com banana isolated" -> "banana"). */
+export function englishTerm(response: RawResponse): string | undefined {
+  for (const item of response.output ?? []) {
+    if (item.type !== "web_search_call") continue;
+    for (const query of [...(item.action?.queries ?? []), item.action?.query ?? ""]) {
+      const term = query
+        .replace(/site:\S+/gi, " ")
+        .replace(/\b(isolated|photo|white background)\b/gi, " ")
+        .replace(/[^\p{L}\p{N}' -]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (term && term.length <= 40) return term;
+    }
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------- open source: Openverse (CC-licensed photos, free, no key)
+
+type OpenverseImage = {
+  title?: string;
+  foreign_landing_url?: string;
+  thumbnail?: string;
+  creator?: string;
+  license?: string;
+  license_version?: string;
+  source?: string;
+  provider?: string;
+};
+
+const OPENVERSE_LICENSES: Record<string, string> = { cc0: "CC0", pdm: "Publiek domein", by: "CC BY", "by-sa": "CC BY-SA" };
+
+/** Stock sources only: Flickr results for "banana" are trees and beaches, for "cucumber" sea cucumbers. */
+export const OPENVERSE_SOURCES = ["stocksnap", "rawpixel"];
+
+export function openverseUrl(term: string): string {
+  const url = new URL("https://api.openverse.org/v1/images/");
+  const params = {
+    q: term,
+    license: Object.keys(OPENVERSE_LICENSES).join(","),
+    category: "photograph",
+    source: OPENVERSE_SOURCES.join(","),
+    mature: "false",
+    page_size: "20",
+  };
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  return url.href;
+}
+
+/** Only titles that name the product. Openverse's own resized copy is used, so the server never contacts the photo host itself. */
+export function leadsFromOpenverse(body: { results?: OpenverseImage[] }, term: string, provider: Provider): Lead[] {
+  const words = part(term)
+    .split(" ")
+    .filter((word) => word.length > 2)
+    .map((word) => word.replace(/(es|s)$/, ""));
+  const leads: Lead[] = [];
+  for (const result of body.results ?? []) {
+    const image = cleanUrl(result.thumbnail);
+    const page = cleanUrl(result.foreign_landing_url);
+    const license = result.license ? OPENVERSE_LICENSES[result.license] : undefined;
+    if (!image || !page || !license || image.hostname !== "api.openverse.org" || blocked(page)) continue;
+    if (!words.some((word) => part(result.title).includes(word))) continue;
+    const name = result.license === "by" || result.license === "by-sa" ? `${license} ${result.license_version ?? ""}`.trim() : license;
+    const source = (result.source ?? "Openverse").replace(/^\w/, (letter) => letter.toUpperCase());
+    leads.push({
+      kind: "open-image",
+      imageUrl: image.href,
+      sourcePageUrl: page.href,
+      title: result.title?.slice(0, 160),
+      sourceName: source,
+      license: name,
+      attribution: [stripHtml(result.creator ?? ""), name, `${source} via Openverse`].filter(Boolean).join(" · "),
+      provider,
+    });
+    if (leads.length >= IMAGE_RULES.openverseLeads) break;
+  }
+  return leads;
 }
 
 // ---------------------------------------------------------------- provider: Brave Image Search (inactive without BRAVE_SEARCH_API_KEY)
@@ -267,10 +350,10 @@ async function readLimited(response: Response, limit: number): Promise<Buffer | 
 }
 
 /** Every redirect hop is checked again, so a search result cannot steer the server to a private address. */
-async function get(fetchImpl: Fetch, url: string, accept: string): Promise<Response | null> {
+async function get(fetchImpl: Fetch, url: string, accept: string, timeoutMs = IMAGE_RULES.fetchTimeoutMs): Promise<Response | null> {
   let target = cleanUrl(url);
   for (let hop = 0; target && hop < 4; hop += 1) {
-    const response = await fetchImpl(target.href, { headers: { "User-Agent": USER_AGENT, Accept: accept }, redirect: "manual", signal: AbortSignal.timeout(IMAGE_RULES.fetchTimeoutMs) });
+    const response = await fetchImpl(target.href, { headers: { "User-Agent": USER_AGENT, Accept: accept }, redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
     const location = response.headers.get("location");
     if (response.status < 300 || response.status >= 400 || !location) return response;
     target = cleanUrl(new URL(location, target).href);
@@ -310,8 +393,8 @@ export type Fetched = { dataUrl: string; cors: boolean };
 export type Failure = "page-unavailable" | "no-image-on-page" | "image-unavailable" | "not-an-image";
 export type Resolved = Omit<ReferenceImage, "matchingStatus"> & Fetched;
 
-async function fetchImage(fetchImpl: Fetch, url: string): Promise<Fetched | Failure> {
-  const response = await get(fetchImpl, url, "image/jpeg,image/png,image/webp").catch(() => null);
+async function fetchImage(fetchImpl: Fetch, url: string, timeoutMs?: number, accept = "image/jpeg,image/png,image/webp"): Promise<Fetched | Failure> {
+  const response = await get(fetchImpl, url, accept, timeoutMs).catch(() => null);
   if (!response?.ok) return "image-unavailable";
   const type = (response.headers.get("content-type") ?? "").split(";")[0].trim() as ImageType;
   if (type !== "image/jpeg" && type !== "image/png" && type !== "image/webp") return "not-an-image";
@@ -378,6 +461,23 @@ async function resolvePage(fetchImpl: Fetch, lead: Extract<Lead, { kind: "page" 
   };
 }
 
+async function resolveOpenImage(fetchImpl: Fetch, lead: Extract<Lead, { kind: "open-image" }>): Promise<Resolved | Failure> {
+  // Openverse answers 406 to a list of image types for thumbnails it has not made yet; the type is still checked below.
+  const image = await fetchImage(fetchImpl, lead.imageUrl, IMAGE_RULES.openverseTimeoutMs, "*/*");
+  if (typeof image === "string") return image;
+  return {
+    imageUrl: lead.imageUrl,
+    sourcePageUrl: lead.sourcePageUrl,
+    title: lead.title,
+    provider: lead.provider,
+    usageRightsStatus: "permitted",
+    sourceName: lead.sourceName,
+    license: lead.license,
+    attribution: lead.attribution,
+    ...image,
+  };
+}
+
 async function resolveImage(fetchImpl: Fetch, lead: Extract<Lead, { kind: "image" }>): Promise<Resolved | Failure> {
   const thumb = lead.thumbnailUrl ? await fetchImage(fetchImpl, lead.thumbnailUrl) : "image-unavailable";
   const image = typeof thumb === "string" ? await fetchImage(fetchImpl, lead.imageUrl) : thumb;
@@ -396,15 +496,21 @@ async function resolveImage(fetchImpl: Fetch, lead: Extract<Lead, { kind: "image
 
 /** failures are "<source>:<failure>", e.g. "unsplash.com:page-unavailable" or "other:no-image-on-page". */
 export async function resolveLeads(fetchImpl: Fetch, leads: Lead[]): Promise<{ resolved: Resolved[]; failures: string[] }> {
-  const open = (lead: Lead) => lead.kind === "commons" || (lead.kind === "page" && lead.open);
-  const ordered = [...leads.filter(open), ...leads.filter((lead) => !open(lead))].slice(0, IMAGE_RULES.maxLeads);
-  const settled = await Promise.all(
-    ordered.map((lead) =>
-      (lead.kind === "commons" ? resolveCommons(fetchImpl, lead) : lead.kind === "page" ? resolvePage(fetchImpl, lead) : resolveImage(fetchImpl, lead)).catch(
-        (): Failure => "image-unavailable",
-      ),
-    ),
-  );
+  const rank = (lead: Lead) => (lead.kind === "commons" ? 0 : lead.kind === "open-image" ? 1 : lead.kind === "page" && lead.open ? 2 : 3);
+  const ordered = leads
+    .map((lead, index) => ({ lead, index }))
+    .sort((a, b) => rank(a.lead) - rank(b.lead) || a.index - b.index)
+    .map(({ lead }) => lead)
+    .slice(0, IMAGE_RULES.maxLeads);
+  const resolve = (lead: Lead) =>
+    lead.kind === "commons"
+      ? resolveCommons(fetchImpl, lead)
+      : lead.kind === "open-image"
+        ? resolveOpenImage(fetchImpl, lead)
+        : lead.kind === "page"
+          ? resolvePage(fetchImpl, lead)
+          : resolveImage(fetchImpl, lead);
+  const settled = await Promise.all(ordered.map((lead) => resolve(lead).catch((): Failure => "image-unavailable")));
   const seen = new Set<string>();
   const resolved: Resolved[] = [];
   const failures: string[] = [];
@@ -420,6 +526,7 @@ export async function resolveLeads(fetchImpl: Fetch, leads: Lead[]): Promise<{ r
 
 /** Names only the open sources; every other site is "other", so monitoring never records which shops were visited. */
 function sourceClass(lead: Lead): string {
+  if (lead.kind === "open-image") return "openverse";
   const host = new URL(lead.sourcePageUrl).hostname;
   return OPEN_SOURCES.find((domain) => host === domain || host.endsWith(`.${domain}`)) ?? "other";
 }
@@ -567,9 +674,9 @@ export function addUsage(a?: Usage, b?: Usage): Usage | undefined {
 
 type ResponsesClient = { responses: { create: (body: never, options?: { signal?: AbortSignal }) => Promise<unknown> } };
 
-export type DiscoveryConfig = { model: string; maxConcurrent: number; braveKey?: string };
+export type DiscoveryConfig = { model: string; maxConcurrent: number; braveKey?: string; openverse?: boolean };
 
-export type SearchReport = { leads: Lead[]; usage?: Usage; searchCalls: number; providerCalls: number; imageResults: number };
+export type SearchReport = { leads: Lead[]; usage?: Usage; searchCalls: number; providerCalls: number; imageResults: number; term?: string };
 
 export function createImageDiscovery(client: ResponsesClient, config: DiscoveryConfig, fetchImpl: Fetch = fetch, now: () => number = Date.now) {
   const cache = new Map<string, { discovery: Discovery; until: number }>();
@@ -587,7 +694,17 @@ export function createImageDiscovery(client: ResponsesClient, config: DiscoveryC
     }
     const search = (await client.responses.create(openAiSearchRequest(config.model, identity) as never)) as RawResponse;
     const found = leadsFromOpenAi(search);
-    return { leads: found.leads, usage: usageOf(search), searchCalls: found.searchCalls, providerCalls: 0, imageResults: found.imageResults };
+    return { leads: found.leads, usage: usageOf(search), searchCalls: found.searchCalls, providerCalls: 0, imageResults: found.imageResults, term: englishTerm(search) };
+  }
+
+  /** Openverse's index is English; the term comes from the query the model already wrote, so this costs no extra model call. */
+  async function openverseLeads(identity: ImageIdentity, term: string | undefined): Promise<{ leads: Lead[]; failure?: string }> {
+    if (!config.openverse || !identity.generic || !term) return { leads: [] };
+    const response = await get(fetchImpl, openverseUrl(term), "application/json", IMAGE_RULES.openverseTimeoutMs).catch(() => null);
+    if (!response?.ok) return { leads: [], failure: response?.status === 429 ? "openverse:rate-limited" : "openverse:unavailable" };
+    const body = (await response.json().catch(() => ({}))) as { results?: OpenverseImage[] };
+    const leads = leadsFromOpenverse(body, term, provider);
+    return leads.length ? { leads } : { leads, failure: "openverse:no-results" };
   }
 
   /** The one entry point for finding pictures of a product. Switching provider changes nothing else. */
@@ -595,8 +712,10 @@ export function createImageDiscovery(client: ResponsesClient, config: DiscoveryC
     let report: SearchReport = { leads: [], searchCalls: 0, providerCalls: 0, imageResults: 0 };
     try {
       report = await findLeads(identity);
-      const { resolved, failures } = await resolveLeads(fetchImpl, report.leads);
+      const open = await openverseLeads(identity, report.term);
+      const { resolved, failures } = await resolveLeads(fetchImpl, [...report.leads, ...open.leads]);
       if (!report.leads.length) failures.push("search:no-results");
+      if (open.failure) failures.push(open.failure);
       const base = { usage: report.usage, searchCalls: report.searchCalls, providerCalls: report.providerCalls, failures };
       if (!resolved.length) return { ok: true, discovery: { status: "none", candidates: [], provider, searchedAt: now() }, ...base };
       const check = (await client.responses.create(verifyRequest(config.model, identity, resolved) as never)) as RawResponse;

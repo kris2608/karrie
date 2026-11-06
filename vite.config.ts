@@ -41,7 +41,7 @@ export default defineConfig({
           },
           {
             // Open-licence reference pictures only; pictures with unclear rights are kept as local copies instead.
-            urlPattern: /^https:\/\/(upload\.wikimedia\.org|thumb\.wikimedia\.org|images\.unsplash\.com|cdn\.pixabay\.com)\//,
+            urlPattern: /^https:\/\/(upload\.wikimedia\.org\/|thumb\.wikimedia\.org\/|images\.unsplash\.com\/|cdn\.pixabay\.com\/|api\.openverse\.org\/v1\/images\/[0-9a-f-]+\/thumb\/)/,
             handler: "CacheFirst",
             options: {
               cacheName: "reference-images",
