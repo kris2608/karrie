@@ -14,6 +14,7 @@ export const SHOP_PAGE = `<!doctype html><html><head><title>AH Terra Pindakaas 1
 
 export const raw = (overrides: Partial<RawFacts> = {}): RawFacts => ({
   sameProduct: true,
+  samePack: true,
   nutriScore: "B",
   per100Unit: "g",
   energyKcal: 618,

@@ -29,7 +29,10 @@ export const FACT_RULES = {
 
 const num = z.number().nullable();
 export const FactsSchema = z.object({
-  sameProduct: z.boolean().describe("The page is about exactly this product (same brand, kind and variant), not a category or another product."),
+  sameProduct: z
+    .boolean()
+    .describe("The page is about this product: same brand, kind and variant or flavour. A different pack size or a multipack of it still counts; a category or another variant does not."),
+  samePack: z.boolean().describe("The page is about the same pack size as the product, not a multipack or another weight."),
   nutriScore: z.enum(["A", "B", "C", "D", "E"]).nullable(),
   per100Unit: z.enum(["g", "ml"]).nullable(),
   energyKcal: num,
@@ -124,7 +127,7 @@ export function factsRequest(model: string, product: string, evidence: Evidence)
     instructions: [
       "You copy product facts from a Dutch shop or brand page. Use only what the page text says; never your own knowledge.",
       "Use null or an empty list for anything the page does not state. Nutrition values are per 100 g or 100 ml, as numbers.",
-      "If the page is not about exactly this product, set sameProduct to false.",
+      "If the page is about another product or variant, set sameProduct to false. The same product in another pack size or a multipack is still the same product; then set samePack to false.",
     ].join("\n"),
     input: `Product: ${product}\nNutri-Score images on the page: ${evidence.nutriScores.join(", ") || "none"}\n\nPage text:\n${evidence.text}`,
     text: { format: { type: FACTS.type, name: FACTS.name, strict: true, schema: FACTS.schema } },
@@ -204,7 +207,7 @@ export function guardFacts(raw: RawFacts, evidence: Evidence, source: { url: str
   const allergens = list(raw.allergens);
   const allergenWords = new Set(allergens.map(norm));
   const claims = list(raw.claims).filter((claim) => !/^nutri ?score/.test(norm(claim)) && !allergenWords.has(norm(claim)) && norm(claim).length > 3);
-  const quantity = raw.quantity && text.replace(/ /g, "").includes(norm(raw.quantity).replace(/ /g, "")) ? raw.quantity.trim().slice(0, 20) : undefined;
+  const quantity = raw.samePack && raw.quantity && text.replace(/ /g, "").includes(norm(raw.quantity).replace(/ /g, "")) ? raw.quantity.trim().slice(0, 20) : undefined;
 
   const facts: ProductFacts = {
     ...(nutriScore && { nutriScore }),

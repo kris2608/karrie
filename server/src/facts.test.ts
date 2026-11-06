@@ -51,6 +51,13 @@ describe("guardFacts", () => {
     expect(facts.claims).toEqual(["Vegan"]);
   });
 
+  it("keeps the values of the same product in another pack, but not that pack's size", () => {
+    const facts = guardFacts(raw({ samePack: false }), evidence, SOURCE)!;
+    expect(facts.per100?.salt).toBe(0.01);
+    expect(facts.ingredients).toBe("Pinda's (100%).");
+    expect(facts.quantity).toBeUndefined();
+  });
+
   it("returns nothing for another product or a page without facts", () => {
     expect(guardFacts(raw({ sameProduct: false }), evidence, SOURCE)).toBeNull();
     const empty = raw({ nutriScore: null, energyKcal: null, fat: null, saturatedFat: null, sugars: null, fibre: null, protein: null, salt: null, ingredients: null, allergens: [], claims: [] });
