@@ -50,7 +50,7 @@ Bestaande bestanden (JavaScript, iconen, service worker) worden rechtstreeks ges
 ## Eigen domein: karrie.eu
 
 - **DNS** bij de registrar: `A`-record `karrie.eu` → `216.24.57.1` en `CNAME` `www.karrie.eu` → `karrieapp.onrender.com`.
-- **Render**: `karrieapp` → Settings → Custom Domains bevat `karrie.eu` en `www.karrie.eu`. Beide moeten **Verified** zijn met een uitgegeven certificaat; tot dan geeft HTTPS op dat adres een fout.
+- **Render**: `karrieapp` → Settings → Custom Domains bevat `karrie.eu` en `www.karrie.eu`. Beide moeten **Verified** zijn met een uitgegeven certificaat; tot dan geeft HTTPS op dat adres een fout. Render stuurt `karrie.eu` nu door naar `www.karrie.eu` (301), dus de app en zijn gegevens wonen op `www`. Andersom kan in hetzelfde scherm; de server staat beide toe.
 - **Server**: `ALLOWED_ORIGINS` van `karrie-api` bevat `https://karrie.eu,https://www.karrie.eu,https://karrieapp.onrender.com`. Zonder het nieuwe adres weigert de server foto, streepjescode, aanbiedingen en zelf toegevoegde producten (403). Staat de variabele in het dashboard op een andere waarde, pas hem daar aan.
 - **Oude adres**: `karrieapp.onrender.com` blijft werken. Lijstjes, stickers en eigen producten staan per adres op het toestel; wie Karrie vanaf het oude adres op het beginscherm zette, ziet op `karrie.eu` een lege app. Zet Karrie vanaf `karrie.eu` opnieuw op het beginscherm.
 - **Umami** telt bezoeken op alle drie adressen (`data-domains` in `vite.config.ts`).
