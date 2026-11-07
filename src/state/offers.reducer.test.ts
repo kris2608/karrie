@@ -28,6 +28,16 @@ describe("supermarket per list", () => {
     expect(reducer(state, { type: "new-draft" }).adventure?.retailer).toBe("lidl");
   });
 
+  it("a default chosen in the parent settings starts new lists, without changing the current one", () => {
+    const state = reducer(reducer(withDraft(), { type: "set-retailer", retailer: "jumbo" }), { type: "set-default-retailer", retailer: "albert_heijn" });
+    expect(state.adventure?.retailer).toBe("jumbo");
+    expect(state.settings.retailer).toBe("albert_heijn");
+    expect(reducer(state, { type: "new-draft" }).adventure?.retailer).toBe("albert_heijn");
+    const none = reducer(state, { type: "set-default-retailer", retailer: null });
+    expect(none.settings).not.toHaveProperty("retailer");
+    expect(reducer(none, { type: "new-draft" }).adventure).not.toHaveProperty("retailer");
+  });
+
   it("8. switching supermarket changes every question to the new one", () => {
     const jumbo = reducer(withDraft(), { type: "set-retailer", retailer: "jumbo" });
     const ah = reducer(jumbo, { type: "set-retailer", retailer: "albert_heijn" });

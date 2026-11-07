@@ -152,6 +152,8 @@ export type Adventure = {
   discovered?: string[];
   /** Home milestones already celebrated for this list. */
   cheered?: number[];
+  /** The parent wiped this list's saved copy, so it is only saved again on an explicit Bewaren. */
+  forgotten?: boolean;
 };
 
 export type SavedItem = PackInfo & {

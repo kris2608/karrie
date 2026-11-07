@@ -104,6 +104,31 @@ it("wist een bewaard lijstje, zet het terug op zijn plek en wist alles", () => {
   expect(state.adventure?.items).toHaveLength(1);
 });
 
+it("een gewist lijstje komt niet vanzelf terug als vorig lijstje", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  let state = reducer(initialState, { type: "add-product", product: banaan });
+  state = reducer(state, { type: "save-favorite" });
+  state = reducer(state, { type: "clear-saved" });
+  expect(reducer(state, { type: "new-draft" }).saved).toEqual([]);
+
+  // Lang drukken en dan Ongedaan maken: dan hoort het er weer bij.
+  const id = state.adventure!.id;
+  const kept = reducer(reducer(state, { type: "restore-saved", list: { id, name: "x", items: [], favorite: false, updatedAt: 1 }, index: 0 }), { type: "new-draft" });
+  expect(kept.saved.map((list) => list.id)).toEqual([id]);
+
+  // Zelf weer bewaren mag altijd.
+  expect(reducer(state, { type: "save-favorite" }).saved.map((list) => list.id)).toEqual([id]);
+});
+
+it("een afgerond avontuur dat gewist is, komt niet terug na nieuw avontuur of terug", () => {
+  let state = shop();
+  for (let step = 0; step < 4; step += 1) state = reducer(state, { type: "found" });
+  expect(state.saved).toHaveLength(1);
+  state = reducer(state, { type: "forget-saved", id: state.saved[0].id });
+  expect(reducer(state, { type: "undo" }).saved).toEqual([]);
+  expect(reducer(state, { type: "new-draft" }).saved).toEqual([]);
+});
+
 it("bewaart een lijstje met een naam en supermarkt en neemt die mee bij openen", () => {
   const banaan = recognizeList("banaan")[0].product!;
   let state = reducer(initialState, { type: "add-product", product: banaan });

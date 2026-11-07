@@ -13,7 +13,9 @@ import { SoundSwitch } from "../../components/ui/SoundSwitch";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { softSpring } from "../../motion/variants";
+import { retailerName } from "../../domain/retailers";
 import { stickerLabel } from "../../domain/stickers";
+import { RetailerPicker } from "../offers/RetailerPicker";
 import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
@@ -46,7 +48,7 @@ function ListCard({ list, label: fallback, onOpen, onForget }: { list: SavedList
 }
 
 export function HomeScreen() {
-  const { adventure, saved, stickers, dispatch } = useAdventure();
+  const { adventure, saved, stickers, settings, dispatch } = useAdventure();
   const navigate = useNavigate();
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
@@ -186,6 +188,13 @@ export function HomeScreen() {
         <SoundSwitch />
         <DiscoverySwitch />
         <ReferenceSwitch />
+        <div className="setting-block" data-testid="default-retailer">
+          <span className="switch-label">
+            <strong>Supermarkt</strong>
+            <small>{settings.retailer ? `Nieuwe lijstjes tonen aanbiedingen van ${retailerName(settings.retailer)}` : "Geen: Karrie zoekt geen aanbiedingen"}</small>
+          </span>
+          <RetailerPicker value={settings.retailer} onChange={(retailer) => dispatch({ type: "set-default-retailer", retailer })} />
+        </div>
         {saved.length > 0 &&
           (confirmClear ? (
             <div className="clear-saved" data-testid="clear-saved-confirm">

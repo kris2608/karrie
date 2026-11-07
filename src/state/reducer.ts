@@ -70,6 +70,8 @@ export type Action =
   | { type: "set-discovery"; enabled: boolean }
   | { type: "set-reference-images"; enabled: boolean }
   | { type: "set-retailer"; retailer: RetailerId | null }
+  /** The parent's default for new lists; the current list keeps its own supermarket. */
+  | { type: "set-default-retailer"; retailer: RetailerId | null }
   | { type: "set-image-choice"; itemId: string; choice: ImageChoice | undefined }
   | { type: "add-mine"; key: string }
   | { type: "forget-mine"; key: string }
@@ -161,7 +163,7 @@ function withHistory(state: AppState, adventure: Adventure) {
 }
 
 function upsertSaved(saved: SavedList[], adventure: Adventure, favorite?: boolean): SavedList[] {
-  if (!adventure.items.length) return saved;
+  if (!adventure.items.length || (adventure.forgotten && favorite === undefined)) return saved;
   const existing = saved.find((list) => list.id === adventure.id);
   const entry: SavedList = {
     id: adventure.id,
@@ -180,6 +182,16 @@ function upsertSaved(saved: SavedList[], adventure: Adventure, favorite?: boolea
     updatedAt: Date.now(),
   };
   return [entry, ...saved.filter((list) => list.id !== entry.id)].slice(0, 40);
+}
+
+/** The current list loses its saved copy; starting a new list, finishing or undoing must not bring it back. */
+function forget(adventure: Adventure | null, ids: string[]): Adventure | null {
+  return adventure && ids.includes(adventure.id) ? { ...adventure, forgotten: true } : adventure;
+}
+
+function remembered(adventure: Adventure): Adventure {
+  const { forgotten: _forgotten, ...rest } = adventure;
+  return rest;
 }
 
 function mergeLines(items: AdventureItem[], lines: { product: Product; quantity: number }[]): AdventureItem[] {
@@ -293,6 +305,10 @@ export function reducer(state: AppState, action: Action): AppState {
       const settings: Settings = retailer ? { ...rest, retailer } : rest;
       if (!state.adventure || state.adventure.phase === "done") return { ...state, settings };
       return { ...state, settings, adventure: touch(withRetailer(state.adventure, retailer), {}) };
+    }
+    case "set-default-retailer": {
+      const { retailer: _previous, ...rest } = state.settings;
+      return { ...state, settings: action.retailer ? { ...rest, retailer: action.retailer } : rest };
     }
     case "set-image-choice":
       return updateItem(state, action.itemId, (item) => {
@@ -486,10 +502,8 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!state.adventure?.items.length) return state;
       const name = action.name?.trim().slice(0, 40);
       const store = action.store?.trim().slice(0, 40);
-      const adventure =
-        action.name === undefined && action.store === undefined
-          ? state.adventure
-          : { ...state.adventure, name: name || DEFAULT_LIST_NAME, store: store || undefined };
+      const { forgotten: _forgotten, ...current } = state.adventure;
+      const adventure = action.name === undefined && action.store === undefined ? current : { ...current, name: name || DEFAULT_LIST_NAME, store: store || undefined };
       return { ...state, adventure, saved: upsertSaved(state.saved, adventure, true) };
     }
     case "open-saved": {
@@ -501,13 +515,14 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, adventure: withRetailer({ ...adventure, ...(list.store && { store: list.store }), items }, retailer) };
     }
     case "forget-saved":
-      return { ...state, saved: state.saved.filter((list) => list.id !== action.id) };
+      return { ...state, saved: state.saved.filter((list) => list.id !== action.id), adventure: forget(state.adventure, [action.id]) };
     case "restore-saved": {
       const saved = state.saved.filter((list) => list.id !== action.list.id);
-      return { ...state, saved: [...saved.slice(0, action.index), action.list, ...saved.slice(action.index)] };
+      const adventure = state.adventure?.id === action.list.id ? remembered(state.adventure) : state.adventure;
+      return { ...state, adventure, saved: [...saved.slice(0, action.index), action.list, ...saved.slice(action.index)] };
     }
     case "clear-saved":
-      return { ...state, saved: [] };
+      return { ...state, saved: [], adventure: forget(state.adventure, state.saved.map((list) => list.id)) };
     default:
       return state;
   }

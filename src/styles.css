@@ -413,6 +413,14 @@ h1, h2, p { margin: 0; }
   cursor: pointer;
 }
 .switch-label { display: grid; }
+.setting-block {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
 .switch-label strong { font-weight: 900; }
 .switch-label small { color: var(--ink-soft); font-size: var(--text-label); }
 .switch-track {
