@@ -73,6 +73,8 @@ Gebruik het HTTPS-adres, niet een lokaal IP-adres zonder certificaat.
 2. Menu → **App installeren** of **Toevoegen aan startscherm**.
 3. Open Karrie vanaf het icoon.
 
+Het tabblad-icoon (`favicon.svg`) en de app-iconen zijn dezelfde Karrie als op het beginscherm en in de WhatsApp-voorvertoning. Pas je de tekening in `src/components/mascot/Karrie.tsx` aan, maak de iconen dan opnieuw met `npm run icons` (dat gebruikt Chrome of Edge; zet anders `CHROME_PATH`). Een icoon dat al op het beginscherm staat, verandert pas als je Karrie daar verwijdert en opnieuw toevoegt.
+
 ## Checklist op iPhone en Android
 
 - Het startscherm toont Karrie en **Speur, vind en vink af!**

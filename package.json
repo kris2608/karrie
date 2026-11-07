@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:server": "npm test --prefix server",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "vite-node scripts/generate-icons.ts"
   },
   "dependencies": {
     "@fontsource/nunito": "^5.2.6",
