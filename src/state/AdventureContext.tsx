@@ -74,11 +74,14 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     for (const identity of wanted) references.request(identity);
   }, [wanted, state.settings.referenceImages]);
 
-  const draftItems = ready && state.adventure?.phase === "draft" ? state.adventure.items : null;
+  const listItems =
+    ready && state.adventure && (state.adventure.phase === "draft" || state.adventure.phase === "shopping")
+      ? state.adventure.items
+      : null;
   const retailer = state.adventure?.retailer;
   useEffect(() => {
-    offers.sync(draftItems ? offerQueries(draftItems, retailer) : []);
-  }, [draftItems, retailer]);
+    offers.sync(listItems ? offerQueries(listItems, retailer) : []);
+  }, [listItems, retailer]);
 
   useCustomEnrichment(state, dispatch, ready);
 

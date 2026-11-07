@@ -15,7 +15,12 @@ import { activeItem, foundCount } from "../../domain/shopQueue";
 import type { AdventureItem } from "../../domain/types";
 import { productEnter, productExit, spring } from "../../motion/variants";
 import { useFoundSequence, type Flight } from "../../motion/useFoundSequence";
+import { analyticsRetailer } from "../../domain/retailers";
+import { trackEvent } from "../../services/analytics";
+import { useOfferViews } from "../../storage/offers";
 import { useAdventure } from "../../state/AdventureContext";
+import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
+import { OfferTag, offerLabel } from "../offers/OfferTag";
 import { MissionCard, ParentCheck } from "./MissionCard";
 
 const SWIPE_DISTANCE = 90;
@@ -30,6 +35,7 @@ export function ShopScreen() {
   const reduced = useReducedMotion() ?? false;
   const [parentOpen, setParentOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
+  const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const [missionShown, setMissionShown] = useState<string | null>(null);
   const location = useLocation();
   /** Shown once when a list collected at home goes shopping; a tap or a moment later it is gone. */
@@ -56,6 +62,9 @@ export function ShopScreen() {
   });
 
   const current = adventure ? activeItem(adventure.items) : undefined;
+  const retailer = adventure?.retailer;
+  const { views: offerViews } = useOfferViews(adventure?.items ?? [], retailer);
+  const offer = current ? offerViews.get(current.id) : undefined;
   const offered = current?.mission?.status === "offered" && !sequence.locked && !intro ? current.id : null;
 
   useEffect(() => {
@@ -208,6 +217,22 @@ export function ShopScreen() {
             </motion.h1>
           )}
         </AnimatePresence>
+        {current && offer?.answer.offer && retailer && (
+          <button
+            type="button"
+            className="offer-tag-button shop-offer"
+            aria-label={`${offerLabel(offer.shown, retailer)}: details`}
+            data-testid="shop-offer"
+            onClick={() => {
+              const deal = offer.answer.offer;
+              if (!deal) return;
+              setOfferOpen({ itemName: current.name, offer: deal, shown: offer.shown });
+              trackEvent({ name: "offer_opened", data: { retailer: analyticsRetailer(retailer), match_type: deal.matchType } });
+            }}
+          >
+            <OfferTag shown={offer.shown} retailer={retailer} />
+          </button>
+        )}
       </div>
 
       <div className="scan-mission">
@@ -292,6 +317,8 @@ export function ShopScreen() {
           </motion.button>
         )}
       </AnimatePresence>
+
+      <OfferSheet open={offerOpen} onClose={() => setOfferOpen(null)} />
 
       <Sheet open={checkOpen && Boolean(searching)} onClose={() => setCheckOpen(false)} label="Bonusmissie controleren">
         {searching && (

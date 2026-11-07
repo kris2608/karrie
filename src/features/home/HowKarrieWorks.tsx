@@ -70,8 +70,8 @@ export function HowKarrieWorks({ headingRef, onStart, onSkip }: HowKarrieWorksPr
         </div>
         <p className="howto-small">Niet ieder product heeft een aanbieding. Controleer de prijs en voorwaarden altijd even in de winkel.</p>
         <p className="howto-small">
-          Kiezen hoeft niet. Je kunt de supermarkt wijzigen bij Toevoegen, Controleren of in de instellingen. Aanbiedingen zie je tijdens het maken van
-          het lijstje, niet tijdens de speurtocht.
+          Kiezen hoeft niet. Je kunt de supermarkt wijzigen bij Toevoegen, Controleren of in de instellingen. Aanbiedingen zie je op het lijstje en
+          tijdens de speurtocht, als klein label bij het product.
         </p>
         <Attribution />
       </section>

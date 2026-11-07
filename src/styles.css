@@ -1175,7 +1175,9 @@ h1, h2, p { margin: 0; }
 .stage-art .product-art { height: 100%; filter: drop-shadow(0 10px 8px rgba(120, 72, 20, 0.2)); }
 .product-title {
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-2);
   min-height: 2.8rem;
   text-align: center;
 }
@@ -1186,6 +1188,7 @@ h1, h2, p { margin: 0; }
   overflow-wrap: anywhere;
   hyphens: auto;
 }
+.shop-offer { justify-self: center; }
 .qty {
   display: inline-block;
   margin-right: var(--space-2);
