@@ -79,6 +79,7 @@ Het tabblad-icoon (`favicon.svg`) en de app-iconen zijn dezelfde Karrie als op h
 
 - Het startscherm toont Karrie en **Speur, vind en vink af!**
 - Tik bij **Toevoegen** op een product: een groen vinkje stijgt in ongeveer een seconde uit de tegel op. **Lijstje** onderaan opent het lijstje.
+- Scroll bij **Toevoegen** naar beneden: na **Groente en fruit** volgen vanzelf **Bakkerij**, **Houdbaar** en de rest, en de tab bovenin loopt mee. Tikken op een tab scrolt naar die afdeling; tijdens het zoeken zie je alleen de zoekresultaten.
 - Start een avontuur. De knop met de drie streepjes linksboven opent het overzicht voor ouders, met onderaan **Naar het beginscherm**. Het beginscherm toont dan **Verder speuren**.
 - Karrie kijkt door een grote verrekijker zolang hij zoekt.
 - **Gevonden!** laat het product naar het mandje vliegen en een ster naar de teller. Dubbel tikken telt maar één keer.
@@ -304,7 +305,7 @@ Een eerdere ronde liet zien waarom de controle op "het hele product" nodig is: z
 
 ## Mijn producten
 
-Een product dat van een foto is herkend en een merk heeft, of dat niet in de catalogus staat, onthoudt Karrie op dit toestel als **Mijn producten**: naam, merk, afdeling, foto en eventuele bonusmissie. In **Toevoegen** staat het met een hartje onder zijn eigen afdeling, onder **Alles** en in de zoekresultaten. Tikken zet het op de lijst (of telt er één bij). Lang drukken haalt het van de lijst en vergeet het, met **Ongedaan maken**. Een herkende AH Terra pindakaas telt op zijn eigen tegel, niet ook op de tegel Pindakaas. Karrie onthoudt hoogstens 120 producten.
+Een product dat van een foto is herkend en een merk heeft, of dat niet in de catalogus staat, onthoudt Karrie op dit toestel als **Mijn producten**: naam, merk, afdeling, foto en eventuele bonusmissie. In **Toevoegen** staat het met een hartje vooraan in zijn eigen afdeling en in de zoekresultaten. Tikken zet het op de lijst (of telt er één bij). Lang drukken haalt het van de lijst en vergeet het, met **Ongedaan maken**. Een herkende AH Terra pindakaas telt op zijn eigen tegel, niet ook op de tegel Pindakaas. Karrie onthoudt hoogstens 120 producten.
 
 ## Thuis verzamelen (Lijstjesavontuur)
 

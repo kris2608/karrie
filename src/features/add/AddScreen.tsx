@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../../domain/categories";
@@ -17,6 +17,7 @@ import { useLongPress } from "../../components/ui/useLongPress";
 import { discoveredCount } from "../../domain/homeAdventure";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { DiscoverBanner } from "./DiscoverBanner";
+import { activeSection } from "./sectionSpy";
 import { Attribution, OfferTag, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { RETAILERS, retailerName, type RetailerId } from "../../domain/retailers";
@@ -49,6 +50,11 @@ const NO_ITEMS: AdventureItem[] = [];
 
 /** The green check rises out of the tile, slow enough for a child to follow. */
 const BURST_MS = 1100;
+
+/** A category counts as "in view" once its heading is in the top third of what's visible under the sticky header. */
+const SPY_SHARE = 0.3;
+/** Fallback for browsers without `scrollend`: after a tab jump, follow the scroll again. */
+const JUMP_MS = 1000;
 
 type GridTileProps = {
   name: string;
@@ -138,7 +144,13 @@ export function AddScreen() {
   const { adventure, mine, settings, dispatch } = useAdventure();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<CategoryId | "all">("produce");
+  const [active, setActive] = useState<CategoryId>(CATEGORIES[0].id);
+  const reduced = useReducedMotion() ?? false;
+  const headRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLElement>(null);
+  const sectionRefs = useRef<Partial<Record<CategoryId, HTMLElement | null>>>({});
+  const jumping = useRef<(() => void) | null>(null);
+  const pendingJump = useRef<CategoryId | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
@@ -169,16 +181,81 @@ export function AddScreen() {
   }, [adventure, mineKeys]);
 
   const needle = normalize(query);
-  const activeTab = needle ? null : category;
-  const inTab = (entryCategory: CategoryId) => Boolean(needle) || category === "all" || entryCategory === category;
-  const visible = useMemo(
-    () => products.filter((product) => matches(product, needle) && (needle || category === "all" || product.category === category)),
-    [category, needle],
-  );
-  const mineVisible = mine.filter((entry) => matchesMine(entry, needle) && inTab(entry.category));
+  const visible = useMemo(() => products.filter((product) => matches(product, needle)), [needle]);
+  const mineVisible = mine.filter((entry) => matchesMine(entry, needle));
   const extras = [...onList.entries()]
-    .filter(([tile, { item }]) => !productById(tile) && !mineKeys.has(tile) && (needle ? normalize(item.name).includes(needle) : inTab(item.category)))
+    .filter(([tile, { item }]) => !productById(tile) && !mineKeys.has(tile) && (!needle || normalize(item.name).includes(needle)))
     .map(([, entry]) => entry);
+
+  useEffect(() => {
+    if (needle) return;
+    let frame = 0;
+    const follow = () => {
+      frame = 0;
+      if (jumping.current) return;
+      const head = headRef.current?.offsetHeight ?? 0;
+      const line = head + (window.innerHeight - head) * SPY_SHARE;
+      const tops = CATEGORIES.map((entry) => sectionRefs.current[entry.id]?.getBoundingClientRect().top ?? Infinity);
+      const atBottom = window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      const index = activeSection(tops, line, atBottom);
+      if (index >= 0) setActive(CATEGORIES[index].id);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(follow);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    follow();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.cancelAnimationFrame(frame);
+    };
+  }, [needle]);
+
+  useEffect(() => {
+    const strip = tabsRef.current;
+    const tab = strip?.querySelector<HTMLElement>(`[data-category="${active}"]`);
+    if (!strip || !tab) return;
+    strip.scrollTo({ left: tab.offsetLeft - strip.offsetLeft - (strip.clientWidth - tab.offsetWidth) / 2, behavior: reduced ? "auto" : "smooth" });
+  }, [active, reduced]);
+
+  useEffect(() => {
+    if (needle || !pendingJump.current) return;
+    scrollToSection(pendingJump.current);
+    pendingJump.current = null;
+  });
+
+  useEffect(() => () => jumping.current?.(), []);
+
+  function scrollToSection(id: CategoryId) {
+    const section = sectionRefs.current[id];
+    if (!section) return;
+    setActive(id);
+    jumping.current?.();
+    const top = id === CATEGORIES[0].id ? 0 : section.getBoundingClientRect().top + window.scrollY - (headRef.current?.offsetHeight ?? 0);
+    const timer = window.setTimeout(() => release(), JUMP_MS);
+    const release = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("scrollend", release);
+      window.removeEventListener("touchstart", release);
+      window.removeEventListener("wheel", release);
+      jumping.current = null;
+    };
+    jumping.current = release;
+    window.addEventListener("scrollend", release);
+    window.addEventListener("touchstart", release, { passive: true });
+    window.addEventListener("wheel", release, { passive: true });
+    window.scrollTo({ top, behavior: reduced ? "auto" : "smooth" });
+  }
+
+  function jumpTo(id: CategoryId) {
+    if (needle) {
+      setActive(id);
+      pendingJump.current = id;
+      setQuery("");
+      return;
+    }
+    scrollToSection(id);
+  }
 
   function addMore(item: AdventureItem) {
     dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 });
@@ -264,11 +341,59 @@ export function AddScreen() {
     }
   }
 
-  const tabs: { id: CategoryId | "all"; label: string }[] = [{ id: "all", label: "Alles" }, ...CATEGORIES.map((entry) => ({ id: entry.id, label: entry.short }))];
+  const mineTile = (entry: SavedItem) => {
+    const key = mineKey(entry);
+    const listed = onList.get(key);
+    return (
+      <GridTile
+        key={key}
+        name={entry.name}
+        category={entry.category}
+        art={<ItemArt item={listed ? listed.item : entry} />}
+        quantity={listed?.quantity ?? 0}
+        pop={burst?.id === key ? burst : null}
+        onAdd={() => addMine(entry)}
+        onRemove={() => forgetMine(entry)}
+        mine
+        offer={offerOn(listed?.item)}
+      />
+    );
+  };
+
+  const extraTile = (entry: OnList) => (
+    <GridTile
+      key={entry.item.id}
+      name={entry.item.name}
+      category={entry.item.category}
+      art={<ItemArt item={entry.item} />}
+      quantity={entry.quantity}
+      pop={burst?.id === entry.item.productId ? burst : null}
+      onAdd={() => addMore(entry.item)}
+      onRemove={() => removeProduct(tileOf(entry.item))}
+      offer={offerOn(entry.item)}
+    />
+  );
+
+  const productTile = (product: Product) => {
+    const entry = onList.get(product.id);
+    return (
+      <GridTile
+        key={product.id}
+        name={product.name}
+        category={product.category}
+        art={<ItemArt item={entry ? entry.item : { icon: product.id, name: product.name }} />}
+        quantity={entry?.quantity ?? 0}
+        pop={burst?.id === product.id ? burst : null}
+        onAdd={() => addProduct(product)}
+        onRemove={() => removeProduct(product.id)}
+        offer={offerOn(entry?.item)}
+      />
+    );
+  };
 
   return (
     <main className="screen screen-add">
-      <div className="add-head">
+      <div className="add-head" ref={headRef}>
         <TopBar
           title="Wat nemen we mee?"
           action={
@@ -302,81 +427,54 @@ export function AddScreen() {
           </label>
           <PhotoButton onClick={() => photo.current?.open()} />
         </div>
-        <div className="tabs" role="tablist" aria-label="Categorieën">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
+        <nav className="tabs" ref={tabsRef} aria-label="Categorieën">
+          {CATEGORIES.map((tab) => {
+            const current = !needle && active === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
-                className={active ? "tab is-active" : "tab"}
-                onClick={(event) => {
-                  setCategory(tab.id);
-                  setQuery("");
-                  event.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-                }}
+                data-category={tab.id}
+                aria-current={current ? "true" : undefined}
+                className={current ? "tab is-active" : "tab"}
+                onClick={() => jumpTo(tab.id)}
               >
-                {active && <motion.span layoutId="tab-pill" className="tab-pill" transition={spring} />}
-                <span className="tab-label">{tab.label}</span>
+                {current && <motion.span layoutId="tab-pill" className="tab-pill" transition={spring} />}
+                <span className="tab-label">{tab.short}</span>
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
 
       {!needle && <DiscoverBanner count={discovered} onStart={() => photo.current?.discover()} />}
 
-      <div className="product-grid">
-        {mineVisible.map((entry) => {
-          const key = mineKey(entry);
-          const listed = onList.get(key);
-          return (
-            <GridTile
-              key={key}
-              name={entry.name}
-              category={entry.category}
-              art={<ItemArt item={listed ? listed.item : entry} />}
-              quantity={listed?.quantity ?? 0}
-              pop={burst?.id === key ? burst : null}
-              onAdd={() => addMine(entry)}
-              onRemove={() => forgetMine(entry)}
-              mine
-              offer={offerOn(listed?.item)}
-            />
-          );
-        })}
-        {extras.map((entry) => (
-          <GridTile
-            key={entry.item.id}
-            name={entry.item.name}
-            category={entry.item.category}
-            art={<ItemArt item={entry.item} />}
-            quantity={entry.quantity}
-            pop={burst?.id === entry.item.productId ? burst : null}
-            onAdd={() => addMore(entry.item)}
-            onRemove={() => removeProduct(tileOf(entry.item))}
-            offer={offerOn(entry.item)}
-          />
-        ))}
-        {visible.map((product) => {
-          const entry = onList.get(product.id);
-          return (
-            <GridTile
-              key={product.id}
-              name={product.name}
-              category={product.category}
-              art={<ItemArt item={entry ? entry.item : { icon: product.id, name: product.name }} />}
-              quantity={entry?.quantity ?? 0}
-              pop={burst?.id === product.id ? burst : null}
-              onAdd={() => addProduct(product)}
-              onRemove={() => removeProduct(product.id)}
-              offer={offerOn(entry?.item)}
-            />
-          );
-        })}
-      </div>
+      {needle ? (
+        <div className="product-grid">
+          {mineVisible.map(mineTile)}
+          {extras.map(extraTile)}
+          {visible.map(productTile)}
+        </div>
+      ) : (
+        CATEGORIES.map((section) => (
+          <section
+            key={section.id}
+            ref={(node) => {
+              sectionRefs.current[section.id] = node;
+            }}
+            className="product-section"
+            aria-labelledby={`section-${section.id}`}
+            data-testid="product-section"
+          >
+            <h2 id={`section-${section.id}`}>{section.label}</h2>
+            <div className="product-grid">
+              {mineVisible.filter((entry) => entry.category === section.id).map(mineTile)}
+              {extras.filter((entry) => entry.item.category === section.id).map(extraTile)}
+              {visible.filter((product) => product.category === section.id).map(productTile)}
+            </div>
+          </section>
+        ))
+      )}
       {deals > 0 && <Attribution className="add-attribution" />}
       {visible.length === 0 && extras.length === 0 && mineVisible.length === 0 && <p className="empty">Niets gevonden. Probeer een ander woord.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
