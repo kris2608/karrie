@@ -4,8 +4,11 @@ import type { CategoryId } from "./types";
 export const CATEGORY_ICONS: Record<CategoryId, string> = {
   produce: "appel",
   bakery: "brood",
+  meat: "gehakt",
+  breakfast: "pindakaas",
   pantry: "pakket",
   dairy: "melk",
+  drinks: "water",
   frozen: "ijs",
   household: "handzeep",
 };

@@ -4,10 +4,10 @@ import { initialState, reducer } from "../../state/reducer";
 import { CUSTOM_RULES, createCustomProductClient, enrichmentOf } from "./client";
 
 const PRODUCT = {
-  canonicalName: "walnoot",
-  displayName: "Walnoten",
-  singularName: "walnoot",
-  pluralName: "walnoten",
+  canonicalName: "cashewnoot",
+  displayName: "Cashewnoten",
+  singularName: "cashewnoot",
+  pluralName: "cashewnoten",
   childFriendlyLabel: "nootjes",
   category: "pantry",
   subcategory: "noten",
@@ -40,12 +40,12 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 describe("custom product client", () => {
   it("sends only the typed name and turns the answer into an enrichment", async () => {
     const { api, calls } = client(() => json(200, { status: "ok", product: PRODUCT, illustrations: false }));
-    const outcome = await api.normalize("Walnoten");
-    expect(calls).toEqual([{ url: "https://api.example/api/products/normalize", body: { name: "Walnoten", createdFrom: "search" } }]);
+    const outcome = await api.normalize("Cashewnoten");
+    expect(calls).toEqual([{ url: "https://api.example/api/products/normalize", body: { name: "Cashewnoten", createdFrom: "search" } }]);
     expect(outcome).toEqual({
       status: "ok",
       illustrations: false,
-      enrichment: { displayName: "Walnoten", canonicalName: "walnoot", singularName: "walnoot", pluralName: "walnoten", childFriendlyLabel: "nootjes", category: "pantry", subcategory: "noten" },
+      enrichment: { displayName: "Cashewnoten", canonicalName: "cashewnoot", singularName: "cashewnoot", pluralName: "cashewnoten", childFriendlyLabel: "nootjes", category: "pantry", subcategory: "noten" },
     });
   });
 
@@ -67,22 +67,22 @@ describe("custom product client", () => {
   it("asks for a drawing at most a few times a day and treats 404 as no drawing", async () => {
     const image = "data:image/webp;base64,UklGRg==";
     const { api, calls } = client((url) => (url.startsWith("data:") ? new Response(new Blob(["RIFF"], { type: "image/webp" })) : json(200, { status: "ok", image })));
-    const first = await api.illustration("Walnoten");
+    const first = await api.illustration("Cashewnoten");
     expect(first.status).toBe("ok");
-    for (let index = 1; index < CUSTOM_RULES.illustrationsPerDay; index += 1) await api.illustration("Walnoten");
-    expect(await api.illustration("Walnoten")).toEqual({ status: "retry" });
+    for (let index = 1; index < CUSTOM_RULES.illustrationsPerDay; index += 1) await api.illustration("Cashewnoten");
+    expect(await api.illustration("Cashewnoten")).toEqual({ status: "retry" });
     expect(calls.filter((call) => call.url.endsWith("/api/products/illustration"))).toHaveLength(CUSTOM_RULES.illustrationsPerDay);
-    expect(await client(() => json(404, { status: "error", code: "not-found" })).api.illustration("Walnoten")).toEqual({ status: "none" });
+    expect(await client(() => json(404, { status: "error", code: "not-found" })).api.illustration("Cashewnoten")).toEqual({ status: "none" });
   });
 });
 
 describe("customWork", () => {
   it("lists each pending product once, then its drawing once the tidy-up is done", () => {
-    let state = reducer(initialState, { type: "add-custom", name: "walnoten", itemId: crypto.randomUUID() });
-    expect(customWork(state)).toEqual({ normalize: [{ productId: "custom:walnoot", name: "Walnoten" }], illustrate: [] });
-    state = reducer(state, { type: "enrich-custom", productId: "custom:walnoot", result: { displayName: "Walnoten", canonicalName: "walnoot", category: "pantry" }, illustrations: true });
-    expect(customWork(state)).toEqual({ normalize: [], illustrate: [{ productId: "custom:walnoot", name: "Walnoten" }] });
-    state = reducer(state, { type: "set-illustration", productId: "custom:walnoot", illustrationId: "drawing-1" });
+    let state = reducer(initialState, { type: "add-custom", name: "cashewnoten", itemId: crypto.randomUUID() });
+    expect(customWork(state)).toEqual({ normalize: [{ productId: "custom:cashewnoot", name: "Cashewnoten" }], illustrate: [] });
+    state = reducer(state, { type: "enrich-custom", productId: "custom:cashewnoot", result: { displayName: "Cashewnoten", canonicalName: "cashewnoot", category: "pantry" }, illustrations: true });
+    expect(customWork(state)).toEqual({ normalize: [], illustrate: [{ productId: "custom:cashewnoot", name: "Cashewnoten" }] });
+    state = reducer(state, { type: "set-illustration", productId: "custom:cashewnoot", illustrationId: "drawing-1" });
     expect(customWork(state)).toEqual({ normalize: [], illustrate: [] });
   });
 

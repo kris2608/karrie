@@ -68,7 +68,7 @@ describe("foto herkennen", () => {
     state = reducer(state, { type: "apply-recognition", itemId: before.id, photoId: "p3", pack: TERRA });
     expect(items(state)).toHaveLength(2);
     const after = items(state).find((item) => item.id === before.id)!;
-    expect(after).toMatchObject({ id: before.id, quantity: 3, category: "pantry", icon: "pindakaas", productId: "pindakaas", photoId: "p3", source: "vision" });
+    expect(after).toMatchObject({ id: before.id, quantity: 3, category: "breakfast", icon: "pindakaas", productId: "pindakaas", photoId: "p3", source: "vision" });
   });
 
   it("keeps a legacy barcode item from an old list and only swaps the picture", () => {

@@ -10,8 +10,11 @@ import type { CategoryId, Product } from "./types";
 export const SECTION_CATEGORY: Record<ShopSection, CategoryId> = {
   "groente-fruit": "produce",
   bakker: "bakery",
+  "vlees-vis-vega": "meat",
+  ontbijt: "breakfast",
   houdbaar: "pantry",
   koeling: "dairy",
+  dranken: "drinks",
   diepvries: "frozen",
   huishouden: "household",
 };
@@ -58,7 +61,8 @@ export type VisionDraft = {
 
 export function draftFromVision(product: RecognizedProduct): VisionDraft {
   const match = catalogMatch(product);
-  const category = (product.category && SECTION_CATEGORY[product.category]) ?? match?.category ?? "pantry";
+  /** Prefer the catalog department when we matched a drawing; otherwise use the shop section from the photo. */
+  const category = match?.category ?? (product.category && SECTION_CATEGORY[product.category]) ?? "pantry";
   const inferred = new Set(product.inferredFields);
   const ingredients = product.visibleIngredients ?? undefined;
   return {

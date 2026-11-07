@@ -10,10 +10,10 @@ function play(actions: Action[], from: AppState = initialState) {
 const add = (name: string, itemId: string = crypto.randomUUID()): Action => ({ type: "add-custom", name, itemId });
 
 const WALNUTS: CustomEnrichment = {
-  displayName: "Walnoten",
-  canonicalName: "walnoot",
-  singularName: "walnoot",
-  pluralName: "walnoten",
+  displayName: "Cashewnoten",
+  canonicalName: "cashewnoot",
+  singularName: "cashewnoot",
+  pluralName: "cashewnoten",
   childFriendlyLabel: "nootjes",
   category: "pantry",
   subcategory: "noten",
@@ -22,13 +22,13 @@ const WALNUTS: CustomEnrichment = {
 
 describe("custom generic products", () => {
   it("adds a typed-in product as a custom generic line and remembers it on this device", () => {
-    const state = play([add("walnoten", "line-1")]);
+    const state = play([add("cashewnoten", "line-1")]);
     const [item] = state.adventure!.items;
     expect(item).toMatchObject({
       id: "line-1",
-      productId: "custom:walnoot",
-      name: "Walnoten",
-      canonicalName: "walnoten",
+      productId: "custom:cashewnoot",
+      name: "Cashewnoten",
+      canonicalName: "cashewnoten",
       category: "pantry",
       kind: "custom_generic",
       source: "user_created",
@@ -41,11 +41,11 @@ describe("custom generic products", () => {
     expect(item.brand).toBeUndefined();
     expect(item.nutrition).toBeUndefined();
     expect(state.mine).toHaveLength(1);
-    expect(mineKey(state.mine[0])).toBe("mine:custom:walnoot");
+    expect(mineKey(state.mine[0])).toBe("mine:custom:cashewnoot");
   });
 
   it("never makes a second product for the singular or plural", () => {
-    const state = play([add("walnoten"), add("walnoot"), add("Walnoten")]);
+    const state = play([add("cashewnoten"), add("cashewnoot"), add("Cashewnoten")]);
     expect(state.adventure!.items).toHaveLength(1);
     expect(state.adventure!.items[0].quantity).toBe(3);
     expect(state.mine).toHaveLength(1);
@@ -63,17 +63,17 @@ describe("custom generic products", () => {
   });
 
   it("re-uses the remembered product on a later list, with its enrichment", () => {
-    const first = play([add("walnoten"), { type: "enrich-custom", productId: "custom:walnoot", result: WALNUTS }, { type: "new-draft" }]);
-    const later = reducer(first, add("walnoot"));
+    const first = play([add("cashewnoten"), { type: "enrich-custom", productId: "custom:cashewnoot", result: WALNUTS }, { type: "new-draft" }]);
+    const later = reducer(first, add("cashewnoot"));
     expect(later.adventure!.items).toHaveLength(1);
-    expect(later.adventure!.items[0]).toMatchObject({ name: "Walnoten", icon: "pindakaas", subcategory: "noten", enrichment: { status: "done" } });
+    expect(later.adventure!.items[0]).toMatchObject({ name: "Cashewnoten", icon: "pindakaas", subcategory: "noten", enrichment: { status: "done" } });
     expect(later.mine).toHaveLength(1);
   });
 
   it("applies the enrichment to the list, Mijn producten and saved lists", () => {
-    const state = play([add("walnoten"), { type: "save-favorite" }, { type: "enrich-custom", productId: "custom:walnoot", result: WALNUTS }]);
+    const state = play([add("cashewnoten"), { type: "save-favorite" }, { type: "enrich-custom", productId: "custom:cashewnoot", result: WALNUTS }]);
     for (const item of [state.adventure!.items[0], state.mine[0], state.saved[0].items[0]]) {
-      expect(item).toMatchObject({ name: "Walnoten", canonicalName: "walnoot", category: "pantry", icon: "pindakaas", aliases: ["walnoot", "nootjes"] });
+      expect(item).toMatchObject({ name: "Cashewnoten", canonicalName: "cashewnoot", category: "pantry", icon: "pindakaas", aliases: ["cashewnoot", "nootjes"] });
     }
   });
 
@@ -90,9 +90,9 @@ describe("custom generic products", () => {
   });
 
   it("does not overwrite what the parent chose in Review", () => {
-    const start = play([add("walnoten")]);
+    const start = play([add("cashewnoten")]);
     const itemId = start.adventure!.items[0].id;
-    const state = play([{ type: "edit-item", itemId, category: "produce", icon: "appel" }, { type: "enrich-custom", productId: "custom:walnoot", result: WALNUTS }], start);
+    const state = play([{ type: "edit-item", itemId, category: "produce", icon: "appel" }, { type: "enrich-custom", productId: "custom:cashewnoot", result: WALNUTS }], start);
     expect(state.adventure!.items[0]).toMatchObject({ category: "produce", icon: "appel" });
   });
 
@@ -106,27 +106,27 @@ describe("custom generic products", () => {
   });
 
   it("stores the generated drawing on every copy", () => {
-    const state = play([add("walnoten"), { type: "set-illustration", productId: "custom:walnoot", illustrationId: "illustration:custom:walnoot" }]);
-    expect(state.adventure!.items[0]).toMatchObject({ illustrationId: "illustration:custom:walnoot", illustration: "ready" });
+    const state = play([add("cashewnoten"), { type: "set-illustration", productId: "custom:cashewnoot", illustrationId: "illustration:custom:cashewnoot" }]);
+    expect(state.adventure!.items[0]).toMatchObject({ illustrationId: "illustration:custom:cashewnoot", illustration: "ready" });
     expect(state.mine[0]).toMatchObject({ illustration: "ready" });
     expect(reducer(play([add("komijn")]), { type: "set-illustration", productId: "custom:komijn", illustrationId: null }).mine[0].illustration).toBe("none");
   });
 
   it("works in the shop like any other product", () => {
-    const state = play([add("walnoten"), { type: "start-shopping" }, { type: "found" }]);
+    const state = play([add("cashewnoten"), { type: "start-shopping" }, { type: "found" }]);
     expect(state.adventure!.phase).toBe("done");
     expect(state.adventure!.items[0]).toMatchObject({ kind: "custom_generic", status: "found" });
   });
 
   it("counts product_added with method custom and no product name", () => {
     const before = initialState;
-    const action = add("walnoten");
+    const action = add("cashewnoten");
     const after = reducer(before, action);
     const events = analyticsEvents(action, before, after);
     expect(events.map((entry) => entry.event)).toEqual([
       { name: "shopping_list_created" },
       { name: "product_added", data: { method: "custom", category: "pantry" } },
     ]);
-    expect(JSON.stringify(events)).not.toMatch(/walnot/i);
+    expect(JSON.stringify(events)).not.toMatch(/cashew/i);
   });
 });

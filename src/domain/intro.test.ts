@@ -23,7 +23,7 @@ describe("needsIntro", () => {
     expect(saved).toHaveLength(1);
     expect(needsIntro({ ...initialState, saved })).toBe(false);
     expect(needsIntro({ ...initialState, stickers: ["ster"] })).toBe(false);
-    const mine = play([{ type: "add-custom", name: "Walnoten", itemId: "line-1" }]).mine;
+    const mine = play([{ type: "add-custom", name: "Cashewnoten", itemId: "line-1" }]).mine;
     expect(mine).toHaveLength(1);
     expect(needsIntro({ ...initialState, mine })).toBe(false);
   });

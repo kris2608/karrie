@@ -1,5 +1,5 @@
 import { openDB } from "idb";
-import { DEFAULT_CATEGORY_ORDER } from "../domain/categories";
+import { DEFAULT_CATEGORY_ORDER, mergeCategoryOrder } from "../domain/categories";
 import type { Adventure, CategoryId, SavedItem, SavedList } from "../domain/types";
 import { defaultSettings, type Settings } from "../state/reducer";
 
@@ -123,7 +123,7 @@ export async function loadPersisted(): Promise<Persisted> {
       adventure: adventure ?? null,
       saved: saved ?? [],
       stickers: stickers ?? [],
-      categoryOrder: categoryOrder?.length ? categoryOrder : [...DEFAULT_CATEGORY_ORDER],
+      categoryOrder: mergeCategoryOrder(categoryOrder),
       settings: { ...defaultSettings, ...settings },
       declined: Array.isArray(discovery?.declined) ? discovery.declined : [],
       mine: Array.isArray(mine) ? mine : [],

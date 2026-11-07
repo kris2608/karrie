@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORY_ORDER } from "../domain/categories";
+import { DEFAULT_CATEGORY_ORDER, mergeCategoryOrder } from "../domain/categories";
 import { matchProduct, normalize } from "../domain/matchProduct";
 import { parseList } from "../domain/parseList";
 import {
@@ -343,14 +343,23 @@ export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "hydrate": {
       const stored = action.data.adventure ?? null;
-      const adventure = isAdventure(stored) ? withRetailer(withHomeProgress({ ...stored, history: stored.history ?? [] }), isRetailer(stored.retailer) ? stored.retailer : undefined) : null;
+      const adventure = isAdventure(stored)
+        ? withRetailer(
+            withHomeProgress({
+              ...stored,
+              history: stored.history ?? [],
+              categoryOrder: mergeCategoryOrder(stored.categoryOrder),
+            }),
+            isRetailer(stored.retailer) ? stored.retailer : undefined,
+          )
+        : null;
       const settings: Settings = { ...defaultSettings, ...action.data.settings };
       if (!isRetailer(settings.retailer)) delete settings.retailer;
       return {
         adventure,
         saved: Array.isArray(action.data.saved) ? action.data.saved : [],
         stickers: Array.isArray(action.data.stickers) ? action.data.stickers : [],
-        categoryOrder: action.data.categoryOrder?.length ? action.data.categoryOrder : [...DEFAULT_CATEGORY_ORDER],
+        categoryOrder: mergeCategoryOrder(action.data.categoryOrder),
         settings,
         declined: Array.isArray(action.data.declined) ? action.data.declined : [],
         mine: Array.isArray(action.data.mine) ? action.data.mine : [],

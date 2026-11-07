@@ -60,10 +60,10 @@ function client(fetcher: VisionDeps["fetch"], overrides: Partial<VisionDeps> = {
 const ok = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
 
 describe("visionMapping", () => {
-  it("maps AH Terra pindakaas to the catalog drawing and pantry, with no EAN", () => {
+  it("maps AH Terra pindakaas to the catalog drawing and breakfast, with no EAN", () => {
     const draft = draftFromVision(PEANUT);
     expect(draft.match?.id).toBe("pindakaas");
-    expect(draft).toMatchObject({ name: "100% Pindakaas Naturel", category: "pantry", icon: "pindakaas" });
+    expect(draft).toMatchObject({ name: "100% Pindakaas Naturel", category: "breakfast", icon: "pindakaas" });
     expect(draft.pack).toMatchObject({ brand: "AH Terra", recognition: { variant: "Naturel", confidence: "high", nutriScoreSeen: "A" } });
     expect("ean" in draft.pack).toBe(false);
   });

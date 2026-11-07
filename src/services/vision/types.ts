@@ -1,6 +1,16 @@
 import type { Confidence, Criterion } from "../../domain/types";
 
-export const SHOP_SECTIONS = ["groente-fruit", "bakker", "houdbaar", "koeling", "diepvries", "huishouden"] as const;
+export const SHOP_SECTIONS = [
+  "groente-fruit",
+  "bakker",
+  "vlees-vis-vega",
+  "ontbijt",
+  "houdbaar",
+  "koeling",
+  "dranken",
+  "diepvries",
+  "huishouden",
+] as const;
 export type ShopSection = (typeof SHOP_SECTIONS)[number];
 
 const ALTERNATIVE_STATUS = ["none", "possible", "insufficient-data"] as const;

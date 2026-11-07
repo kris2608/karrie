@@ -37,8 +37,11 @@ type DraftLine = {
 const TINT: Record<CategoryId, string> = {
   produce: "#dff5cf",
   bakery: "#ffe9c2",
+  meat: "#ffd5d0",
+  breakfast: "#ffe8c8",
   pantry: "#ffe0da",
   dairy: "#d9f0ff",
+  drinks: "#d4e8ff",
   frozen: "#dcf3f6",
   household: "#ece3ff",
 };
@@ -517,7 +520,7 @@ export function AddScreen() {
         ))
       )}
       {deals > 0 && <Attribution className="add-attribution" />}
-      {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals walnoten.</p>}
+      {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
       {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, dan zoekt Karrie er een plaatje bij.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
       {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje onthoudt Karrie van eerder. Lang drukken vergeet ze.</p>}

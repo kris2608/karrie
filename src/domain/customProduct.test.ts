@@ -4,8 +4,8 @@ import type { SavedItem } from "./types";
 
 describe("customName", () => {
   it("accepts plain product words and tidies them", () => {
-    expect(customName("walnoten")).toBe("Walnoten");
-    expect(customName("  cashew   noten ")).toBe("Cashew noten");
+    expect(customName("cashewnoten")).toBe("Cashewnoten");
+    expect(customName("  cashewnoten ")).toBe("Cashewnoten");
     expect(customName("komijn")).toBe("Komijn");
     expect(customName("crème fraîche")).toBe("Crème fraîche");
   });
@@ -19,8 +19,8 @@ describe("customName", () => {
   it("refuses whole phrases and shopping-list sentences", () => {
     expect(customName("dingen voor ontbijt")).toBeNull();
     expect(customName("brood met kaas")).toBeNull();
-    expect(customName("hele ongezouten walnoten van de notenmix afdeling")).toBeNull();
-    expect(customName("vier hele grote walnoten")).toBeNull();
+    expect(customName("hele ongezouten cashewnoten van de notenmix afdeling")).toBeNull();
+    expect(customName("vier hele grote cashewnoten")).toBeNull();
   });
 });
 
@@ -50,17 +50,18 @@ describe("singularKey", () => {
   });
 
   it("builds one product id for both forms", () => {
-    expect(customProductId("Walnoten")).toBe("custom:walnoot");
-    expect(customProductId("walnoot")).toBe("custom:walnoot");
+    expect(customProductId("Cashewnoten")).toBe("custom:cashewnoot");
+    expect(customProductId("cashewnoot")).toBe("custom:cashewnoot");
   });
 });
 
 describe("suggestion", () => {
-  const walnuts: SavedItem = { productId: "custom:walnoot", name: "Walnoten", icon: "pakket", category: "pantry", quantity: 1, kind: "custom_generic" };
+  const cashews: SavedItem = { productId: "custom:cashewnoot", name: "Cashewnoten", icon: "pakket", category: "pantry", quantity: 1, kind: "custom_generic" };
 
   it("finds catalog products first, also by singular or plural", () => {
     expect(suggestion("prei", [])).toMatchObject({ kind: "catalog", product: { id: "prei" }, close: false });
     expect(suggestion("Courgettes", [])).toMatchObject({ kind: "catalog", product: { id: "courgette" }, close: false });
+    expect(suggestion("walnoten", [])).toMatchObject({ kind: "catalog", product: { id: "walnoten" }, close: false });
   });
 
   it("offers a typo match only as a close suggestion", () => {
@@ -68,12 +69,12 @@ describe("suggestion", () => {
   });
 
   it("finds a product this device made before, in either form", () => {
-    expect(suggestion("walnoot", [walnuts])).toMatchObject({ kind: "mine", entry: { productId: "custom:walnoot" } });
-    expect(suggestion("walnoten", [walnuts])).toMatchObject({ kind: "mine" });
+    expect(suggestion("cashewnoot", [cashews])).toMatchObject({ kind: "mine", entry: { productId: "custom:cashewnoot" } });
+    expect(suggestion("cashewnoten", [cashews])).toMatchObject({ kind: "mine" });
   });
 
   it("has nothing for a product that does not exist yet", () => {
-    expect(suggestion("walnoten", [])).toBeNull();
+    expect(suggestion("cashewnoten", [])).toBeNull();
     expect(suggestion("komijn", [])).toBeNull();
     expect(suggestion("rozijnen", [])).toBeNull();
   });

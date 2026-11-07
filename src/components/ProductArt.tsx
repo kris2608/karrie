@@ -31,6 +31,123 @@ const apple: Draw = ({ color, accent = LEAF }) => ({
   marks: line("M70 34q12-2 22-2", shade(accent, 0.35), 2),
 });
 
+/** Pear shape with a thin stem — not the round apple silhouette. */
+const pear: Draw = ({ color, accent = LEAF }) => ({
+  layers: [
+    L(<rect x="61" y="18" width="6" height="18" rx="3" />, BROWN, { flat: true }),
+    L(
+      <path d="M64 36c-8 2-14 12-14 22 0 22 12 42 14 42s14-20 14-42c0-10-6-20-14-22z" />,
+      color,
+      { shine: [{ cx: 52, cy: 70, rx: 6, ry: 14, rot: -18 }] },
+    ),
+    L(<path d="M68 28c5-10 18-12 24-6-5 8-16 10-24 6z" />, accent),
+  ],
+});
+
+/** Bell pepper with a green crown. */
+const pepper: Draw = ({ color, accent = "#2f8f46" }) => ({
+  layers: [
+    L(
+      <path d="M64 34c-18 2-28 18-26 40 2 20 14 36 26 36s24-16 26-36c2-22-8-38-26-40z" />,
+      color,
+      { shine: [{ cx: 48, cy: 62, rx: 7, ry: 14, rot: -22 }] },
+    ),
+    L(<path d="M52 30c4-10 12-14 20-10 2 8-2 14-8 16 6 0 12 2 16 8-8 2-14 0-18-4-2 6-8 10-14 8 2-6 4-12 4-18z" />, accent, { flat: true }),
+  ],
+  marks: line("M64 48v36", shade(color, 0.22), 3),
+});
+
+/** Fuzzy brown kiwi with a green cut face. */
+const kiwiFruit: Draw = ({ color = "#8dbe45", accent = "#c06a32" }) => ({
+  layers: [
+    L(<ellipse cx="64" cy="70" rx="38" ry="30" />, accent, { shine: [{ cx: 48, cy: 58, rx: 8, ry: 10, rot: -25 }] }),
+    L(<ellipse cx="64" cy="70" rx="26" ry="20" />, color, { flat: true }),
+  ],
+  marks: (
+    <g>
+      <ellipse cx="64" cy="70" rx="8" ry="6" fill="#f4efe4" />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+        const rad = (deg * Math.PI) / 180;
+        return dot(64 + Math.cos(rad) * 16, 70 + Math.sin(rad) * 12, 2.2, "#5b4636");
+      })}
+    </g>
+  ),
+});
+
+/** Lumpy potato with eyes. */
+const potato: Draw = ({ color = "#e2b15a", accent = "#c48a3a" }) => ({
+  layers: [
+    L(
+      <path d="M28 72c4-22 22-36 42-34 22 2 34 20 32 40-2 22-20 34-40 32-20-2-36-16-34-38z" />,
+      color,
+      { shine: [{ cx: 48, cy: 58, rx: 10, ry: 8, rot: -20 }] },
+    ),
+  ],
+  marks: (
+    <g>
+      {[[44, 62], [70, 54], [82, 76], [56, 86]].map(([cx, cy]) => (
+        <g key={`${cx}-${cy}`}>
+          {dot(cx, cy, 3.2, accent)}
+          {dot(cx - 1, cy - 1, 1.2, shade(accent, 0.35))}
+        </g>
+      ))}
+    </g>
+  ),
+});
+
+/** A few small potatoes in a pile. */
+const babyPotatoes: Draw = ({ color = "#e2b15a", accent = "#c48a3a" }) => ({
+  layers: [
+    L(<ellipse cx="46" cy="78" rx="18" ry="14" />, shade(color, 0.08), { shine: [{ cx: 40, cy: 72, rx: 5, ry: 4 }] }),
+    L(<ellipse cx="78" cy="74" rx="20" ry="15" />, color, { shine: [{ cx: 70, cy: 66, rx: 5, ry: 4 }] }),
+    L(<ellipse cx="64" cy="54" rx="16" ry="13" />, tint(color, 0.12), { shine: [{ cx: 58, cy: 48, rx: 4, ry: 3 }] }),
+  ],
+  marks: <g>{[[42, 76], [74, 70], [66, 52]].map(([cx, cy]) => dot(cx, cy, 2.4, accent))}</g>,
+});
+
+/** Two long green beans. */
+const greenBeans: Draw = ({ color = "#3cbf6e", accent = "#1f8a45" }) => ({
+  layers: [
+    L(
+      <path d="M24 78c18-28 42-40 68-36 8 1 12 8 8 14-20 4-42 14-58 34-4 5-12 2-18-12z" />,
+      color,
+      { shine: [{ cx: 56, cy: 58, rx: 14, ry: 4, rot: -28 }] },
+    ),
+    L(
+      <path d="M30 92c22-24 50-34 72-24 6 3 6 10 0 14-24-2-46 6-60 24-4 5-14 2-12-14z" />,
+      tint(color, 0.1),
+      { shine: [{ cx: 70, cy: 72, rx: 12, ry: 3.5, rot: -20 }] },
+    ),
+  ],
+  marks: line("M40 70q20-8 40 0M48 86q22-6 38 4", accent, 2.5),
+});
+
+/** Bulb of garlic. */
+const garlic: Draw = ({ color = "#f4efe4", accent = "#d9c7b0" }) => ({
+  layers: [
+    L(<path d="M64 28c-4 8-6 14-4 20" />, accent, { flat: true }),
+    L(
+      <path d="M64 48c-22 2-34 20-30 40 4 18 20 28 30 28s26-10 30-28c4-20-8-38-30-40z" />,
+      color,
+      { shine: [{ cx: 50, cy: 70, rx: 8, ry: 14, rot: -15 }] },
+    ),
+  ],
+  marks: line("M64 58v40M50 66q8 20 0 36M78 66q-8 20 0 36", accent, 2.5),
+});
+
+/** Purple eggplant with green top. */
+const eggplant: Draw = ({ color = "#6b3a8a", accent = LEAF }) => ({
+  layers: [
+    L(
+      <path d="M64 40c-16 4-26 24-24 48 2 22 14 34 24 34s22-12 24-34c2-24-8-44-24-48z" />,
+      color,
+      { shine: [{ cx: 50, cy: 70, rx: 7, ry: 16, rot: -18 }] },
+    ),
+    L(<path d="M52 34c6-12 18-16 28-8-4 8-14 12-24 10 2 6-2 12-8 14 0-6 0-12 4-16z" />, accent, { flat: true }),
+    L(<rect x="61" y="22" width="6" height="14" rx="3" />, BROWN, { flat: true }),
+  ],
+});
+
 const tomato: Draw = ({ color, accent = "#3aaa4a" }) => ({
   layers: [
     L(<ellipse cx="64" cy="74" rx="38" ry="32" />, color, { shine: [{ cx: 46, cy: 62, rx: 8, ry: 11, rot: -30 }] }),
@@ -626,6 +743,14 @@ const KIND: Record<ArtKind, Draw> = {
 const BESPOKE: Record<string, Draw> = {
   appel: apple,
   banaan: banana,
+  peer: pear,
+  paprika: pepper,
+  kiwi: kiwiFruit,
+  aardappel: potato,
+  aardappeltjes: babyPotatoes,
+  sperziebonen: greenBeans,
+  knoflook: garlic,
+  aubergine: eggplant,
   brood: bread,
   melk: milk,
   eieren: eggs,

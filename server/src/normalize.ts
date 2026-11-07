@@ -5,7 +5,17 @@ import { customName, normalizeName, singularKey } from "./productName.js";
 import { errorCode, type RecognizeErrorCode } from "./recognize.js";
 import { CATALOG_TYPES } from "./schema.js";
 
-export const DEPARTMENTS = ["produce", "bakery", "pantry", "dairy", "frozen", "household"] as const;
+export const DEPARTMENTS = [
+  "produce",
+  "bakery",
+  "meat",
+  "breakfast",
+  "pantry",
+  "dairy",
+  "drinks",
+  "frozen",
+  "household",
+] as const;
 
 const Name = z.string().describe("Dutch, at most three words, no brand, no quantity.");
 
@@ -18,7 +28,11 @@ export const NormalizedSchema = z.strictObject({
   singularName: Name,
   pluralName: Name,
   childFriendlyLabel: Name.describe("A word a five-year-old knows for it, e.g. 'nootjes'; may equal displayName."),
-  category: z.enum(DEPARTMENTS).describe("produce: groente en fruit; bakery: brood; pantry: houdbaar (also nuts, spices, dried fruit); dairy: zuivel, kaas en eieren; frozen: diepvries; household: verzorging en huishouden."),
+  category: z
+    .enum(DEPARTMENTS)
+    .describe(
+      "produce: groente en fruit; bakery: brood; meat: vlees, vis en vega; breakfast: ontbijt en broodbeleg; pantry: houdbaar (also nuts, spices, dried fruit); dairy: zuivel, kaas en eieren; drinks: dranken; frozen: diepvries; household: verzorging en huishouden.",
+    ),
   subcategory: z.string().nullable().describe("A short Dutch shelf name such as 'noten', 'specerijen' or 'gedroogd fruit', or null."),
   isGeneric: z.boolean().describe("False when the name is a brand or a branded product."),
   closestDrawing: z

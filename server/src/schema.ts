@@ -1,20 +1,34 @@
 import { z } from "zod";
 
-export const SHOP_SECTIONS = ["groente-fruit", "bakker", "houdbaar", "koeling", "diepvries", "huishouden"] as const;
+export const SHOP_SECTIONS = [
+  "groente-fruit",
+  "bakker",
+  "vlees-vis-vega",
+  "ontbijt",
+  "houdbaar",
+  "koeling",
+  "dranken",
+  "diepvries",
+  "huishouden",
+] as const;
 export const INFERABLE_FIELDS = ["productName", "genericName", "brand", "variant", "packageSize", "category", "subcategory"] as const;
 
 /** Karrie's food catalog ids (src/data/catalog.ts). Each has a drawing. */
 export const FOOD_TYPES = [
   "appel", "banaan", "peer", "sinaasappel", "aardbei", "druiven", "mandarijn", "citroen", "kiwi", "tomaat", "komkommer", "paprika",
-  "wortel", "broccoli", "sla", "avocado", "aardappel", "ui", "champignons", "courgette", "sperziebonen", "prei",
-  "brood", "volkorenbrood", "bolletjes", "croissant", "beschuit", "crackers", "stokbrood", "pita", "wraps",
-  "pasta", "rijst", "havermout", "pindakaas", "jam", "hagelslag", "ontbijtgranen", "muesli", "tomatenpuree", "soep", "olijfolie",
-  "bloem", "suiker", "koffie", "thee", "koekjes", "chips", "pastasaus", "mais", "honing", "sinaasappelsap", "water",
-  "melk", "yoghurt", "kwark", "kaas", "boter", "eieren", "slagroom", "vla", "karnemelk", "roomkaas", "kipfilet", "gehakt", "zalm",
-  "doperwten", "ijs", "pizza", "vissticks", "spinazie", "friet", "diepvriesbrood", "bessen",
+  "wortel", "broccoli", "sla", "avocado", "aardappel", "aardappeltjes", "ui", "knoflook", "champignons", "courgette", "aubergine",
+  "sperziebonen", "prei", "verse-spinazie",
+  "brood", "volkorenbrood", "bolletjes", "croissant", "stokbrood",
+  "kipfilet", "gehakt", "zalm", "vegaburger",
+  "beschuit", "crackers", "havermout", "pindakaas", "jam", "hagelslag", "muesli", "honing", "appelstroop",
+  "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "bloem", "suiker", "koekjes", "chips", "pastasaus", "mais",
+  "augurk", "olijven", "walnoten", "babyvoeding",
+  "melk", "yoghurt", "kwark", "kaas", "mozzarella", "feta", "boter", "eieren", "slagroom", "vla", "karnemelk", "roomkaas",
+  "koffie", "thee", "sinaasappelsap", "water", "drinkpakje", "frisdrank", "siroop",
+  "doperwten", "ijs", "pizza", "vissticks", "spinazie", "bessen", "wokgroenten", "pastagroenten", "kant-en-klaar",
 ] as const;
 export const HOUSEHOLD_TYPES = [
-  "toiletpapier", "keukenpapier", "afwasmiddel", "wasmiddel", "vuilniszakken", "handzeep", "tandpasta", "shampoo", "schoonmaakmiddel", "vaatwastabletten",
+  "toiletpapier", "keukenpapier", "afwasmiddel", "wasmiddel", "vuilniszakken", "handzeep", "tandpasta", "shampoo", "schoonmaakmiddel", "vaatwastabletten", "luiers",
 ] as const;
 export const CATALOG_TYPES = [...FOOD_TYPES, ...HOUSEHOLD_TYPES] as const;
 

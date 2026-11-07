@@ -1,6 +1,15 @@
 import type { RetailerId } from "./retailers";
 
-export type CategoryId = "produce" | "bakery" | "pantry" | "dairy" | "frozen" | "household";
+export type CategoryId =
+  | "produce"
+  | "bakery"
+  | "meat"
+  | "breakfast"
+  | "pantry"
+  | "dairy"
+  | "drinks"
+  | "frozen"
+  | "household";
 
 export type ItemStatus = "pending" | "found" | "skipped";
 
