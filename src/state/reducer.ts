@@ -16,6 +16,7 @@ import { SCORING } from "../domain/scoring";
 import { nextSticker } from "../domain/stickers";
 import { mineKey, remember as rememberMine } from "../domain/mine";
 import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
+import { isRetailer, type RetailerId } from "../domain/retailers";
 import { productById, products } from "../data/catalog";
 import {
   createAdventure,
@@ -35,6 +36,8 @@ export type Settings = {
   smartDiscovery: boolean;
   /** Look up reference pictures for products on the list; sends only product names, never photos. */
   referenceImages: boolean;
+  /** The supermarket picked last; new lists start with it. */
+  retailer?: RetailerId;
 };
 
 export const defaultSettings: Settings = { soundEnabled: false, smartDiscovery: true, referenceImages: true };
@@ -66,6 +69,7 @@ export type Action =
   | { type: "set-sound"; enabled: boolean }
   | { type: "set-discovery"; enabled: boolean }
   | { type: "set-reference-images"; enabled: boolean }
+  | { type: "set-retailer"; retailer: RetailerId | null }
   | { type: "set-image-choice"; itemId: string; choice: ImageChoice | undefined }
   | { type: "add-mine"; key: string }
   | { type: "forget-mine"; key: string }
@@ -120,8 +124,13 @@ export function listName(list: Pick<SavedList, "name">): string | undefined {
   return list.name && list.name !== DEFAULT_LIST_NAME && list.name !== "Voorbeeldlijst" ? list.name : undefined;
 }
 
-function blankDraft(order: CategoryId[]): Adventure {
-  return createAdventure(DEFAULT_LIST_NAME, [], order, "draft");
+function blankDraft(order: CategoryId[], retailer?: RetailerId): Adventure {
+  return withRetailer(createAdventure(DEFAULT_LIST_NAME, [], order, "draft"), retailer);
+}
+
+function withRetailer(adventure: Adventure, retailer: RetailerId | undefined): Adventure {
+  const { retailer: _previous, ...rest } = adventure;
+  return retailer ? { ...rest, retailer } : rest;
 }
 
 function remember(adventure: Adventure): { items: AdventureItem[]; phase: Adventure["phase"]; stickerId?: string; stickers: string[] } {
@@ -145,6 +154,7 @@ function upsertSaved(saved: SavedList[], adventure: Adventure, favorite?: boolea
     id: adventure.id,
     name: adventure.name,
     ...(adventure.store && { store: adventure.store }),
+    ...(adventure.retailer && { retailer: adventure.retailer }),
     items: adventure.items.map((item) => ({
       productId: item.productId,
       name: item.name,
@@ -205,7 +215,7 @@ function shortName(text: string | undefined) {
 }
 
 function ensureDraft(state: AppState): Adventure {
-  if (!state.adventure || state.adventure.phase === "done") return blankDraft(state.categoryOrder);
+  if (!state.adventure || state.adventure.phase === "done") return blankDraft(state.categoryOrder, state.settings.retailer);
   return state.adventure;
 }
 
@@ -225,13 +235,15 @@ export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "hydrate": {
       const stored = action.data.adventure ?? null;
-      const adventure = isAdventure(stored) ? { ...stored, history: stored.history ?? [] } : null;
+      const adventure = isAdventure(stored) ? withRetailer({ ...stored, history: stored.history ?? [] }, isRetailer(stored.retailer) ? stored.retailer : undefined) : null;
+      const settings: Settings = { ...defaultSettings, ...action.data.settings };
+      if (!isRetailer(settings.retailer)) delete settings.retailer;
       return {
         adventure,
         saved: Array.isArray(action.data.saved) ? action.data.saved : [],
         stickers: Array.isArray(action.data.stickers) ? action.data.stickers : [],
         categoryOrder: action.data.categoryOrder?.length ? action.data.categoryOrder : [...DEFAULT_CATEGORY_ORDER],
-        settings: { ...defaultSettings, ...action.data.settings },
+        settings,
         declined: Array.isArray(action.data.declined) ? action.data.declined : [],
         mine: Array.isArray(action.data.mine) ? action.data.mine : [],
       };
@@ -262,6 +274,13 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "set-reference-images":
       return { ...state, settings: { ...state.settings, referenceImages: action.enabled } };
+    case "set-retailer": {
+      const retailer = action.retailer ?? undefined;
+      const { retailer: _previous, ...rest } = state.settings;
+      const settings: Settings = retailer ? { ...rest, retailer } : rest;
+      if (!state.adventure || state.adventure.phase === "done") return { ...state, settings };
+      return { ...state, settings, adventure: touch(withRetailer(state.adventure, retailer), {}) };
+    }
     case "set-image-choice":
       return updateItem(state, action.itemId, (item) => {
         const { imageChoice: _previous, ...rest } = item;
@@ -311,11 +330,11 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "new-draft": {
       const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
-      return { ...state, saved, adventure: blankDraft(state.categoryOrder) };
+      return { ...state, saved, adventure: blankDraft(state.categoryOrder, state.settings.retailer) };
     }
     case "start-sample": {
       const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
-      return { ...state, saved, adventure: createSampleAdventure(state.categoryOrder) };
+      return { ...state, saved, adventure: withRetailer(createSampleAdventure(state.categoryOrder), state.settings.retailer) };
     }
     case "add-product": {
       const adventure = ensureDraft(state);
@@ -460,7 +479,8 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!list) return state;
       const adventure = createAdventure(list.name, [], state.categoryOrder, "draft");
       const items = sortByCategory(list.items.map(itemFromSaved), state.categoryOrder);
-      return { ...state, adventure: { ...adventure, ...(list.store && { store: list.store }), items } };
+      const retailer = isRetailer(list.retailer) ? list.retailer : state.settings.retailer;
+      return { ...state, adventure: withRetailer({ ...adventure, ...(list.store && { store: list.store }), items }, retailer) };
     }
     case "forget-saved":
       return { ...state, saved: state.saved.filter((list) => list.id !== action.id) };

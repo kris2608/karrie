@@ -3,6 +3,7 @@ import { setSoundEnabled } from "../feedback/sound";
 import { trackEvent } from "../services/analytics";
 import { loadPersisted, savePersisted } from "../storage/db";
 import { preparePhotos } from "../storage/photos";
+import { offerQueries, offers } from "../storage/offers";
 import { references } from "../storage/references";
 import { wantedReferences } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
@@ -41,6 +42,7 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancel = false;
+    void offers.hydrate();
     Promise.all([loadPersisted(), references.hydrate()])
       .then(async ([data]) => {
         const minePhotos = data.mine.flatMap((entry) => (entry.photoId ? [entry.photoId] : []));
@@ -70,6 +72,12 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     references.setEnabled(state.settings.referenceImages);
     for (const identity of wanted) references.request(identity);
   }, [wanted, state.settings.referenceImages]);
+
+  const draftItems = ready && state.adventure?.phase === "draft" ? state.adventure.items : null;
+  const retailer = state.adventure?.retailer;
+  useEffect(() => {
+    offers.sync(draftItems ? offerQueries(draftItems, retailer) : []);
+  }, [draftItems, retailer]);
 
   const value = useMemo(() => ({ ...state, dispatch }), [state, dispatch]);
   if (!ready) {

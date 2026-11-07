@@ -5,6 +5,8 @@ import { createHandler } from "./app.js";
 import { createBarcodeLookup } from "./barcode.js";
 import { createImageDiscovery } from "./images.js";
 import { createLimits } from "./limits.js";
+import { createOfferLookup } from "./offers/index.js";
+import { createPrijsProfeet } from "./offers/prijsprofeet.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
@@ -75,6 +77,24 @@ const barcode = createBarcodeLookup({
   web: client && env.BARCODE_WEB_SEARCH !== "off" ? { client, model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model } : undefined,
 });
 
+const offerLimits = createLimits({
+  perIpPerHour: number("OFFERS_LIMIT_PER_IP_HOUR", 300),
+  perIpPerDay: number("OFFERS_LIMIT_PER_IP_DAY", 1500),
+  dailyRequests: number("OFFERS_LIMIT_DAILY_REQUESTS", 20_000),
+  dailyBudgetUsd: 1,
+  inputUsdPerMTok: 0,
+  cachedInputUsdPerMTok: 0,
+  outputUsdPerMTok: 0,
+});
+
+const prijsProfeet =
+  env.OFFERS !== "off"
+    ? createPrijsProfeet({
+        userAgent: env.PRIJSPROFEET_USER_AGENT || "Karrie/1.0 (+https://karrieapp.onrender.com)",
+        apiKey: env.PRIJSPROFEET_API_KEY || undefined,
+      })
+    : null;
+
 const handler = createHandler({
   allowedOrigins: (env.ALLOWED_ORIGINS ?? "https://karrieapp.onrender.com,http://localhost:5173,http://localhost:4173")
     .split(",")
@@ -94,6 +114,7 @@ const handler = createHandler({
       }
     : undefined,
   barcode: { lookup: barcode, limits: barcodeLimits, searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01) },
+  offers: prijsProfeet ? { lookup: createOfferLookup(prijsProfeet), provider: prijsProfeet, limits: offerLimits } : undefined,
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 

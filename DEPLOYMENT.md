@@ -297,6 +297,36 @@ Een eerdere ronde liet zien waarom de controle op "het hele product" nodig is: z
 
 Een product dat van een foto is herkend en een merk heeft, of dat niet in de catalogus staat, onthoudt Karrie op dit toestel als **Mijn producten**: naam, merk, afdeling, foto en eventuele bonusmissie. In **Toevoegen** staat het met een hartje onder zijn eigen afdeling, onder **Alles** en in de zoekresultaten. Tikken zet het op de lijst (of telt er één bij). Lang drukken haalt het van de lijst en vergeet het, met **Ongedaan maken**. Een herkende AH Terra pindakaas telt op zijn eigen tegel, niet ook op de tegel Pindakaas. Karrie onthoudt hoogstens 120 producten.
 
+## Aanbiedingen (PrijsProfeet)
+
+Kies per lijstje één supermarkt: **Jumbo**, **Albert Heijn** of **Lidl**. Dat kan in **Controleren** (onder de titel) en in **Toevoegen** (het knopje rechtsboven, met een labeltje). Nog een keer tikken op de gekozen supermarkt zet het weer uit. Zonder supermarkt zoekt Karrie niets op. Een nieuw lijstje begint met de supermarkt die je het laatst koos; een bewaard lijstje houdt zijn eigen supermarkt.
+
+**Wat je ziet.** In **Controleren** staat bij een product **Aanbieding** (oranje) als het zeker of vrijwel zeker hetzelfde product is, en **Mogelijke aanbieding** (alleen een rand) als het waarschijnlijk zo is maar niet zeker. Bovenaan staat dan bijvoorbeeld "2 producten in de aanbieding bij Jumbo"; daar tellen alleen de zekere aanbiedingen mee. Tik op een label voor de actie (bijvoorbeeld "2 voor €2,99" en "Normaal €1,79"), het product van de supermarkt, de einddatum, de voorwaarden (alleen online, met klantenkaart, maximaal per klant) en een link naar de supermarkt. Karrie rekent zelf geen besparing uit. In **Toevoegen** krijgt een tegel die op de lijst staat alleen een klein oranje labeltje bij een zekere aanbieding. Er komt geen melding, geen pop-up en geen "Geen aanbieding". In het winkelavontuur van het kind is niets te zien van aanbiedingen; Karrie vervangt ook nooit zelf een product.
+
+**Zo wordt gezocht.** De app stuurt de naam, de andere namen uit de catalogus ("bananen"), de afdeling, en bij een merkproduct het merk, de variant, de inhoud en de gescande streepjescode naar `POST /api/offers/match` op `karrie-api`. De server vraagt PrijsProfeet `GET https://www.prijsprofeet.nl/api/v1/search` met `q`, `retailer`, `promotion_status=active` en `page_size=20`. Andere eindpunten gebruikt Karrie niet: `/match/*`, schapprijzen en prijsgeschiedenis zijn betaald.
+
+**Zo wordt gematcht (streng).**
+
+- **Exact**: de streepjescode is gelijk. Wijkt de inhoud af (1 l tegen 1,5 l), dan wordt het **waarschijnlijk** met gemiddelde zekerheid.
+- **Merkproduct zonder streepjescode**: hetzelfde merk en dezelfde naam. Is ook de inhoud gelijk en staat er niets extra's in de naam, dan is het waarschijnlijk met hoge zekerheid; anders gemiddeld. Een ander merk of een andere variant ("volle" in plaats van "halfvolle") telt niet.
+- **Standaardproduct** ("Banaan"): de afdeling moet passen (groente bij groente-fruit, zuivel bij zuivel-eieren of kaas, enzovoort), de naam moet er enkelvoud of meervoud in staan, en elk ander woord moet onschuldig zijn. Woorden als "los" en "per kg" veranderen niets; woorden als "bio", "tros" en "halfvolle" maken het gemiddeld zeker. Elk ander woord betekent: niet dit product. "Ella's Kitchen Baby bananen ontbijtje" is dus geen banaan, "Dove roller komkommer" geen komkommer en "Witte kaas" geen kaas. Een A-merk bij een standaardproduct is hoogstens gemiddeld zeker.
+- Alleen acties met status `active` tellen, en alleen tussen `valid_from` en het einde van de dag `valid_until` (Nederlandse tijd).
+- **Aanbieding** = exact of hoge zekerheid. **Mogelijke aanbieding** = gemiddelde zekerheid.
+
+Live gemeten in november 2026 (`node scripts/check-offers.mjs`, 24 zoekopdrachten): bij AH gaf de Arla-melk met streepjescode **exact** en zonder streepjescode **waarschijnlijk, hoog**; "Banaan" werd **mogelijk** Chiquita bananen en "Melk" **mogelijk** Arla. Bij Jumbo en Lidl vond Karrie voor de testproducten niets dat streng genoeg overeenkwam.
+
+**Bewaren.** De gekozen supermarkt staat bij het lijstje (en bij bewaarde lijstjes) en de laatst gekozen bij de instellingen, in IndexedDB op het toestel. Antwoorden staan ook in IndexedDB (`offers`), per supermarkt en product. Een lijst toont bewaarde antwoorden meteen. Na 6 uur vraagt Karrie het op de achtergrond opnieuw; een antwoord ouder dan 24 uur of een actie na de einddatum wordt nooit getoond. De server onthoudt zoekresultaten hoogstens 3 uur en nooit langer dan de eerste einddatum erin.
+
+**Rustig zoeken.** Vragen wachten 300 ms, zodat snel na elkaar toevoegen of van supermarkt wisselen niets extra kost. Hetzelfde product wordt maar één keer tegelijk gevraagd, en er lopen hoogstens twee vragen tegelijk. Na een fout probeert Karrie het opnieuw na 2, 8 en 32 minuten, na een limiet na 30 minuten. Offline wacht Karrie tot er weer verbinding is en toont het alleen geldige bewaarde antwoorden. Faalt PrijsProfeet, dan zie je gewoon geen label; het lijstje en het avontuur werken door.
+
+**Limieten.** Zonder sleutel staat PrijsProfeet 120 zoekopdrachten per minuut toe, en 500 zoekopdrachten op alleen een streepjescode per dag. Karrie blijft daar voor de hele server onder: hoogstens 60 per minuut en 400 streepjescodes per dag (daarna zoekt Karrie op naam). Bij een `429` stopt de server met vragen zolang `Retry-After` zegt. Per IP: 300 per uur en 1500 per dag (`OFFERS_LIMIT_PER_IP_HOUR`, `OFFERS_LIMIT_PER_IP_DAY`). `/api/health` toont onder `offers` de aantallen per supermarkt en uitkomst, het geheugen en of de server even pauzeert.
+
+**Instellen op Render (`karrie-api`).** Niets is verplicht. `OFFERS=off` zet het uit. `PRIJSPROFEET_USER_AGENT` (standaard `Karrie/1.0 (+https://karrieapp.onrender.com)`; PrijsProfeet weigert namen met "bot", "crawler", "spider" of "slurp"). **Aanbevolen:** vraag een gratis sleutel aan op prijsprofeet.nl en zet die als `PRIJSPROFEET_API_KEY` (geheim, alleen op de server). Daarmee wordt de limiet 150 per minuut en is Karrie herkenbaar voor PrijsProfeet. De gratis sleutel kost niets; een betaald abonnement is niet nodig en niet ingesteld.
+
+**Naamsvermelding.** Waar een label of het aanbiedingsvenster staat, staat ook "Aanbiedingen via PrijsProfeet" met een link naar https://www.prijsprofeet.nl, zoals PrijsProfeet vraagt.
+
+**Privacy.** Er gaat alleen productinformatie naar de server en PrijsProfeet: geen foto's, geen namen of leeftijden, geen lijstnaam, geen locatie. De server logt alleen de supermarkt, of het een standaardproduct was en de uitkomst, niet de productnaam.
+
 ## Statistieken (Umami)
 
 Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.is). Umami zet geen cookies en maakt geen gebruikersprofiel; Karrie roept nooit `umami.identify()` aan.
@@ -317,7 +347,7 @@ Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.i
 | `adventure_started` | **Start** van een lijstje dat nog niet liep | `item_count` |
 | `adventure_completed` | het laatste product gevonden | `item_count`, `completed_missions` |
 | `bonus_mission_completed` | de ouder bevestigt een bonusmissie | `choice`: alternative of original |
-| `offer_opened` | nog niet actief: aanbiedingen bestaan nog niet in Karrie | (`retailer`, `match_type`) |
+| `offer_opened` | de ouder tikt op een aanbiedingslabel in **Controleren** en het venster gaat open | `retailer`: jumbo, ah, lidl; `match_type`: exact of likely |
 
 Wat niet telt: een bewaard lijstje openen, terug naar een lopend avontuur, **Ongedaan maken**, een streepjescode die de camera steeds opnieuw ziet (één keer per cameragebruik), een mislukte herkenning, een missie die alleen getoond of overgeslagen wordt, en het eindscherm opnieuw openen. Na **Terug** en opnieuw **Gevonden!** telt de voltooiing niet nog eens zolang de app open blijft.
 
@@ -344,6 +374,7 @@ Reken op ongeveer $0,004 per foto: 100 foto's per maand kosten zo'n $0,40. Het d
 - De app staat per toestel 25 herkenningen per dag toe.
 - Voorbeeldfoto's: per toestel 40 zoekopdrachten per dag; op de server per IP 30 per uur en 80 per dag (`IMAGE_LIMIT_PER_IP_HOUR`, `IMAGE_LIMIT_PER_IP_DAY`), 200 per dag in totaal (`IMAGE_LIMIT_DAILY_REQUESTS`) en hoogstens 3 tegelijk (`IMAGE_MAX_CONCURRENT`, daarboven `503`). Antwoorden uit het geheugen van de server tellen niet mee. Optioneel: `OPENAI_IMAGE_SEARCH_MODEL` (standaard het herkenningsmodel) en `BRAVE_SEARCH_API_KEY` (zet Brave aan voor merkproducten; standaardproducten blijven via OpenAI-webzoeken en Openverse gaan). `IMAGE_OPENVERSE=off` zet Openverse uit.
 - Streepjescodes: op de server per IP 60 per uur en 200 per dag, 1000 per dag in totaal (zie **Streepjescode in de camera**). Antwoorden uit het geheugen tellen niet mee. Per toestel loopt er hoogstens één opzoeking per code tegelijk.
+- Aanbiedingen: per IP 300 per uur en 1500 per dag; naar PrijsProfeet hoogstens 60 per minuut en 400 streepjescodes per dag voor de hele server (zie **Aanbiedingen**).
 - De tellers op de server staan in het geheugen. Ze beginnen opnieuw na een herstart of slaapstand, en per-IP-limieten zijn te omzeilen door een ander IP-adres. **Stel daarom ook een maandlimiet in bij OpenAI** (platform.openai.com → Settings → Limits). Dat is de harde grens.
 
 ## Checklist camera en bonusmissies (op een echte telefoon)
@@ -381,6 +412,14 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - Scan een product dat al in **Mijn producten** staat. Naam en merk komen van jou (**uit Mijn producten**), niet van Open Food Facts.
 - Zet vliegtuigmodus aan en scan een code die je eerder scande: het product komt uit het geheugen van het toestel. Een nieuwe code geeft **Opzoeken lukt nu niet** en **Zelf invullen**.
 
+**Aanbiedingen (op beide toestellen)**
+
+- **Toevoegen**: tik op het knopje rechtsboven en kies **Albert Heijn**. Zet Banaan, Melk en Komkommer op de lijst. Er komt geen melding.
+- **Controleren**: Albert Heijn staat aan. Bij een product met een actie staat **Aanbieding** of **Mogelijke aanbieding**, met "Aanbiedingen via PrijsProfeet" eronder. Tik op een label: het venster toont de actie, de einddatum en **Bekijk bij Albert Heijn**.
+- Kies **Jumbo**: de labels van AH verdwijnen en die van Jumbo komen (of niets). Kies weer **Albert Heijn**: de labels staan er meteen weer, zonder te wachten.
+- Bewaar het lijstje, maak een nieuw lijstje met **Lidl** en open het bewaarde lijstje: dat staat nog op Albert Heijn.
+- Zet vliegtuigmodus aan en open het lijstje: bewaarde labels blijven, er komt geen foutmelding. **Start avontuur** werkt en in het avontuur staan geen labels.
+
 ## Bekende beperkingen
 
 - Camera, foto herkennen en bonusmissies zijn niet getest op een echte iPhone of Android-telefoon. Ze zijn getest in een desktopbrowser (met een nagebootste camera en met de galerijknop), met echte productfoto's en echte OpenAI-aanroepen.
@@ -400,4 +439,8 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - Voorbeeldfoto's van merkproducten komen bijna altijd van winkelsites met onbekende rechten. Ze worden alleen op het eigen toestel bewaard en getoond; of dat voor jouw gebruik mag, is aan de eigenaar van de app.
 - De zoekresultaten verschillen per keer: hetzelfde product vond de ene keer wel en de andere keer geen foto. **Opnieuw zoeken** helpt soms.
 - Het geheugen van de server met open-licentiefoto's is leeg na een herstart of slaapstand; dan wordt opnieuw (betaald) gezocht.
+- Aanbiedingen zijn alleen in een desktopbrowser getest (met de echte PrijsProfeet en een lokale server), niet op een echte telefoon.
+- De matching is bewust streng: een standaardproduct krijgt alleen **Aanbieding** bij een huismerkproduct met precies die naam. Bij A-merken of extra woorden wordt het hoogstens **Mogelijke aanbieding**, en onbekende woorden ("bananen ontbijtje") betekenen niets. Echte aanbiedingen worden daardoor soms gemist. Geeft PrijsProfeet geen merk bij een product, dan behandelt Karrie het als huismerk.
+- PrijsProfeet haalt de acties zelf bij de supermarkten op. Een fout of vertraging daar (een actie die al voorbij is, een verkeerde prijs) neemt Karrie over; daarom staan de einddatum en de link naar de supermarkt erbij.
+- De limieten naar PrijsProfeet staan in het geheugen van de server en beginnen opnieuw na een herstart.
 - De server controleert adressen op interne IP-nummers, maar zoekt de DNS-naam niet zelf op. Een domein dat naar een intern adres wijst, wordt dus niet herkend; op Render is er geen intern netwerk om te bereiken.

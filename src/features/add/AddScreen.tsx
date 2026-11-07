@@ -15,6 +15,10 @@ import { Sheet } from "../../components/ui/Sheet";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
+import { Attribution, OfferTag, TagIcon } from "../offers/OfferTag";
+import { RetailerPicker } from "../offers/RetailerPicker";
+import { RETAILERS, retailerName, type RetailerId } from "../../domain/retailers";
+import { useOfferViews } from "../../storage/offers";
 import { buzz } from "../../feedback/haptics";
 import { playPop } from "../../feedback/sound";
 import { badgeSpring, spring } from "../../motion/variants";
@@ -39,6 +43,8 @@ const TINT: Record<CategoryId, string> = {
 
 type OnList = { item: AdventureItem; quantity: number };
 
+const NO_ITEMS: AdventureItem[] = [];
+
 /** The green check rises out of the tile, slow enough for a child to follow. */
 const BURST_MS = 1100;
 
@@ -52,15 +58,18 @@ type GridTileProps = {
   onRemove: () => void;
   /** Mijn producten can always be long-pressed: that also forgets them. */
   mine?: boolean;
+  /** Only reliable offers show on a tile; doubtful ones stay on the parent's list screen. */
+  offer?: RetailerId;
 };
 
-function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, mine = false }: GridTileProps) {
+function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, mine = false, offer }: GridTileProps) {
   const { pressing, handlers } = useLongPress(onRemove, quantity === 0 && !mine);
   const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : "", mine ? "is-mine" : ""].filter(Boolean).join(" ");
+  const deal = offer && quantity ? `, in de aanbieding bij ${retailerName(offer)}` : "";
   const label = mine
-    ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}. Lang drukken om te vergeten`
+    ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}. Lang drukken om te vergeten`
     : quantity
-      ? `${name}, ${quantity} op de lijst. Lang drukken om te verwijderen`
+      ? `${name}, ${quantity} op de lijst${deal}. Lang drukken om te verwijderen`
       : name;
   return (
     <motion.button
@@ -91,6 +100,7 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, mine = 
           </svg>
         </span>
       )}
+      {offer && quantity > 0 && <OfferTag shown="deal" retailer={offer} className="card-offer" compact />}
       <AnimatePresence>
         {quantity > 0 && (
           <motion.span key="badge" className="card-badge" variants={badgeSpring} initial="hidden" animate="shown" exit="gone">
@@ -123,7 +133,7 @@ function matches(product: Product, needle: string) {
 }
 
 export function AddScreen() {
-  const { adventure, mine, dispatch } = useAdventure();
+  const { adventure, mine, settings, dispatch } = useAdventure();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryId | "all">("produce");
@@ -131,8 +141,13 @@ export function AddScreen() {
   const [pasteText, setPasteText] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [burst, setBurst] = useState<{ id: string; token: number } | null>(null);
+  const [pickingStore, setPickingStore] = useState(false);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
+  const draft = adventure?.phase === "draft" ? adventure : null;
+  const retailer = draft ? draft.retailer : settings.retailer;
+  const { views, deals } = useOfferViews(draft?.items ?? NO_ITEMS, draft?.retailer);
+  const offerOn = (item: AdventureItem | undefined) => (item && draft?.retailer && views.get(item.id)?.shown === "deal" ? draft.retailer : undefined);
 
   const count = adventure && adventure.phase !== "done" ? adventure.items.length : 0;
   const mineKeys = useMemo(() => new Set(mine.map(mineKey)), [mine]);
@@ -251,7 +266,21 @@ export function AddScreen() {
   return (
     <main className="screen screen-add">
       <div className="add-head">
-        <TopBar title="Wat nemen we mee?" />
+        <TopBar
+          title="Wat nemen we mee?"
+          action={
+            <button
+              type="button"
+              className={retailer ? "store-chip is-set" : "store-chip"}
+              data-testid="store-chip"
+              aria-label={retailer ? `Supermarkt: ${retailerName(retailer)}. Wijzigen` : "Kies een supermarkt voor aanbiedingen"}
+              onClick={() => setPickingStore(true)}
+            >
+              <TagIcon />
+              <span>{retailer ? RETAILERS.find((entry) => entry.id === retailer)?.short : "Winkel"}</span>
+            </button>
+          }
+        />
         <div className="search-row">
           <label className="search">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -309,6 +338,7 @@ export function AddScreen() {
               onAdd={() => addMine(entry)}
               onRemove={() => forgetMine(entry)}
               mine
+              offer={offerOn(listed?.item)}
             />
           );
         })}
@@ -322,6 +352,7 @@ export function AddScreen() {
             pop={burst?.id === entry.item.productId ? burst : null}
             onAdd={() => addMore(entry.item)}
             onRemove={() => removeProduct(tileOf(entry.item))}
+            offer={offerOn(entry.item)}
           />
         ))}
         {visible.map((product) => {
@@ -336,10 +367,12 @@ export function AddScreen() {
               pop={burst?.id === product.id ? burst : null}
               onAdd={() => addProduct(product)}
               onRemove={() => removeProduct(product.id)}
+              offer={offerOn(entry?.item)}
             />
           );
         })}
       </div>
+      {deals > 0 && <Attribution className="add-attribution" />}
       {visible.length === 0 && extras.length === 0 && mineVisible.length === 0 && <p className="empty">Niets gevonden. Probeer een ander woord.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
       {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje zijn eerder herkend. Lang drukken vergeet ze.</p>}
@@ -404,6 +437,19 @@ export function AddScreen() {
             Zet op de lijst
           </PressButton>
         </div>
+      </Sheet>
+
+      <Sheet open={pickingStore} onClose={() => setPickingStore(false)} label="Supermarkt kiezen">
+        <h2>Bij welke supermarkt?</h2>
+        <p className="sheet-note">Dan laat Karrie zien wat er op je lijstje in de aanbieding is.</p>
+        <RetailerPicker
+          value={retailer}
+          onChange={(next) => {
+            dispatch({ type: "set-retailer", retailer: next });
+            setPickingStore(false);
+          }}
+        />
+        <Attribution />
       </Sheet>
 
       <PhotoFlow

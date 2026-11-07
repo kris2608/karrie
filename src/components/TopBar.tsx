@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-export function TopBar({ title, to = "/", label = "Terug" }: { title: string; to?: string; label?: string }) {
+export function TopBar({ title, to = "/", label = "Terug", action }: { title: string; to?: string; label?: string; action?: ReactNode }) {
   return (
     <header className="topbar">
       <Link to={to} className="round-button" aria-label={label}>
@@ -9,6 +10,7 @@ export function TopBar({ title, to = "/", label = "Terug" }: { title: string; to
         </svg>
       </Link>
       <h1>{title}</h1>
+      {action && <div className="topbar-action">{action}</div>}
     </header>
   );
 }

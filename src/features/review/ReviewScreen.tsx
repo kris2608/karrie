@@ -13,9 +13,18 @@ import { missionOn } from "../../domain/discovery";
 import { spring } from "../../motion/variants";
 import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
+import { summaryText } from "../../domain/offers";
+import { analyticsRetailer } from "../../domain/retailers";
+import { trackEvent } from "../../services/analytics";
+import { offerQueries, offers, useOfferViews, type OfferView } from "../../storage/offers";
+import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
+import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
+import { RetailerPicker } from "../offers/RetailerPicker";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
+
+const NO_ITEMS: AdventureItem[] = [];
 
 function Arrow({ up }: { up?: boolean }) {
   return (
@@ -31,14 +40,32 @@ export function ReviewScreen() {
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
   const [saving, setSaving] = useState(false);
+  const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
+  const items = adventure?.items ?? NO_ITEMS;
+  const retailer = adventure?.phase === "draft" ? adventure.retailer : undefined;
+  const { views, deals } = useOfferViews(items, retailer);
 
   useEffect(() => {
     if ((location.state as { editItem?: string } | null)?.editItem) navigate(".", { replace: true, state: null });
   }, [location.state, navigate]);
 
+  const openedWith = useRef(false);
+  useEffect(() => {
+    if (openedWith.current || !retailer) return;
+    openedWith.current = true;
+    offers.sync(offerQueries(items, retailer));
+  }, [items, retailer]);
+
   if (!adventure || adventure.phase === "done") return <Missing />;
+
+  function openOffer(item: AdventureItem, view: OfferView) {
+    const offer = view.answer.offer;
+    if (!offer || !retailer) return;
+    setOfferOpen({ itemName: item.name, offer, shown: view.shown });
+    trackEvent({ name: "offer_opened", data: { retailer: analyticsRetailer(retailer), match_type: offer.matchType } });
+  }
 
   const groups = adventure.categoryOrder
     .map((category) => ({
@@ -90,6 +117,18 @@ export function ReviewScreen() {
           {adventure.store}
         </p>
       )}
+      {adventure.phase === "draft" && (
+        <section className="offer-bar" aria-label="Aanbiedingen">
+          <RetailerPicker value={adventure.retailer} onChange={(retailer) => dispatch({ type: "set-retailer", retailer })} />
+          {adventure.retailer && deals > 0 && (
+            <p className="offer-summary" data-testid="offer-summary">
+              <TagIcon />
+              <span>{summaryText(deals, adventure.retailer)}</span>
+            </p>
+          )}
+          {adventure.retailer && views.size > 0 && <Attribution />}
+        </section>
+      )}
       {groups.length === 0 && (
         <p className="empty">
           Nog geen producten. <Link to="/toevoegen">Voeg er een paar toe.</Link>
@@ -122,8 +161,10 @@ export function ReviewScreen() {
                   item={item}
                   first={index === 0}
                   last={index === group.items.length - 1}
+                  offer={views.get(item.id)}
                   onEdit={() => setEditId(item.id)}
                   onRemove={() => remove(item)}
+                  onOffer={(view) => openOffer(item, view)}
                 />
               ))}
             </AnimatePresence>
@@ -156,6 +197,7 @@ export function ReviewScreen() {
         }}
         onRemove={() => editing && remove(editing)}
       />
+      <OfferSheet open={offerOpen} onClose={() => setOfferOpen(null)} />
       <SaveListSheet open={saving} adventure={adventure} onClose={() => setSaving(false)} onSave={saveForLater} />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <Toast notice={notice} onDismiss={dismiss} />
@@ -163,8 +205,19 @@ export function ReviewScreen() {
   );
 }
 
-function ItemRow({ item, first, last, onEdit, onRemove }: { item: AdventureItem; first: boolean; last: boolean; onEdit: () => void; onRemove: () => void }) {
-  const { settings, declined, dispatch } = useAdventure();
+type ItemRowProps = {
+  item: AdventureItem;
+  first: boolean;
+  last: boolean;
+  offer?: OfferView;
+  onEdit: () => void;
+  onRemove: () => void;
+  onOffer: (view: OfferView) => void;
+};
+
+function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
+  const { adventure, settings, declined, dispatch } = useAdventure();
+  const retailer = adventure?.retailer;
   const { pressing, handlers } = useLongPress(onRemove);
   const detail = [item.brand, item.packageSize].filter(Boolean).join(" · ");
   const mission = settings.smartDiscovery && missionOn(item, declined);
@@ -190,6 +243,18 @@ function ItemRow({ item, first, last, onEdit, onRemove }: { item: AdventureItem;
       <div className="item-main">
         <strong>{item.name}</strong>
         {detail && <small className="item-detail">{detail}</small>}
+        {offer && retailer && (
+          <button
+            type="button"
+            className="offer-tag-button"
+            data-no-long-press
+            aria-label={`${offerLabel(offer.shown, retailer)}: details`}
+            data-testid="offer-button"
+            onClick={() => onOffer(offer)}
+          >
+            <OfferTag shown={offer.shown} retailer={retailer} />
+          </button>
+        )}
         <div className="stepper" data-no-long-press>
           <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
             −

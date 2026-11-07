@@ -81,3 +81,13 @@ services:
         value: "200"
       - key: BARCODE_LIMIT_DAILY_REQUESTS
         value: "1000"
+      - key: OFFERS
+        value: "on"
+      - key: PRIJSPROFEET_USER_AGENT
+        value: Karrie/1.0 (+https://karrieapp.onrender.com)
+      - key: PRIJSPROFEET_API_KEY
+        sync: false
+      - key: OFFERS_LIMIT_PER_IP_HOUR
+        value: "300"
+      - key: OFFERS_LIMIT_PER_IP_DAY
+        value: "1500"

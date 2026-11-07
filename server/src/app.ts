@@ -5,6 +5,8 @@ import type { BarcodeLookup, LookupResult } from "./barcode.js";
 import { canonicalEan } from "./ean.js";
 import { ImageIdentitySchema, type ImageDiscovery } from "./images.js";
 import type { Limits } from "./limits.js";
+import type { OfferLookup } from "./offers/index.js";
+import { RETAILERS, type PrijsProfeet } from "./offers/prijsprofeet.js";
 import type { RecognizeResult } from "./recognize.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
 
@@ -23,6 +25,13 @@ export type BarcodeDeps = {
   searchCallUsd: number;
 };
 
+export type OfferDeps = {
+  lookup: Pick<OfferLookup, "find" | "stats">;
+  provider?: Pick<PrijsProfeet, "stats">;
+  /** Per-IP limits; PrijsProfeet's own limits are kept by the provider for the whole server. */
+  limits: Limits;
+};
+
 export type AppDeps = {
   allowedOrigins: string[];
   requireOrigin: boolean;
@@ -32,11 +41,12 @@ export type AppDeps = {
   recognize: (dataUrl: string, scannedEan?: string) => Promise<RecognizeResult>;
   images?: ImageDeps;
   barcode?: BarcodeDeps;
+  offers?: OfferDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
 };
 
-const ROUTES = ["/api/products/recognize-photo", "/api/images/discover", "/api/products/barcode"];
+const ROUTES = ["/api/products/recognize-photo", "/api/images/discover", "/api/products/barcode", "/api/offers/match"];
 
 const STATUS_BY_CODE: Record<string, number> = {
   refused: 422,
@@ -93,6 +103,7 @@ export function createHandler(deps: AppDeps) {
   const imageOutcomes: Record<string, number> = {};
   const barcodeFailures: Record<string, number> = {};
   const barcodeOutcomes: Record<string, number> = {};
+  const offerOutcomes: Record<string, number> = {};
   const count = (into: Record<string, number>, key: string) => (into[key] = (into[key] ?? 0) + 1);
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
@@ -135,6 +146,9 @@ export function createHandler(deps: AppDeps) {
         stats: deps.limits.stats(),
         images: deps.images ? { provider: deps.images.discovery.provider, stats: deps.images.limits.stats(), outcomes: imageOutcomes, failures: imageFailures } : undefined,
         barcode: deps.barcode ? { webSearch: deps.barcode.lookup.webEnabled, stats: deps.barcode.limits.stats(), outcomes: barcodeOutcomes, failures: barcodeFailures } : undefined,
+        offers: deps.offers
+          ? { stats: deps.offers.limits.stats(), cache: deps.offers.lookup.stats(), provider: deps.offers.provider?.stats(), outcomes: offerOutcomes }
+          : undefined,
       });
     }
 
@@ -160,6 +174,7 @@ export function createHandler(deps: AppDeps) {
     }
     if (url.pathname === "/api/images/discover") return discoverImages(body);
     if (url.pathname === "/api/products/barcode") return lookupBarcode(body);
+    if (url.pathname === "/api/offers/match") return matchOffer(body);
 
     const image = checkImage(body);
     if (!image.ok) return send(image.status, { status: "error", code: image.code });
@@ -246,8 +261,53 @@ export function createHandler(deps: AppDeps) {
       count(barcodeOutcomes, result.ok ? result.answer.status : `error-${result.code}`);
       return reply(result);
     }
+
+    /** Only the product's name, kind and barcode go to PrijsProfeet; nothing about the family. */
+    async function matchOffer(body: unknown) {
+      const offers = deps.offers;
+      if (!offers) return send(503, { status: "error", code: "misconfigured" });
+      const request = OfferRequestSchema.safeParse(body);
+      if (!request.success) return send(400, { status: "error", code: "bad-request" });
+      const { retailer, product } = request.data;
+      const ean = product.ean ? canonicalEan(product.ean) : null;
+      if (product.ean && !ean) return send(400, { status: "error", code: "bad-request" });
+
+      const denial = offers.limits.admit(clientIp(req));
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const callStarted = now();
+      const result = await offers.lookup.find({ ...product, ean: ean ?? undefined }, retailer);
+      offers.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+      Object.assign(entry, { retailer, generic: product.generic, lookupMs: now() - callStarted });
+      if (!result.ok) {
+        count(offerOutcomes, `error-${result.code}`);
+        return send(result.code === "limit" ? 429 : 502, { status: "error", code: result.code === "limit" ? "rate-limited" : "unavailable" });
+      }
+      count(offerOutcomes, `${retailer}-${result.match.matchType}`);
+      entry.found = result.match.matchType;
+      return send(200, { status: "ok", match: result.match, fetchedAt: new Date(now()).toISOString() });
+    }
   };
 }
+
+const OfferText = z.string().trim().min(1).max(120);
+
+const OfferRequestSchema = z
+  .object({
+    retailer: z.enum(RETAILERS),
+    product: z
+      .object({
+        name: OfferText,
+        aliases: z.array(OfferText).max(8).optional(),
+        category: z.enum(["produce", "bakery", "pantry", "dairy", "frozen", "household"]),
+        generic: z.boolean(),
+        brand: OfferText.optional(),
+        variant: OfferText.optional(),
+        size: z.string().trim().min(1).max(40).optional(),
+        ean: z.string().max(14).optional(),
+      })
+      .strict(),
+  })
+  .strict();
 
 const BarcodeRequestSchema = z.object({ ean: z.string().max(14) }).strict();
 

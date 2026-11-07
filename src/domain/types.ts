@@ -1,3 +1,5 @@
+import type { RetailerId } from "./retailers";
+
 export type CategoryId = "produce" | "bakery" | "pantry" | "dairy" | "frozen" | "household";
 
 export type ItemStatus = "pending" | "found" | "skipped";
@@ -137,6 +139,8 @@ export type Adventure = {
   name: string;
   /** The supermarket the parent typed when saving; not used for anything else yet. */
   store?: string;
+  /** The supermarket whose offers are shown for this list; no lookups happen without one. */
+  retailer?: RetailerId;
   phase: AdventurePhase;
   items: AdventureItem[];
   categoryOrder: CategoryId[];
@@ -158,6 +162,7 @@ export type SavedList = {
   id: string;
   name: string;
   store?: string;
+  retailer?: RetailerId;
   items: SavedItem[];
   favorite: boolean;
   updatedAt: number;
