@@ -151,6 +151,7 @@ De gratis web service slaapt na ongeveer 15 minuten zonder verkeer. De eerste he
 - OpenAI verwerkt de foto. Met `store: false` bewaart OpenAI de aanvraag niet voor later ophalen; OpenAI kan aanvragen wel tijdelijk bewaren voor misbruikcontrole volgens de [API-gegevensregels](https://platform.openai.com/docs/guides/your-data). Het camerascherm zegt dat de foto naar OpenAI gaat.
 - De bevestigde foto (512 pixels) blijft alleen op het toestel, in IndexedDB, en alleen als hij de tekening vervangt. Foto's die nergens meer gebruikt worden, worden bij het opstarten opgeruimd.
 - **Maak foto** in het productvenster zet een foto bij een product zonder hem te versturen.
+- Anonieme statistieken via Umami Cloud: zonder cookies, zonder namen, producten, streepjescodes, lijstjes, foto's of locatie. Zie **Statistieken (Umami)**.
 
 **Wat Karrie wel en niet doet**
 
@@ -295,6 +296,34 @@ Een eerdere ronde liet zien waarom de controle op "het hele product" nodig is: z
 ## Mijn producten
 
 Een product dat van een foto is herkend en een merk heeft, of dat niet in de catalogus staat, onthoudt Karrie op dit toestel als **Mijn producten**: naam, merk, afdeling, foto en eventuele bonusmissie. In **Toevoegen** staat het met een hartje onder zijn eigen afdeling, onder **Alles** en in de zoekresultaten. Tikken zet het op de lijst (of telt er één bij). Lang drukken haalt het van de lijst en vergeet het, met **Ongedaan maken**. Een herkende AH Terra pindakaas telt op zijn eigen tegel, niet ook op de tegel Pindakaas. Karrie onthoudt hoogstens 120 producten.
+
+## Statistieken (Umami)
+
+Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.is). Umami zet geen cookies en maakt geen gebruikersprofiel; Karrie roept nooit `umami.identify()` aan.
+
+**Instellen.** Zet `UMAMI_SCRIPT_URL` (bijvoorbeeld `https://cloud.umami.is/script.js`) en `UMAMI_WEBSITE_ID` bij de statische site **`karrieapp`** (Environment), niet alleen bij `karrie-api`. Kies daarna **Manual Deploy → Clear build cache & deploy**: de waarden worden tijdens het bouwen in `index.html` gezet. Ontbreekt er één, dan bouwt de site gewoon zonder statistieken. Beide waarden zijn openbaar; er is geen Umami-sleutel nodig.
+
+**Waar het niet telt.** `npm run dev` krijgt het script nooit. Een gebouwde versie telt alleen op `karrieapp.onrender.com` (`data-domains`), dus `vite preview` op localhost stuurt niets. Wie in de browser *Do Not Track* aan heeft, wordt niet geteld. Zoekparameters en `#` worden niet meegestuurd.
+
+**Paginaweergaven** komen automatisch: Umami ziet ook het wisselen van scherm binnen de app (`/`, `/toevoegen`, `/controleren`, `/winkel`, `/klaar`).
+
+**Gebeurtenissen.** Alleen vaste namen, vaste waarden en aantallen:
+
+| Gebeurtenis | Wanneer | Gegevens |
+| --- | --- | --- |
+| `shopping_list_created` | eerste product op een nieuw lijstje (een geplakte lijst telt als één) | geen |
+| `product_added` | een nieuwe regel op het lijstje; nog een tik op hetzelfde product of **+** telt niet | `method`: catalog, paste, saved (Mijn producten), photo, barcode, manual; `category`: afdeling |
+| `product_recognized` | een herkend product: streepjescode bekend, of foto herkend | `method`: barcode of photo; `source`: open_food_facts, web_search, cache, my_products, openai |
+| `adventure_started` | **Start** van een lijstje dat nog niet liep | `item_count` |
+| `adventure_completed` | het laatste product gevonden | `item_count`, `completed_missions` |
+| `bonus_mission_completed` | de ouder bevestigt een bonusmissie | `choice`: alternative of original |
+| `offer_opened` | nog niet actief: aanbiedingen bestaan nog niet in Karrie | (`retailer`, `match_type`) |
+
+Wat niet telt: een bewaard lijstje openen, terug naar een lopend avontuur, **Ongedaan maken**, een streepjescode die de camera steeds opnieuw ziet (één keer per cameragebruik), een mislukte herkenning, een missie die alleen getoond of overgeslagen wordt, en het eindscherm opnieuw openen. Na **Terug** en opnieuw **Gevonden!** telt de voltooiing niet nog eens zolang de app open blijft.
+
+**Controleren in Umami Cloud.** Open Websites → Karrie. **Realtime** toont binnen enkele seconden een bezoek aan `karrieapp.onrender.com` en elke gebeurtenis. Onder **Events** staan de gebeurtenissen met hun aantallen; klik op een naam voor de verdeling van `method`, `source` of `choice`. In de browser (DevTools → Network, filter `api/send`) zie je per verzoek precies wat er wordt verstuurd.
+
+Faalt Umami (geblokkeerd, offline, traag), dan merkt Karrie daar niets van: er wordt niets opnieuw geprobeerd of bewaard.
 
 ## Kosten (gemeten met `gpt-5.4-mini`, november 2026)
 

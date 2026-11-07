@@ -4,9 +4,11 @@ import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { mergeDraft, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem } from "../../domain/types";
+import { trackEvent } from "../../services/analytics";
 import { lookupBarcode, type BarcodeOutcome } from "../../services/barcode/lookup";
 import { vision, type VisionResult } from "../../services/vision/client";
 import { useAdventure } from "../../state/AdventureContext";
+import { barcodeSource } from "../../state/analyticsEvents";
 import { savePhoto } from "../../storage/photos";
 import { decodeStill } from "./barcodeReader";
 import { blobToDataUrl, decodePhoto, fullRect, processPhoto, releasePhoto, type ProcessedPhoto } from "./imageProcessing";
@@ -75,10 +77,18 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
   const [barcodeStatus, setBarcodeStatus] = useState<BarcodeStatus>(null);
   const scan = useRef<Scan | null>(null);
   const request = useRef<AbortController | null>(null);
+  /** Counts camera openings, so one code read again and again in the same session is counted once. */
+  const session = useRef(0);
+  const stepKind = useRef<Step["kind"]>("idle");
   const liveTarget = target && items.find((item) => item.id === target.id);
+
+  useEffect(() => {
+    stepKind.current = step.kind;
+  }, [step.kind]);
 
   useImperativeHandle(ref, () => ({
     open(next) {
+      session.current += 1;
       setTarget(next);
       setPhoto(null);
       scan.current = null;
@@ -113,6 +123,12 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     return next;
   }
 
+  /** Anonymous count of a successful identification; the code itself only keys the once-per-session check. */
+  function countBarcode(ean: string, outcome: BarcodeOutcome) {
+    const source = barcodeSource(outcome);
+    if (source) trackEvent({ name: "product_recognized", data: { method: "barcode", source } }, `${session.current}:${ean}`);
+  }
+
   /** A confirmed code from the live preview: show the product straight away when it is known, else keep the camera open. */
   function barcode(ean: string) {
     const current = startLookup(ean);
@@ -120,6 +136,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     void current.outcome.then((outcome) => {
       if (scan.current !== current) return;
       if (identified(outcome)) {
+        if (stepKind.current === "camera") countBarcode(ean, outcome);
         setStep((now) => (now.kind === "camera" ? { kind: "result", draft: mergeDraft(known(ean, outcome)) } : now));
         return;
       }
@@ -142,6 +159,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
       if (ean) {
         const outcome = await startLookup(ean).outcome;
         if (identified(outcome)) {
+          countBarcode(ean, outcome);
           const draft = mergeDraft(known(ean, outcome));
           // A gallery picture with a barcode is often the back of the pack; a known front photo looks better.
           if (draft.imageUrl || draft.photoId) setPhoto(null);
@@ -183,6 +201,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     if (result.status === "aborted") return;
     if (result.status === "ok") {
       if (result.product.containsPeople) return setStep({ kind: "problem", problem: PEOPLE });
+      if (result.product.recognized) trackEvent({ name: "product_recognized", data: { method: "photo", source: "openai" } });
       const lookup = scanned ? known(scanned.ean, await scanned.outcome) : {};
       setStep({ kind: "result", draft: mergeDraft({ ...lookup, photo: result.product }) });
       return;

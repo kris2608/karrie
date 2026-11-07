@@ -84,7 +84,17 @@ export type Action =
   | { type: "move-category"; category: CategoryId; direction: -1 | 1 }
   | { type: "set-category-order"; order: CategoryId[] }
   | { type: "restore-generic"; itemId: string }
-  | { type: "add-recognized"; name: string; category: CategoryId; icon: string; productId?: string; photoId?: string; pack?: VisionPack }
+  | {
+      type: "add-recognized";
+      name: string;
+      category: CategoryId;
+      icon: string;
+      productId?: string;
+      photoId?: string;
+      pack?: VisionPack;
+      /** How the product was identified; only used for anonymous statistics. */
+      via?: "photo" | "barcode" | "manual";
+    }
   | { type: "set-photo"; itemId: string; photoId: string }
   | { type: "apply-recognition"; itemId: string; photoId?: string; pack: VisionPack }
   | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }

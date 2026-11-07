@@ -109,8 +109,9 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
     const matched = draft?.match && draft.match.category === category ? draft.match : null;
     const icon = matched ? matched.id : categoryIcon(category);
     const withPhoto = !draft || draft.keepPhoto || !matched;
+    const via = draft?.from.photo ? "photo" : draft?.from.barcode || draft?.from.mine ? "barcode" : "manual";
     void commit((photoId) => {
-      dispatch({ type: "add-recognized", name: finalName, category, icon, productId: matched?.id, photoId, pack: draft?.pack });
+      dispatch({ type: "add-recognized", name: finalName, category, icon, productId: matched?.id, photoId, pack: draft?.pack, via });
       return `${finalName} staat op je lijst`;
     }, withPhoto);
   }

@@ -1,10 +1,34 @@
+import { loadEnv, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+/** Only the production site counts; the tracker ignores localhost and previews. */
+const UMAMI_DOMAIN = "karrieapp.onrender.com";
+
+/** Adds the Umami Cloud tracker to production builds only, when both public values are set. */
+function umami(): Plugin {
+  let tag: string | null = null;
+  return {
+    name: "karrie-umami",
+    apply: "build",
+    configResolved(config) {
+      const env = loadEnv(config.mode, config.envDir || process.cwd(), "UMAMI_");
+      const src = (process.env.UMAMI_SCRIPT_URL ?? env.UMAMI_SCRIPT_URL ?? "").trim();
+      const id = (process.env.UMAMI_WEBSITE_ID ?? env.UMAMI_WEBSITE_ID ?? "").trim();
+      tag = /^https:\/\/[^\s"<>]+$/.test(src) && /^[0-9a-f-]{36}$/i.test(id) ? `<script defer src="${src}" data-website-id="${id}" data-domains="${UMAMI_DOMAIN}" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>` : null;
+      if (!tag && (src || id)) config.logger.warn("Umami: UMAMI_SCRIPT_URL or UMAMI_WEBSITE_ID looks wrong; no tracker added.");
+    },
+    transformIndexHtml(html) {
+      return tag && !html.includes("data-website-id") ? html.replace("</head>", `    ${tag}\n  </head>`) : html;
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
+    umami(),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",

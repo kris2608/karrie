@@ -29,6 +29,11 @@ services:
         value: "22"
       - key: VITE_API_ORIGIN
         value: https://karrie-api.onrender.com
+      # Umami Cloud, read at build time; both values end up public in index.html.
+      - key: UMAMI_SCRIPT_URL
+        sync: false
+      - key: UMAMI_WEBSITE_ID
+        sync: false
 
   - type: web
     runtime: node
