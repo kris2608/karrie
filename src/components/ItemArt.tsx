@@ -5,7 +5,10 @@ import { usePhotoUrl } from "../storage/photos";
 import { useReferenceUrl } from "../storage/references";
 import { ProductArt } from "./ProductArt";
 
-type ArtItem = Pick<PackInfo, "imageUrl" | "imageKind" | "imageSource" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition"> & { icon: string; name: string };
+type ArtItem = Pick<PackInfo, "imageUrl" | "imageKind" | "imageSource" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition" | "illustrationId"> & {
+  icon: string;
+  name: string;
+};
 
 export function hasPhoto(item: Pick<PackInfo, "imageUrl" | "imageKind" | "photoId">): boolean {
   return item.imageKind === "photo" && Boolean(item.photoId || item.imageUrl);
@@ -28,11 +31,19 @@ export function ItemArt({ item, className }: { item: ArtItem; className?: string
   const reference = useReferenceUrl(wanted ? identity : null);
   const usable = (url: string | null | undefined) => (url && !failed.includes(url) ? url : null);
   const url = pickArt(item.imageChoice, usable(reference?.url), usable(photo), wanted);
+  const drawing = usable(usePhotoUrl(item.illustrationId));
 
   if (url) {
     return (
       <span className={className ? `product-art item-photo ${className}` : "product-art item-photo"}>
         <img src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable={false} onError={() => setFailed((list) => [...list, url])} />
+      </span>
+    );
+  }
+  if (drawing) {
+    return (
+      <span className={className ? `product-art item-drawing ${className}` : "product-art item-drawing"}>
+        <img src={drawing} alt="" decoding="async" draggable={false} onError={() => setFailed((list) => [...list, drawing])} />
       </span>
     );
   }

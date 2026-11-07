@@ -3,6 +3,9 @@ import { createServer } from "node:http";
 import OpenAI from "openai";
 import { createHandler } from "./app.js";
 import { createBarcodeLookup } from "./barcode.js";
+import { createCandidateStore } from "./candidates.js";
+import { createIllustrator } from "./illustration.js";
+import { normalizeProduct } from "./normalize.js";
 import { createImageDiscovery } from "./images.js";
 import { createLimits } from "./limits.js";
 import { createOfferLookup } from "./offers/index.js";
@@ -95,6 +98,33 @@ const prijsProfeet =
       })
     : null;
 
+const productLimits = createLimits({
+  perIpPerHour: number("PRODUCTS_LIMIT_PER_IP_HOUR", 30),
+  perIpPerDay: number("PRODUCTS_LIMIT_PER_IP_DAY", 100),
+  dailyRequests: number("PRODUCTS_LIMIT_DAILY_REQUESTS", 1000),
+  dailyBudgetUsd: number("PRODUCTS_DAILY_BUDGET_USD", 0.5),
+  inputUsdPerMTok: number("PRICE_INPUT_PER_MTOK", 0.75),
+  cachedInputUsdPerMTok: number("PRICE_CACHED_INPUT_PER_MTOK", 0.075),
+  outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
+});
+
+const candidates = createCandidateStore({ file: env.CANDIDATES_FILE || undefined, maxCandidates: number("CANDIDATES_MAX", 5000) });
+
+/** Paid per picture; off unless ILLUSTRATIONS_ENABLED is "true". See DEPLOYMENT.md for the costs. */
+const illustrationLimits = createLimits({
+  perIpPerHour: number("ILLUSTRATION_LIMIT_PER_IP_HOUR", 5),
+  perIpPerDay: number("ILLUSTRATION_LIMIT_PER_IP_DAY", 10),
+  dailyRequests: number("ILLUSTRATION_LIMIT_DAILY_REQUESTS", 100),
+  dailyBudgetUsd: number("ILLUSTRATION_DAILY_BUDGET_USD", 1),
+  inputUsdPerMTok: 0,
+  cachedInputUsdPerMTok: 0,
+  outputUsdPerMTok: 0,
+});
+const illustrator =
+  client && env.ILLUSTRATIONS_ENABLED === "true"
+    ? createIllustrator(client, { model: env.ILLUSTRATION_MODEL || "gpt-image-1", imageUsd: number("PRICE_ILLUSTRATION", 0.011) })
+    : null;
+
 const handler = createHandler({
   allowedOrigins: (env.ALLOWED_ORIGINS ?? "https://karrieapp.onrender.com,http://localhost:5173,http://localhost:4173")
     .split(",")
@@ -115,6 +145,13 @@ const handler = createHandler({
     : undefined,
   barcode: { lookup: barcode, limits: barcodeLimits, searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01) },
   offers: prijsProfeet ? { lookup: createOfferLookup(prijsProfeet), provider: prijsProfeet, limits: offerLimits } : undefined,
+  products: {
+    normalize: (name) => normalizeProduct(client!, { model: env.OPENAI_PRODUCT_MODEL || config.model, maxOutputTokens: number("PRODUCT_MAX_OUTPUT_TOKENS", 600) }, name),
+    candidates,
+    limits: productLimits,
+    illustrations: illustrator ? { illustrator, limits: illustrationLimits } : undefined,
+    adminToken: env.CANDIDATES_ADMIN_TOKEN || undefined,
+  },
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 
@@ -125,5 +162,15 @@ createServer((req, res) => {
     res.end(JSON.stringify({ status: "error", code: "server" }));
   });
 }).listen(port, () => {
-  console.log(JSON.stringify({ event: "listening", port, model: config.model, configured: Boolean(client), imageProvider: discovery?.provider }));
+  console.log(
+    JSON.stringify({
+      event: "listening",
+      port,
+      model: config.model,
+      configured: Boolean(client),
+      imageProvider: discovery?.provider,
+      candidates: candidates.persistent ? "file" : "memory",
+      illustrations: Boolean(illustrator),
+    }),
+  );
 });

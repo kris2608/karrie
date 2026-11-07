@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../../domain/categories";
+import { customName, customProductId, suggestion } from "../../domain/customProduct";
 import { normalize } from "../../domain/matchProduct";
 import { matchesMine, mineKey } from "../../domain/mine";
 import type { AdventureItem, CategoryId, Product, SavedItem } from "../../domain/types";
@@ -186,6 +187,12 @@ export function AddScreen() {
   const extras = [...onList.entries()]
     .filter(([tile, { item }]) => !productById(tile) && !mineKeys.has(tile) && (!needle || normalize(item.name).includes(needle)))
     .map(([, entry]) => entry);
+  /** Search results with the closest catalog product first, also when only a typo or the plural matched. */
+  const known = useMemo(() => (needle ? suggestion(query, mine) : null), [needle, query, mine]);
+  const close = known?.kind === "catalog" ? known.product : null;
+  const results = close ? [close, ...visible.filter((product) => product.id !== close.id)] : visible;
+  const nothing = visible.length === 0 && extras.length === 0 && mineVisible.length === 0;
+  const custom = needle && nothing && (!known || (known.kind === "catalog" && known.close)) ? customName(query) : null;
 
   useEffect(() => {
     if (needle) return;
@@ -314,6 +321,26 @@ export function AddScreen() {
     setBurst((current) => ({ id: product.id, token: (current?.token ?? 0) + 1 }));
     playPop();
     buzz(8);
+  }
+
+  function addCustom(name: string) {
+    const productId = customProductId(name);
+    const key = mineKey({ name, kind: "custom_generic", productId });
+    const remembered = mine.some((entry) => mineKey(entry) === key);
+    const existing = adventure?.phase === "done" ? undefined : adventure?.items.find((item) => item.productId === productId && item.status !== "found");
+    const itemId = crypto.randomUUID();
+    dispatch({ type: "add-custom", name, itemId });
+    setBurst((current) => ({ id: key, token: (current?.token ?? 0) + 1 }));
+    playPop();
+    buzz(8);
+    show(`${name} toegevoegd!`, {
+      label: "Ongedaan maken",
+      run: () => {
+        if (existing) dispatch({ type: "set-quantity", itemId: existing.id, quantity: existing.quantity });
+        else dispatch({ type: "remove-item", itemId });
+        if (!remembered) dispatch({ type: "forget-mine", key });
+      },
+    });
   }
 
   function recognize() {
@@ -453,7 +480,24 @@ export function AddScreen() {
         <div className="product-grid">
           {mineVisible.map(mineTile)}
           {extras.map(extraTile)}
-          {visible.map(productTile)}
+          {results.map(productTile)}
+          {custom && (
+            <motion.button
+              type="button"
+              className="product-card add-custom"
+              data-testid="add-custom"
+              whileTap={{ scale: 0.94 }}
+              transition={{ duration: 0.09 }}
+              onClick={() => addCustom(custom)}
+            >
+              <span className="card-art add-custom-art" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span className="card-name">Voeg “{query.trim()}” toe</span>
+            </motion.button>
+          )}
         </div>
       ) : (
         CATEGORIES.map((section) => (
@@ -476,9 +520,10 @@ export function AddScreen() {
         ))
       )}
       {deals > 0 && <Attribution className="add-attribution" />}
-      {visible.length === 0 && extras.length === 0 && mineVisible.length === 0 && <p className="empty">Niets gevonden. Probeer een ander woord.</p>}
+      {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals walnoten.</p>}
+      {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, dan zoekt Karrie er een plaatje bij.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
-      {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje zijn eerder herkend. Lang drukken vergeet ze.</p>}
+      {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje onthoudt Karrie van eerder. Lang drukken vergeet ze.</p>}
 
       <div className="dock dock-fixed">
         <PressButton variant="quiet" data-testid="paste" onClick={() => setPasteOpen(true)}>

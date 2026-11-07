@@ -730,6 +730,14 @@ h1, h2, p { margin: 0; }
   box-shadow: 0 2px 0 var(--green-shade);
 }
 .card-badge > span { display: block; }
+.product-card.add-custom {
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 2px var(--teal);
+  color: var(--ink);
+}
+.add-custom-art::before { background: var(--teal-soft); }
+.add-custom-art svg { width: 44px; height: 44px; color: var(--teal-shade); }
+.add-custom .card-name { overflow-wrap: anywhere; }
 .card-mine { position: absolute; top: 8px; left: 8px; width: 20px; height: 20px; color: var(--coral-shade); pointer-events: none; }
 .card-mine svg { display: block; width: 100%; height: 100%; }
 .card-burst {
@@ -1304,6 +1312,10 @@ h1, h2, p { margin: 0; }
   -webkit-user-drag: none;
 }
 .stage-art .item-photo { width: auto; margin: 0 auto; border-radius: 18%; --photo-fill: 86%; }
+
+/* A generated Karrie drawing sits where the line drawing would, without the photo frame. */
+.item-drawing { display: grid; place-items: center; aspect-ratio: 1; }
+.item-drawing img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 
 /* Camera (the former barcode scanner screen) */
 

@@ -1,6 +1,6 @@
 import type { CategoryId } from "../domain/types";
 
-export type AddMethod = "catalog" | "manual" | "paste" | "photo" | "barcode" | "saved";
+export type AddMethod = "catalog" | "manual" | "paste" | "photo" | "barcode" | "saved" | "custom";
 export type RecognitionSource = "openai" | "open_food_facts" | "web_search" | "cache" | "my_products";
 
 /** Only fixed names, fixed values and counts: never product names, EANs, list names or photos. */

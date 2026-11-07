@@ -20,7 +20,10 @@ export type ImageKind = "generic" | "photo";
 export type ImageChoice = "reference" | "photo" | "drawing";
 
 /** How the product itself was identified. "off": Open Food Facts by barcode; "barcode": a web page that prints the barcode. */
-export type ItemSource = "catalog" | "manual" | "off" | "barcode" | "vision";
+export type ItemSource = "catalog" | "manual" | "off" | "barcode" | "vision" | "user_created";
+
+/** Background tidying of a product the parent typed in; "failed" stops after a few tries and keeps the item as typed. */
+export type Enrichment = { status: "pending" | "done" | "failed"; tries: number; at?: number };
 
 /** Where one field came from: the parent, Open Food Facts, a web page, read on the photo, or guessed from it. */
 export type FieldSource = "parent" | "off" | "web" | "photo" | "guess";
@@ -104,6 +107,16 @@ export type PackInfo = {
   alternative?: AlternativeAssessment;
   /** The parent's choice for the bonus mission; undefined means the evidence-based default. */
   missionEnabled?: boolean;
+  /** A generic product the parent added because the catalog did not have it. */
+  kind?: "custom_generic";
+  canonicalName?: string;
+  aliases?: string[];
+  subcategory?: string;
+  createdAt?: number;
+  enrichment?: Enrichment;
+  /** Key of a generated Karrie-style drawing in the photos store; never a parent photo. */
+  illustrationId?: string;
+  illustration?: "pending" | "ready" | "none";
 };
 
 /** Per-adventure state of a bonus mission: offered at start, active once the child goes looking. */

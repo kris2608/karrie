@@ -35,6 +35,14 @@ const PACK_KEYS = [
   "recognition",
   "alternative",
   "missionEnabled",
+  "kind",
+  "canonicalName",
+  "aliases",
+  "subcategory",
+  "createdAt",
+  "enrichment",
+  "illustrationId",
+  "illustration",
 ] as const;
 const IMAGE_KEYS = ["imageUrl", "photoId", "imageKind", "imageSource", "imageChoice"] as const;
 

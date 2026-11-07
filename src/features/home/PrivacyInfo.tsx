@@ -15,7 +15,8 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
         <p>
           Tik je op de ontspanknop, dan gaat die foto via de server van Karrie naar OpenAI om het product te herkennen. Het live camerabeeld en het
           lezen van streepjescodes blijven op je toestel. Voor streepjescodes, voorbeeldfoto's en aanbiedingen stuurt Karrie productgegevens (naam,
-          merk of streepjescode) naar externe diensten, zoals Open Food Facts en PrijsProfeet.
+          merk of streepjescode) naar externe diensten, zoals Open Food Facts en PrijsProfeet. Voeg je zelf een product toe, dan gaat alleen die
+          productnaam naar de server en OpenAI.
         </p>
       </section>
       <section>

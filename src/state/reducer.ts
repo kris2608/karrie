@@ -1,5 +1,5 @@
 import { DEFAULT_CATEGORY_ORDER } from "../domain/categories";
-import { matchProduct } from "../domain/matchProduct";
+import { matchProduct, normalize } from "../domain/matchProduct";
 import { parseList } from "../domain/parseList";
 import {
   activeItem,
@@ -14,7 +14,9 @@ import {
 import { declineKey, pickMissions } from "../domain/discovery";
 import { SCORING } from "../domain/scoring";
 import { nextSticker } from "../domain/stickers";
-import { mineKey, remember as rememberMine } from "../domain/mine";
+import { MINE_LIMIT, mineKey, remember as rememberMine } from "../domain/mine";
+import { categoryIcon } from "../domain/categoryIcon";
+import { customName, customProductId, singularKey, suggestion } from "../domain/customProduct";
 import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
 import { isRetailer, type RetailerId } from "../domain/retailers";
 import { productById, products } from "../data/catalog";
@@ -39,6 +41,21 @@ export type Settings = {
   /** The supermarket picked last; new lists start with it. */
   retailer?: RetailerId;
 };
+
+/** What the server made of a typed-in product; never a brand, barcode or nutrition. */
+export type CustomEnrichment = {
+  displayName: string;
+  canonicalName: string;
+  singularName?: string;
+  pluralName?: string;
+  childFriendlyLabel?: string;
+  category: CategoryId;
+  subcategory?: string;
+  /** A catalog drawing that fits well enough until (or instead of) a generated one. */
+  drawing?: string;
+};
+
+export const ENRICH_TRIES = 3;
 
 export const defaultSettings: Settings = { soundEnabled: false, smartDiscovery: true, referenceImages: true };
 
@@ -107,6 +124,11 @@ export type Action =
   | { type: "set-photo"; itemId: string; photoId: string }
   | { type: "apply-recognition"; itemId: string; photoId?: string; pack: VisionPack }
   | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }
+  /** A generic product the catalog does not have; `itemId` lets the screen undo exactly this line. */
+  | { type: "add-custom"; name: string; itemId: string }
+  /** The background tidy-up of a typed-in product; null counts as a failed try. */
+  | { type: "enrich-custom"; productId: string; result: CustomEnrichment | null; final?: boolean; illustrations?: boolean }
+  | { type: "set-illustration"; productId: string; illustrationId: string | null }
   | { type: "insert-item"; item: AdventureItem; index: number }
   | { type: "start-shopping" }
   | { type: "found" }
@@ -207,6 +229,64 @@ function mergeLines(items: AdventureItem[], lines: { product: Product; quantity:
     }
   }
   return next;
+}
+
+function customEntry(name: string): SavedItem {
+  return {
+    productId: customProductId(name),
+    name,
+    canonicalName: normalize(name),
+    icon: categoryIcon("pantry"),
+    category: "pantry",
+    quantity: 1,
+    kind: "custom_generic",
+    source: "user_created",
+    imageKind: "generic",
+    createdAt: Date.now(),
+    enrichment: { status: "pending", tries: 0 },
+  };
+}
+
+/** Applies one change to every copy of a typed-in product: the list, Mijn producten and saved lists. */
+function updateCustom(state: AppState, productId: string, change: <T extends SavedItem | AdventureItem>(item: T) => T): AppState {
+  const own = <T extends SavedItem | AdventureItem>(item: T) => item.kind === "custom_generic" && item.productId === productId;
+  const apply = <T extends SavedItem | AdventureItem>(items: T[]) => {
+    const next = items.map((item) => (own(item) ? change(item) : item));
+    return next.some((item, index) => item !== items[index]) ? next : items;
+  };
+  const items = state.adventure ? apply(state.adventure.items) : undefined;
+  const saved = state.saved.map((list) => {
+    const next = apply(list.items);
+    return next === list.items ? list : { ...list, items: next };
+  });
+  const mine = apply(state.mine);
+  const savedChanged = saved.some((list, index) => list !== state.saved[index]);
+  const listChanged = Boolean(state.adventure && items && items !== state.adventure.items);
+  if (mine === state.mine && !savedChanged && !listChanged) return state;
+  return {
+    ...state,
+    mine,
+    saved: savedChanged ? saved : state.saved,
+    adventure: state.adventure && listChanged ? touch(state.adventure, { items: items! }) : state.adventure,
+  };
+}
+
+function enriched<T extends SavedItem | AdventureItem>(item: T, result: CustomEnrichment): T {
+  const enrichment = { status: "done" as const, tries: (item.enrichment?.tries ?? 0) + 1, at: Date.now() };
+  const name = singularKey(result.displayName) === singularKey(item.name) ? result.displayName.trim().slice(0, 40) : item.name;
+  const aliases = [...new Set([result.singularName, result.pluralName, result.childFriendlyLabel, result.displayName].map((alias) => alias?.trim() ?? ""))]
+    .filter((alias) => alias && normalize(alias) !== normalize(name));
+  const icon = result.drawing && productById(result.drawing) ? result.drawing : categoryIcon(result.category);
+  return {
+    ...item,
+    name,
+    canonicalName: result.canonicalName,
+    category: result.category,
+    icon,
+    ...(result.subcategory && { subcategory: result.subcategory }),
+    ...(aliases.length && { aliases }),
+    enrichment,
+  };
 }
 
 function updateItem(state: AppState, itemId: string, change: (item: AdventureItem) => AdventureItem): AppState {
@@ -443,13 +523,53 @@ export function reducer(state: AppState, action: Action): AppState {
       return updated ? { ...next, mine: rememberMine(next.mine, updated) } : next;
     }
     case "edit-item":
-      return updateItem(state, action.itemId, (item) => ({
-        ...item,
-        name: action.name?.trim().slice(0, 40) || item.name,
-        category: action.category ?? item.category,
-        icon: action.icon ?? item.icon,
-        productId: action.productId ?? item.productId,
-      }));
+      return updateItem(state, action.itemId, (item) => {
+        const custom = item.kind === "custom_generic";
+        const edited: AdventureItem = {
+          ...item,
+          name: action.name?.trim().slice(0, 40) || item.name,
+          category: action.category ?? item.category,
+          icon: action.icon ?? item.icon,
+          productId: custom ? item.productId : (action.productId ?? item.productId),
+          ...(item.enrichment?.status === "pending" && (action.category || action.icon) && { enrichment: { ...item.enrichment, status: "done" as const } }),
+        };
+        if (!custom || !action.icon || !edited.illustrationId) return edited;
+        const { illustrationId: _drawing, ...rest } = edited;
+        return { ...rest, illustration: "none" };
+      });
+    case "add-custom": {
+      const name = customName(action.name);
+      if (!name) return state;
+      const known = suggestion(name, state.mine);
+      if (known?.kind === "catalog" && !known.close) return reducer(state, { type: "add-product", product: known.product });
+      if (known?.kind === "mine" && known.entry.kind !== "custom_generic") return reducer(state, { type: "add-mine", key: mineKey(known.entry) });
+      const adventure = ensureDraft(state);
+      const productId = customProductId(name);
+      const existing = adventure.items.find((item) => item.status !== "found" && item.productId === productId);
+      if (existing) {
+        const items = adventure.items.map((item) => (item === existing ? { ...item, quantity: Math.min(24, item.quantity + 1) } : item));
+        return { ...state, adventure: touch(adventure, { items }) };
+      }
+      const entry = state.mine.find((saved) => saved.kind === "custom_generic" && saved.productId === productId) ?? customEntry(name);
+      const item: AdventureItem = { ...itemFromSaved(entry), id: action.itemId };
+      const mine = [entry, ...state.mine.filter((saved) => saved !== entry)].slice(0, MINE_LIMIT);
+      return { ...state, mine, adventure: touch(adventure, { items: [...adventure.items, item] }) };
+    }
+    case "enrich-custom":
+      return updateCustom(state, action.productId, (item) => {
+        if (item.enrichment?.status !== "pending") return item;
+        if (action.result) {
+          const next = enriched(item, action.result);
+          return action.illustrations && !next.illustrationId ? { ...next, illustration: "pending" } : next;
+        }
+        const tries = item.enrichment.tries + 1;
+        return { ...item, enrichment: { status: action.final || tries >= ENRICH_TRIES ? "failed" : "pending", tries, at: Date.now() } };
+      });
+    case "set-illustration":
+      return updateCustom(state, action.productId, (item) => {
+        if (item.illustration === "none") return item;
+        return action.illustrationId ? { ...item, illustrationId: action.illustrationId, illustration: "ready" } : { ...item, illustration: item.illustrationId ? "ready" : "none" };
+      });
     case "insert-item": {
       if (!state.adventure || state.adventure.items.some((item) => item.id === action.item.id)) return state;
       const items = [...state.adventure.items];

@@ -1,8 +1,12 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 import type { BarcodeLookup, LookupResult } from "./barcode.js";
+import { APPROVAL, CREATED_FROM, type Candidate, type CandidateStore } from "./candidates.js";
 import { canonicalEan } from "./ean.js";
+import type { Illustrator } from "./illustration.js";
+import type { NormalizeResult } from "./normalize.js";
+import { customName } from "./productName.js";
 import { ImageIdentitySchema, type ImageDiscovery } from "./images.js";
 import type { Limits } from "./limits.js";
 import type { OfferLookup } from "./offers/index.js";
@@ -32,6 +36,22 @@ export type OfferDeps = {
   limits: Limits;
 };
 
+export type IllustrationDeps = {
+  illustrator: Pick<Illustrator, "draw" | "cached" | "stats" | "imageUsd" | "model">;
+  /** Per-IP limits and the daily budget for generated pictures, separate from recognition. */
+  limits: Limits;
+};
+
+export type ProductDeps = {
+  normalize: (name: string) => Promise<NormalizeResult>;
+  candidates: CandidateStore;
+  limits: Limits;
+  /** Only present when ILLUSTRATIONS_ENABLED is on; the route answers 404 otherwise. */
+  illustrations?: IllustrationDeps;
+  /** Bearer token for the review routes; without one they do not exist. */
+  adminToken?: string;
+};
+
 export type AppDeps = {
   allowedOrigins: string[];
   requireOrigin: boolean;
@@ -42,11 +62,31 @@ export type AppDeps = {
   images?: ImageDeps;
   barcode?: BarcodeDeps;
   offers?: OfferDeps;
+  products?: ProductDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
 };
 
-const ROUTES = ["/api/products/recognize-photo", "/api/images/discover", "/api/products/barcode", "/api/offers/match"];
+const ROUTES = [
+  "/api/products/recognize-photo",
+  "/api/images/discover",
+  "/api/products/barcode",
+  "/api/offers/match",
+  "/api/products/normalize",
+  "/api/products/illustration",
+];
+const ADMIN = "/api/admin/candidates";
+
+/** What the app gets back for a typed-in product; the same for a fresh answer and a known candidate. */
+function productOf(candidate: Candidate) {
+  const { canonicalName, displayName, singularName, pluralName, childFriendlyLabel, category, subcategory, closestDrawing } = candidate;
+  return { canonicalName, displayName, singularName, pluralName, childFriendlyLabel, category, subcategory, closestDrawing };
+}
+
+function sameToken(given: string, expected: string): boolean {
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(given), digest(expected));
+}
 
 const STATUS_BY_CODE: Record<string, number> = {
   refused: 422,
@@ -61,6 +101,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   "daily-limit": 429,
   budget: 429,
   "in-flight": 429,
+  "not-a-product": 422,
 };
 
 class BodyTooLarge extends Error {}
@@ -104,6 +145,8 @@ export function createHandler(deps: AppDeps) {
   const barcodeFailures: Record<string, number> = {};
   const barcodeOutcomes: Record<string, number> = {};
   const offerOutcomes: Record<string, number> = {};
+  const productOutcomes: Record<string, number> = {};
+  const illustrationOutcomes: Record<string, number> = {};
   const count = (into: Record<string, number>, key: string) => (into[key] = (into[key] ?? 0) + 1);
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
@@ -149,9 +192,27 @@ export function createHandler(deps: AppDeps) {
         offers: deps.offers
           ? { stats: deps.offers.limits.stats(), cache: deps.offers.lookup.stats(), provider: deps.offers.provider?.stats(), outcomes: offerOutcomes }
           : undefined,
+        products: deps.products
+          ? {
+              stats: deps.products.limits.stats(),
+              candidates: deps.products.candidates.stats(),
+              outcomes: productOutcomes,
+              illustrations: deps.products.illustrations
+                ? {
+                    enabled: true,
+                    model: deps.products.illustrations.illustrator.model,
+                    stats: deps.products.illustrations.limits.stats(),
+                    cache: deps.products.illustrations.illustrator.stats(),
+                    outcomes: illustrationOutcomes,
+                  }
+                : { enabled: false },
+            }
+          : undefined,
       });
     }
 
+    if (url.pathname === ADMIN || url.pathname.startsWith(`${ADMIN}/`)) return admin();
+    if (url.pathname === "/api/products/illustration" && !deps.products?.illustrations) return send(404, { status: "error", code: "not-found" });
     if (!ROUTES.includes(url.pathname)) return send(404, { status: "error", code: "not-found" });
     if (req.method !== "POST") return send(405, { status: "error", code: "method" });
     if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
@@ -175,6 +236,8 @@ export function createHandler(deps: AppDeps) {
     if (url.pathname === "/api/images/discover") return discoverImages(body);
     if (url.pathname === "/api/products/barcode") return lookupBarcode(body);
     if (url.pathname === "/api/offers/match") return matchOffer(body);
+    if (url.pathname === "/api/products/normalize") return normalizeTyped(body);
+    if (url.pathname === "/api/products/illustration") return illustrate(body);
 
     const image = checkImage(body);
     if (!image.ok) return send(image.status, { status: "error", code: image.code });
@@ -286,8 +349,107 @@ export function createHandler(deps: AppDeps) {
       entry.found = result.match.matchType;
       return send(200, { status: "ok", match: result.match, fetchedAt: new Date(now()).toISOString() });
     }
+
+    /** One product name the parent typed, nothing else from the list. A known candidate answers without OpenAI. */
+    async function normalizeTyped(body: unknown) {
+      const products = deps.products;
+      if (!products) return send(503, { status: "error", code: "misconfigured" });
+      const request = NormalizeRequestSchema.safeParse(body);
+      if (!request.success) return send(400, { status: "error", code: "bad-request" });
+      const name = customName(request.data.name);
+      if (!name) {
+        count(productOutcomes, "refused-input");
+        return send(422, { status: "error", code: "not-a-product" });
+      }
+      const ip = clientIp(req);
+      const illustrations = Boolean(products.illustrations);
+      const known = products.candidates.find(name);
+      if (known) {
+        entry.cached = true;
+        if (known.approvalStatus === "rejected") {
+          count(productOutcomes, "known-rejected");
+          return send(422, { status: "error", code: "not-a-product" });
+        }
+        products.candidates.seen(known, ip);
+        count(productOutcomes, "known");
+        return send(200, { status: "ok", product: productOf(known), illustrations });
+      }
+      if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
+      const denial = products.limits.admit(ip);
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+
+      const callStarted = now();
+      const result = await products.normalize(name);
+      const latencyMs = now() - callStarted;
+      products.limits.record({ ok: result.ok, latencyMs, usage: result.usage });
+      Object.assign(entry, { model: deps.model, openaiMs: latencyMs, usage: result.usage, code: result.ok ? undefined : result.code });
+      count(productOutcomes, result.ok ? "normalized" : `error-${result.code}`);
+      if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
+      const candidate = products.candidates.record(result.product, name, request.data.createdFrom ?? "search", ip);
+      return send(200, { status: "ok", product: candidate ? productOf(candidate) : result.product, illustrations: illustrations && Boolean(candidate) });
+    }
+
+    /** Draws only a known candidate, never a free prompt; one picture per candidate, shared by every device. */
+    async function illustrate(body: unknown) {
+      const products = deps.products!;
+      const drawing = products.illustrations!;
+      if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
+      const request = IllustrationRequestSchema.safeParse(body);
+      if (!request.success) return send(400, { status: "error", code: "bad-request" });
+      const name = customName(request.data.name);
+      const candidate = name ? products.candidates.find(name) : null;
+      if (!candidate || candidate.approvalStatus === "rejected") return send(404, { status: "error", code: "unknown" });
+      const hit = drawing.illustrator.cached(candidate);
+      if (hit) {
+        entry.cached = true;
+        count(illustrationOutcomes, "cached");
+        return send(200, { status: "ok", image: hit });
+      }
+      const denial = drawing.limits.admit(clientIp(req));
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const callStarted = now();
+      const result = await drawing.illustrator.draw(candidate);
+      const fresh = result.ok && !result.cached;
+      drawing.limits.record({ ok: result.ok, latencyMs: now() - callStarted, extraUsd: fresh ? drawing.illustrator.imageUsd : 0 });
+      Object.assign(entry, { imageMs: now() - callStarted, code: result.ok ? undefined : result.code });
+      count(illustrationOutcomes, result.ok ? (result.cached ? "cached" : "generated") : `error-${result.code}`);
+      if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
+      products.candidates.setIllustration(candidate.candidateId, `memory:${candidate.candidateId}`);
+      return send(200, { status: "ok", image: result.image });
+    }
+
+    /** Manual review: list candidates and approve or reject them. Without a configured token these routes do not exist. */
+    async function admin() {
+      const token = deps.products?.adminToken;
+      const given = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      if (!token || !given || !sameToken(given, token)) return send(404, { status: "error", code: "not-found" });
+      const candidates = deps.products!.candidates;
+      if (url.pathname === ADMIN && req.method === "GET") {
+        const status = url.searchParams.get("status");
+        if (status && !APPROVAL.includes(status as never)) return send(400, { status: "error", code: "bad-request" });
+        return send(200, { status: "ok", candidates: candidates.list((status as Candidate["approvalStatus"]) || undefined) });
+      }
+      const id = url.pathname.slice(ADMIN.length + 1);
+      if (!id || id.includes("/") || req.method !== "POST") return send(405, { status: "error", code: "method" });
+      let review: z.infer<typeof ReviewSchema>;
+      try {
+        const parsed = ReviewSchema.safeParse(JSON.parse(await readBody(req)));
+        if (!parsed.success) return send(400, { status: "error", code: "bad-request" });
+        review = parsed.data;
+      } catch {
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      const updated = candidates.review(id, review.approvalStatus);
+      return updated ? send(200, { status: "ok", candidate: updated }) : send(404, { status: "error", code: "unknown" });
+    }
   };
 }
+
+const NormalizeRequestSchema = z.object({ name: z.string().max(40), createdFrom: z.enum(CREATED_FROM).optional() }).strict();
+
+const IllustrationRequestSchema = z.object({ name: z.string().max(40) }).strict();
+
+const ReviewSchema = z.object({ approvalStatus: z.enum(APPROVAL) }).strict();
 
 const OfferText = z.string().trim().min(1).max(120);
 

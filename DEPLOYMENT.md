@@ -308,6 +308,46 @@ Een eerdere ronde liet zien waarom de controle op "het hele product" nodig is: z
 
 Een product dat van een foto is herkend en een merk heeft, of dat niet in de catalogus staat, onthoudt Karrie op dit toestel als **Mijn producten**: naam, merk, afdeling, foto en eventuele bonusmissie. In **Toevoegen** staat het met een hartje vooraan in zijn eigen afdeling en in de zoekresultaten. Tikken zet het op de lijst (of telt er één bij). Lang drukken haalt het van de lijst en vergeet het, met **Ongedaan maken**. Een herkende AH Terra pindakaas telt op zijn eigen tegel, niet ook op de tegel Pindakaas. Karrie onthoudt hoogstens 120 producten.
 
+## Zelf een product toevoegen
+
+Staat een gewoon product niet in de catalogus (walnoten, komijn, rozijnen), dan toont **Toevoegen** bij het zoeken een tegel **Voeg "walnoten" toe**. Tikken zet het meteen op de lijst met de melding **Walnoten toegevoegd!** (met **Ongedaan maken**). De ouder hoeft niets in te vullen; de rest gebeurt op de achtergrond.
+
+**Eerst zoeken.** Voor er iets nieuws komt, kijkt Karrie: dezelfde naam in de catalogus, enkelvoud of meervoud ("preien" is Prei), een tikfout ("courget" toont Courgette vooraan, met de tegel om toe te voegen erachter), en een product dat dit toestel al eerder toevoegde ("walnoot" vindt Walnoten). Daarna vraagt de server of iemand anders het al toevoegde.
+
+**Geen vervuiling.** Karrie weigert lege invoer, cijfers, zinnen en lijstjes ("dingen voor ontbijt", "brood met kaas", meer dan drie woorden). Enkelvoud en meervoud worden één product (`custom:walnoot`). Het product blijft algemeen: geen merk, geen streepjescode, geen voedingswaarden.
+
+**Op dit toestel.** Het product staat als **Mijn product** (met hartje) in IndexedDB: `productId`, `canonicalName`, naam, afdeling, `kind: custom_generic`, `source: user_created`, `createdAt`, en zodra die er is een tekening (in de fotoopslag op het toestel). Het werkt in **Controleren** (naam, afdeling en tekening aanpassen; dat wint altijd van de achtergrond) en in de winkel zoals elk ander product.
+
+**Op de achtergrond** (`POST /api/products/normalize`). De app stuurt alleen de getypte naam, nooit de rest van de lijst. De server vraagt OpenAI (Responses API, `store: false`, strikt JSON-schema) om `canonicalName`, `displayName`, `singularName`, `pluralName`, `childFriendlyLabel`, `category`, `subcategory`, `isGeneric`, `closestDrawing` (de tekening uit de catalogus die er het meest op lijkt) en `confidence`. Daarna controleert de server zelf: het moet één algemeen product zijn, zeker genoeg, en hetzelfde woord als getypt (enkelvoud, meervoud of een kleine spelfout). Anders blijft het product gewoon zoals de ouder het typte. Mislukt het, dan probeert de app het hoogstens 3 keer (bij het toevoegen en bij het starten van de app). De afdeling begint als **Houdbaar** met het doosje en verandert als het antwoord binnen is. Noten, specerijen en gedroogd fruit vallen onder Houdbaar met `subcategory` (bijvoorbeeld "noten").
+
+**Kandidaten voor de gedeelde catalogus.** Elk goedgekeurd antwoord wordt een kandidaat op de server: `candidateId`, `canonicalName`, `displayName`, `searchKeys`, afdeling, tekening, `firstSeenAt`, `lastSeenAt`, `usageCount`, `createdFrom` (search, photo of import) en `approvalStatus`. Hetzelfde product in dezelfde afdeling is één kandidaat; `usageCount` telt hoogstens één keer per toestel per dag (een gehashte IP met een sleutel die bij elke herstart nieuw is; IP-adressen worden niet bewaard). Een tweede gezin dat walnoten typt, krijgt het antwoord van de kandidaat, zonder OpenAI. Een kandidaat staat altijd op `pending` en komt **nooit vanzelf** in de catalogus van de app: dat doet een mens.
+
+- **Bewaren.** Zonder `CANDIDATES_FILE` staan kandidaten alleen in het geheugen en zijn ze weg na een herstart of slaapstand. Met `CANDIDATES_FILE=/var/data/candidates.json` schrijft de server ze naar dat bestand (atomair: eerst een tijdelijk bestand, dan hernoemen). Op het gratis Render-plan is er geen blijvende schijf; daarvoor is een betaalde instance nodig (Starter, $7 per maand) plus een Persistent Disk ($0,25 per GB per maand). Dat is **niet ingesteld**.
+- **Beoordelen.** Zet `CANDIDATES_ADMIN_TOKEN` (geheim, lang en willekeurig) op `karrie-api`. Dan werken `GET /api/admin/candidates?status=pending` en `POST /api/admin/candidates/<candidateId>` met `{"approvalStatus":"approved"}` of `"rejected"`, met de kop `Authorization: Bearer <token>`. Zonder token of met een fout token antwoorden ze `404`. Een afgewezen kandidaat wordt voor iedereen weer "niet herkend"; het product blijft dan zoals getypt.
+- **Exporteren.** `npm run candidates:export -- --status=pending --format=csv` in `server/` leest `CANDIDATES_FILE`, of met `KARRIE_API_URL` en `CANDIDATES_ADMIN_TOKEN` de draaiende server. Goedgekeurde kandidaten neem je met de hand over in `src/data/catalog.ts` (met een tekening) of `server/src/schema.ts`.
+- `/api/health` toont onder `products` de aantallen kandidaten per status, of ze in een bestand staan, en de uitkomsten (`normalized`, `known`, `refused-input`, fouten).
+
+**Tekening (uit, kost geld per tekening).** Een nieuw product krijgt de catalogustekening die er het meest op lijkt (anders het doosje van de afdeling). Met `ILLUSTRATIONS_ENABLED=true` maakt de server ook een eigen tekening in Karrie-stijl (`POST /api/products/illustration`): `gpt-image-1`, 1024×1024, kwaliteit `low`, transparante achtergrond, WebP, met een vaste stijlopdracht (platte tekening, dikke ronde lijnen, geen tekst, merk, mensen of foto-realisme). Alleen voor een bekende kandidaat, nooit met vrije tekst; één tekening per kandidaat, daarna uit het geheugen van de server voor iedereen gratis. De app verkleint hem tot 256×256 en bewaart hem op het toestel. Tot hij er is, staat de catalogustekening er; een foto van de ouder wint altijd. Zonder de vlag antwoordt de route `404` en vraagt de app niets.
+
+- **Kosten.** Volgens de prijslijst van OpenAI kost `gpt-image-1` op `low` bij 1024×1024 ongeveer **$0,011 per tekening** (`medium` $0,042, `high` $0,167; niet gebruikt). Er is geen gratis tegoed. 100 nieuwe producten kosten dus ongeveer $1,10. Tekeningen hebben een eigen dagbudget: `ILLUSTRATION_DAILY_BUDGET_USD` (standaard $1, ongeveer 90 tekeningen per dag), per IP 5 per uur en 10 per dag (`ILLUSTRATION_LIMIT_PER_IP_HOUR`, `ILLUSTRATION_LIMIT_PER_IP_DAY`), 100 per dag in totaal (`ILLUSTRATION_LIMIT_DAILY_REQUESTS`) en in de app 8 per toestel per dag. `PRICE_ILLUSTRATION` (standaard 0,011) is wat de server per tekening telt; `ILLUSTRATION_MODEL` kiest een ander model (bijvoorbeeld `gpt-image-1-mini`, goedkoper; zet dan ook `PRICE_ILLUSTRATION`). Voor `gpt-image-1` moet de OpenAI-organisatie geverifieerd zijn (platform.openai.com → Settings → Organization → Verify).
+- **Aanzetten.** Zet op `karrie-api` `ILLUSTRATIONS_ENABLED=true` en controleer een maandlimiet bij OpenAI. Het geheugen met tekeningen is weg na een herstart; de tekeningen op de toestellen blijven.
+
+**Instellingen.**
+
+| Variabele | Standaard | Wat |
+| --- | --- | --- |
+| `OPENAI_PRODUCT_MODEL` | het herkenningsmodel | Model voor het ordenen van een getypt product |
+| `PRODUCTS_LIMIT_PER_IP_HOUR`, `PRODUCTS_LIMIT_PER_IP_DAY` | 30, 100 | Nieuwe producten per IP (bekende kandidaten tellen niet) |
+| `PRODUCTS_LIMIT_DAILY_REQUESTS`, `PRODUCTS_DAILY_BUDGET_USD` | 1000, 0,5 | Hele server per dag |
+| `CANDIDATES_FILE` | leeg (geheugen) | JSON-bestand voor kandidaten |
+| `CANDIDATES_MAX` | 5000 | Daarboven komen er geen nieuwe kandidaten bij |
+| `CANDIDATES_ADMIN_TOKEN` | leeg (routes bestaan niet) | Token voor beoordelen en exporteren |
+| `ILLUSTRATIONS_ENABLED` | uit | `true` zet eigen tekeningen aan (kost geld) |
+| `ILLUSTRATION_MODEL`, `PRICE_ILLUSTRATION` | `gpt-image-1`, 0,011 | Model en prijs per tekening |
+| `ILLUSTRATION_DAILY_BUDGET_USD` | 1 | Dagbudget voor tekeningen |
+
+**Privacy.** Naar de server gaat alleen de getypte productnaam en waar hij vandaan komt (`search`). Geen lijst, geen lijstnaam, geen foto, geen gegevens over het kind. De server logt de naam niet, alleen de uitkomst. Kandidaten bevatten geen IP-adressen of toestel-id's.
+
 ## Thuis verzamelen (Lijstjesavontuur)
 
 In **Toevoegen** staat boven de tegels **Help jij Karrie boodschappen verzamelen?** met **Ga op ontdekking!**. Dat opent dezelfde camera als de cameraknop, maar met een eenvoudig resultaat voor het kind. De cameraknop naast het zoekveld blijft het gewone ouderscherm.
@@ -369,7 +409,7 @@ Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.i
 | Gebeurtenis | Wanneer | Gegevens |
 | --- | --- | --- |
 | `shopping_list_created` | eerste product op een nieuw lijstje (een geplakte lijst telt als één) | geen |
-| `product_added` | een nieuwe regel op het lijstje; nog een tik op hetzelfde product of **+** telt niet | `method`: catalog, paste, saved (Mijn producten), photo, barcode, manual; `category`: afdeling |
+| `product_added` | een nieuwe regel op het lijstje; nog een tik op hetzelfde product of **+** telt niet | `method`: catalog, paste, saved (Mijn producten), photo, barcode, manual, custom (zelf toegevoegd, zonder de naam); `category`: afdeling |
 | `product_recognized` | een herkend product: streepjescode bekend, of foto herkend | `method`: barcode of photo; `source`: open_food_facts, web_search, cache, my_products, openai |
 | `adventure_started` | **Start** van een lijstje dat nog niet liep | `item_count` |
 | `adventure_completed` | het laatste product gevonden | `item_count`, `completed_missions` |
@@ -399,6 +439,8 @@ Reken op ongeveer $0,004 per foto: 100 foto's per maand kosten zo'n $0,40. Het d
 **Voorbeeldfoto's** kosten per nieuw product ongeveer $0,017: $0,01 voor de webzoekaanroep plus zo'n 9.000 invoertokens (zoekresultaten en kleine versies van de foto's). Een merkproduct kost met productinformatie ongeveer $0,021; met Brave in plaats van OpenAI-webzoeken naar verwachting ongeveer $0,016 ($0,005 voor Brave, zonder de webzoekaanroep van $0,01; nog niet gemeten). Een product dat al bekend is, kost niets. Een gezin dat 50 verschillende producten gebruikt, kost dus eenmalig ongeveer $0,85. Een open-licentiefoto die de server al kent, is voor andere gezinnen gratis. Voorbeeldfoto's hebben een eigen dagbudget (`IMAGE_DAILY_BUDGET_USD`, standaard $1, ongeveer 60 nieuwe producten per dag). `/api/health` toont onder `images` het aantal zoekopdrachten en de kosten van vandaag.
 
 **Streepjescodes**: Open Food Facts kost niets. Alleen een code die Open Food Facts niet kent, kost geld: één OpenAI-webzoekaanroep ($0,01) plus de tokens van de zoekresultaten, gemeten op Render $0,014 per onbekende code (ongeveer 8.500 invoertokens, de helft uit de cache, en 5 seconden). Een onbekende code wordt hoogstens één keer per 7 dagen gezocht, zolang de server wakker blijft. Met het dagbudget van $0,50 zijn dat ongeveer 35 onbekende codes per dag. Een bekende code bij Open Food Facts duurde op Render 0,4 tot 0,6 seconde; uit het geheugen van de server 0,2 seconde. Een code uit **Mijn producten** of uit het geheugen van het toestel gaat niet eens naar de server.
+
+**Zelf toegevoegde producten**: het ordenen kost naar schatting $0,001 tot $0,002 per nieuw product (ongeveer 500 invoertokens en 100 tot 300 uitvoertokens; nog niet gemeten). Een product dat al als kandidaat bekend is, kost niets. Een eigen tekening kost ongeveer $0,011 extra, alleen met `ILLUSTRATIONS_ENABLED=true` (zie **Zelf een product toevoegen**).
 
 ## Limieten en misbruik
 

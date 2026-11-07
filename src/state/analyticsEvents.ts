@@ -20,6 +20,8 @@ function addMethod(action: Action): AddMethod | null {
       return "saved";
     case "add-recognized":
       return action.via ?? "manual";
+    case "add-custom":
+      return "custom";
     default:
       return null;
   }

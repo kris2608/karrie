@@ -50,7 +50,10 @@ export function usePhotoUrl(id: string | undefined): string | null {
 
 export function referencedPhotos(adventure: Adventure | null, saved: SavedList[]): Set<string> {
   const ids = new Set<string>();
-  const add = (item: PackInfo) => item.photoId && ids.add(item.photoId);
+  const add = (item: PackInfo) => {
+    if (item.photoId) ids.add(item.photoId);
+    if (item.illustrationId) ids.add(item.illustrationId);
+  };
   if (adventure) {
     adventure.items.forEach(add);
     for (const entry of adventure.history) entry.items.forEach(add);

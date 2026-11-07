@@ -8,6 +8,7 @@ import { references } from "../storage/references";
 import { wantedReferences } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
 import { analyticsEvents } from "./analyticsEvents";
+import { useCustomEnrichment } from "./customEnrichment";
 import { initialState, reducer, type Action, type AppState } from "./reducer";
 
 type AdventureContextValue = AppState & {
@@ -45,7 +46,7 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     void offers.hydrate();
     Promise.all([loadPersisted(), references.hydrate()])
       .then(async ([data]) => {
-        const minePhotos = data.mine.flatMap((entry) => (entry.photoId ? [entry.photoId] : []));
+        const minePhotos = data.mine.flatMap((entry) => [entry.photoId, entry.illustrationId].filter((id): id is string => Boolean(id)));
         const photos = preparePhotos(data.adventure, data.saved, [...references.photoIds(), ...minePhotos]).catch(() => undefined);
         await Promise.race([photos, new Promise((resolve) => window.setTimeout(resolve, 1500))]);
         if (!cancel) rawDispatch({ type: "hydrate", data });
@@ -78,6 +79,8 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     offers.sync(draftItems ? offerQueries(draftItems, retailer) : []);
   }, [draftItems, retailer]);
+
+  useCustomEnrichment(state, dispatch, ready);
 
   const value = useMemo(() => ({ ...state, dispatch }), [state, dispatch]);
   if (!ready) {

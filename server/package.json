@@ -10,7 +10,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "tsc -p tsconfig.json && node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "candidates:export": "node scripts/export-candidates.mjs"
   },
   "dependencies": {
     "openai": "^7.53.0",

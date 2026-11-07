@@ -1,18 +1,23 @@
 import { productById } from "../data/catalog";
+import { singularKey } from "./customProduct";
 import { normalize } from "./matchProduct";
 import type { AdventureItem, SavedItem } from "./types";
 
-/** "Mijn producten": products recognised from a photo, remembered on this device for later lists. */
+/** "Mijn producten": products recognised from a photo or typed in by the parent, remembered on this device for later lists. */
 export const MINE_LIMIT = 120;
 
-/** One entry per name and brand, so a new photo of the same pack replaces the old one. */
-export function mineKey(item: { name: string; brand?: string }): string {
+/**
+ * One entry per name and brand, so a new photo of the same pack replaces the old one.
+ * A typed-in product keeps its id ("custom:walnoot"), which already joins singular and plural.
+ */
+export function mineKey(item: { name: string; brand?: string; kind?: string; productId?: string }): string {
+  if (item.kind === "custom_generic" && item.productId) return `mine:${item.productId}`;
   return `mine:${normalize(item.name)}|${normalize(item.brand ?? "")}`;
 }
 
-/** Worth remembering: a scanned barcode, a branded pack, or anything the catalog does not already have a tile for. */
+/** Worth remembering: a scanned barcode, a branded pack, a typed-in product, or anything the catalog does not already have a tile for. */
 export function worthRemembering(item: AdventureItem): boolean {
-  if (item.ean) return true;
+  if (item.ean || item.kind === "custom_generic") return true;
   const identified = item.source === "vision" || item.source === "off" || item.source === "barcode";
   return identified && (Boolean(item.brand) || !productById(item.productId));
 }
@@ -29,5 +34,7 @@ export function remember(mine: SavedItem[], item: AdventureItem): SavedItem[] {
 }
 
 export function matchesMine(entry: SavedItem, needle: string): boolean {
-  return !needle || normalize(entry.name).includes(needle) || normalize(entry.brand ?? "").includes(needle);
+  if (!needle || normalize(entry.name).includes(needle) || normalize(entry.brand ?? "").includes(needle)) return true;
+  if (entry.aliases?.some((alias) => normalize(alias).includes(needle))) return true;
+  return entry.kind === "custom_generic" && singularKey(entry.name) === singularKey(needle);
 }

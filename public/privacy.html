@@ -115,10 +115,11 @@
             verstuurd. Een hand die het product vasthoudt is goed.
           </li>
         </ul>
-        <h3>Streepjescodes, voorbeeldfoto's en aanbiedingen</h3>
+        <h3>Streepjescodes, voorbeeldfoto's, aanbiedingen en zelf toegevoegde producten</h3>
         <p>
           Hiervoor stuurt Karrie alleen productgegevens: de naam, het merk, de soort of de streepjescode van het product. Nooit je lijstje als
-          geheel, de naam van je lijstje, foto's of je locatie.
+          geheel, de naam van je lijstje, foto's of je locatie. Voeg je zelf een product toe dat Karrie nog niet kent (bijvoorbeeld walnoten), dan
+          gaat alleen die productnaam naar de server, om de juiste naam, afdeling en een tekening te vinden.
         </p>
         <h3>Wat de server bewaart</h3>
         <ul>
@@ -136,6 +137,11 @@
             De server onthoudt in zijn werkgeheugen alleen productgegevens: gevonden productinformatie en voorbeeldfoto's met een open licentie
             hoogstens 30 dagen, aanbiedingen hoogstens 3 uur. Daar zit niets in over jou of je gezin.
           </li>
+          <li>
+            Zelf toegevoegde producten kunnen worden voorgesteld voor de vaste productlijst van Karrie. Daarvoor bewaart de server de productnaam,
+            de afdeling, wanneer het product voor het eerst en het laatst is toegevoegd, en op hoeveel verschillende dagen en toestellen. Een mens
+            beoordeelt die voorstellen. Er staat geen IP-adres, toestel of lijstje bij.
+          </li>
         </ul>
         <p>
           Render levert de website en de server. Zoals elke hostingpartij verwerkt Render daarvoor technische verbindingsgegevens, zoals je
@@ -148,7 +154,8 @@
         <h3>OpenAI</h3>
         <p>
           De foto die je met de ontspanknop maakt, gaat via de server naar OpenAI om het product te herkennen. Ook als Karrie op internet zoekt naar
-          productgegevens of een voorbeeldfoto, gaan de naam en het merk van het product naar OpenAI. Karrie vraagt OpenAI om deze aanvragen niet
+          productgegevens of een voorbeeldfoto, gaan de naam en het merk van het product naar OpenAI, en bij een zelf toegevoegd product de
+          naam die je typte. Karrie vraagt OpenAI om deze aanvragen niet
           op te slaan (<code>store: false</code>). OpenAI kan aanvragen wel tijdelijk bewaren om misbruik te controleren, volgens de
           <a href="https://platform.openai.com/docs/guides/your-data" rel="noopener">regels voor API-gegevens van OpenAI</a>. OpenAI is gevestigd in
           de Verenigde Staten.
