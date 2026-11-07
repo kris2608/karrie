@@ -5,7 +5,7 @@ import { PressButton } from "../../components/ui/PressButton";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { categoryIcon } from "../../domain/categoryIcon";
 import { declineKey, missionOn } from "../../domain/discovery";
-import type { DraftField, ProductDraft } from "../../domain/productDraft";
+import { newItemFor, type DraftField, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem, AlternativeAssessment, CategoryId } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { savePhoto, usePhotoUrl } from "../../storage/photos";
@@ -106,12 +106,9 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   function addNew() {
     const finalName = name.trim();
     if (!finalName) return;
-    const matched = draft?.match && draft.match.category === category ? draft.match : null;
-    const icon = matched ? matched.id : categoryIcon(category);
-    const withPhoto = !draft || draft.keepPhoto || !matched;
-    const via = draft?.from.photo ? "photo" : draft?.from.barcode || draft?.from.mine ? "barcode" : "manual";
+    const { item, withPhoto } = newItemFor(draft, finalName, category);
     void commit((photoId) => {
-      dispatch({ type: "add-recognized", name: finalName, category, icon, productId: matched?.id, photoId, pack: draft?.pack, via });
+      dispatch({ type: "add-recognized", ...item, photoId });
       return `${finalName} staat op je lijst`;
     }, withPhoto);
   }

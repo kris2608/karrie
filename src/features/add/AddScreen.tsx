@@ -14,7 +14,9 @@ import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
+import { discoveredCount } from "../../domain/homeAdventure";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
+import { DiscoverBanner } from "./DiscoverBanner";
 import { Attribution, OfferTag, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { RETAILERS, retailerName, type RetailerId } from "../../domain/retailers";
@@ -150,6 +152,7 @@ export function AddScreen() {
   const offerOn = (item: AdventureItem | undefined) => (item && draft?.retailer && views.get(item.id)?.shown === "deal" ? draft.retailer : undefined);
 
   const count = adventure && adventure.phase !== "done" ? adventure.items.length : 0;
+  const discovered = discoveredCount(adventure && adventure.phase !== "done" ? adventure : null);
   const mineKeys = useMemo(() => new Set(mine.map(mineKey)), [mine]);
   /** A remembered product counts on its own tile, not on the catalog tile of the same type. */
   const tileOf = (item: AdventureItem) => (mineKeys.has(mineKey(item)) ? mineKey(item) : item.productId);
@@ -322,6 +325,8 @@ export function AddScreen() {
           })}
         </div>
       </div>
+
+      {!needle && <DiscoverBanner count={discovered} onStart={() => photo.current?.discover()} />}
 
       <div className="product-grid">
         {mineVisible.map((entry) => {

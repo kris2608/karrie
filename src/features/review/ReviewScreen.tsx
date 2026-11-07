@@ -10,6 +10,7 @@ import { StarIcon } from "../../components/ui/StarIcon";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { missionOn } from "../../domain/discovery";
+import { discoveredCount } from "../../domain/homeAdventure";
 import { spring } from "../../motion/variants";
 import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
@@ -85,8 +86,9 @@ export function ReviewScreen() {
 
   function start() {
     if (!adventure) return;
-    if (adventure.phase !== "shopping") dispatch({ type: "start-shopping" });
-    navigate("/winkel");
+    const fresh = adventure.phase !== "shopping";
+    if (fresh) dispatch({ type: "start-shopping" });
+    navigate("/winkel", fresh && discoveredCount(adventure) > 0 ? { state: { intro: true } } : undefined);
   }
 
   function remove(item: AdventureItem) {

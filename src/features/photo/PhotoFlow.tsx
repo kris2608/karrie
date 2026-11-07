@@ -2,8 +2,11 @@ import { AnimatePresence } from "motion/react";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
+import { challengeFor } from "../../domain/challenges";
+import { createScanGate, discoveredCount } from "../../domain/homeAdventure";
 import { mergeDraft, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem } from "../../domain/types";
+import { playBeep } from "../../feedback/sound";
 import { trackEvent } from "../../services/analytics";
 import { lookupBarcode, type BarcodeOutcome } from "../../services/barcode/lookup";
 import { vision, type VisionResult } from "../../services/vision/client";
@@ -12,10 +15,12 @@ import { barcodeSource } from "../../state/analyticsEvents";
 import { savePhoto } from "../../storage/photos";
 import { decodeStill } from "./barcodeReader";
 import { blobToDataUrl, decodePhoto, fullRect, processPhoto, releasePhoto, type ProcessedPhoto } from "./imageProcessing";
+import { DiscoveryResult } from "./DiscoveryResult";
 import { PhotoCamera, type BarcodeStatus } from "./PhotoCamera";
 import { PhotoResultSheet } from "./PhotoResultSheet";
 
-export type PhotoFlowHandle = { open: (target?: AdventureItem) => void };
+/** open: the parent's camera, or a photo for one item; discover: the child collects products at home. */
+export type PhotoFlowHandle = { open: (target?: AdventureItem) => void; discover: () => void };
 
 type PhotoFlowProps = {
   ref?: Ref<PhotoFlowHandle>;
@@ -68,9 +73,13 @@ const identified = (outcome: BarcodeOutcome) => outcome.status === "mine" || out
  * shutter only stores the photo and no barcodes are read.
  */
 export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
-  const { dispatch, mine } = useAdventure();
+  const { adventure, dispatch, mine } = useAdventure();
   const galleryRef = useRef<HTMLInputElement>(null);
   const [target, setTarget] = useState<AdventureItem | undefined>();
+  const [discovering, setDiscovering] = useState(false);
+  /** In discover mode a parent took over this result, so the detailed sheet shows. */
+  const [parentView, setParentView] = useState(false);
+  const gate = useRef(createScanGate());
   const [step, setStep] = useState<Step>({ kind: "idle" });
   const [photo, setPhoto] = useState<ProcessedPhoto | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -86,16 +95,24 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     stepKind.current = step.kind;
   }, [step.kind]);
 
+  const challenge = discovering ? challengeFor(discoveredCount(adventure && adventure.phase !== "done" ? adventure : null)) : undefined;
+
+  function start(next: AdventureItem | undefined, discover: boolean) {
+    session.current += 1;
+    setTarget(next);
+    setDiscovering(discover);
+    setParentView(false);
+    setPhoto(null);
+    scan.current = null;
+    gate.current.reset();
+    setBarcodeStatus(null);
+    if (!next) vision.warmUp();
+    setStep({ kind: "camera" });
+  }
+
   useImperativeHandle(ref, () => ({
-    open(next) {
-      session.current += 1;
-      setTarget(next);
-      setPhoto(null);
-      scan.current = null;
-      setBarcodeStatus(null);
-      if (!next) vision.warmUp();
-      setStep({ kind: "camera" });
-    },
+    open: (next) => start(next, false),
+    discover: () => start(undefined, true),
   }));
 
   useEffect(() => {
@@ -111,8 +128,10 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     request.current?.abort();
     request.current = null;
     scan.current = null;
+    gate.current.reset();
     setBarcodeStatus(null);
     setPhoto(null);
+    setParentView(false);
     setStep({ kind: "idle" });
   }
 
@@ -131,6 +150,9 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
 
   /** A confirmed code from the live preview: show the product straight away when it is known, else keep the camera open. */
   function barcode(ean: string) {
+    const read = gate.current.read(ean, Date.now());
+    if (read === "held") return;
+    if (read === "new") playBeep();
     const current = startLookup(ean);
     setBarcodeStatus("looking");
     void current.outcome.then((outcome) => {
@@ -160,6 +182,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
         const outcome = await startLookup(ean).outcome;
         if (identified(outcome)) {
           countBarcode(ean, outcome);
+          playBeep();
           const draft = mergeDraft(known(ean, outcome));
           // A gallery picture with a barcode is often the back of the pack; a known front photo looks better.
           if (draft.imageUrl || draft.photoId) setPhoto(null);
@@ -201,7 +224,10 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     if (result.status === "aborted") return;
     if (result.status === "ok") {
       if (result.product.containsPeople) return setStep({ kind: "problem", problem: PEOPLE });
-      if (result.product.recognized) trackEvent({ name: "product_recognized", data: { method: "photo", source: "openai" } });
+      if (result.product.recognized) {
+        trackEvent({ name: "product_recognized", data: { method: "photo", source: "openai" } });
+        playBeep();
+      }
       const lookup = scanned ? known(scanned.ean, await scanned.outcome) : {};
       setStep({ kind: "result", draft: mergeDraft({ ...lookup, photo: result.product }) });
       return;
@@ -211,6 +237,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
 
   /** Zelf invullen keeps a scanned code, so the product is found by it next time. */
   function manual() {
+    setParentView(true);
     setStep({ kind: "result", draft: scan.current ? mergeDraft({ ean: scan.current.ean }) : null });
   }
 
@@ -219,7 +246,15 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     request.current = null;
     setPhoto(null);
     setBarcodeStatus(null);
+    setParentView(false);
     setStep({ kind: "camera" });
+  }
+
+  /** "Zoek de volgende!": a fresh search, without the code of the product just handled popping up again. */
+  function next(ean?: string) {
+    if (ean) gate.current.hold(ean, Date.now());
+    scan.current = null;
+    retake();
   }
 
   const cameraOpen = step.kind === "camera" || step.kind === "recognizing";
@@ -243,7 +278,8 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
         {cameraOpen && (
           <PhotoCamera
             key="camera"
-            title={liveTarget ? `Foto voor ${liveTarget.name}` : "Maak een foto"}
+            title={liveTarget ? `Foto voor ${liveTarget.name}` : discovering ? "Ga op ontdekking!" : "Maak een foto"}
+            hint={challenge?.text}
             localOnly={Boolean(liveTarget)}
             busy={step.kind === "recognizing"}
             slow={step.kind === "recognizing" && step.slow}
@@ -277,21 +313,36 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
             )}
             {step.problem.manual && photo && (
               <PressButton variant="secondary" wide data-testid="photo-manual" onClick={manual}>
-                Zelf invullen
+                {discovering ? "Vraag een ouder" : "Zelf invullen"}
               </PressButton>
             )}
             <div className="sheet-actions scan-actions">
               <PressButton variant="quiet" onClick={close}>
-                Annuleren
+                {discovering ? "Klaar" : "Annuleren"}
               </PressButton>
               <PressButton variant="secondary" data-testid="photo-retake" onClick={retake}>
-                Opnieuw fotograferen
+                {discovering ? "Nog een foto" : "Opnieuw fotograferen"}
               </PressButton>
             </div>
           </>
         )}
 
-        {step.kind === "result" && (
+        {step.kind === "result" && discovering && !parentView && step.draft && (
+          <DiscoveryResult
+            key={`${step.draft.ean ?? ""}|${step.draft.name}`}
+            draft={step.draft}
+            photoUrl={photo && previewUrl ? previewUrl : undefined}
+            photo={photo?.saved}
+            items={items}
+            challenge={challenge}
+            onNext={next}
+            onRetake={retake}
+            onParent={() => setParentView(true)}
+            onClose={close}
+          />
+        )}
+
+        {step.kind === "result" && (!discovering || parentView || !step.draft) && (
           <PhotoResultSheet
             key={step.draft ? `${step.draft.ean ?? ""}|${step.draft.name}` : "manual"}
             draft={step.draft}

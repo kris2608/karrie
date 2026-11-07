@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Karrie } from "../../components/mascot/Karrie";
 import { ItemArt } from "../../components/ItemArt";
 import { ShopScene } from "../../components/scenery/ShopScene";
@@ -22,6 +22,7 @@ const SWIPE_DISTANCE = 90;
 const SWIPE_VELOCITY = 600;
 /** The child sees the regular product first, then Karrie brings up the mission. */
 const MISSION_DELAY_MS = 900;
+const INTRO_MS = 2200;
 
 export function ShopScreen() {
   const { adventure, dispatch } = useAdventure();
@@ -30,6 +31,9 @@ export function ShopScreen() {
   const [parentOpen, setParentOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [missionShown, setMissionShown] = useState<string | null>(null);
+  const location = useLocation();
+  /** Shown once when a list collected at home goes shopping; a tap or a moment later it is gone. */
+  const [intro, setIntro] = useState(() => Boolean((location.state as { intro?: boolean } | null)?.intro));
   const keep = useRef<"original" | "alternative">("original");
   const artRef = useRef<HTMLSpanElement | null>(null);
   // The leaving product unmounts after the next one mounted; its null must not clear the new node.
@@ -52,13 +56,23 @@ export function ShopScreen() {
   });
 
   const current = adventure ? activeItem(adventure.items) : undefined;
-  const offered = current?.mission?.status === "offered" && !sequence.locked ? current.id : null;
+  const offered = current?.mission?.status === "offered" && !sequence.locked && !intro ? current.id : null;
 
   useEffect(() => {
     if (!offered) return;
     const timer = window.setTimeout(() => setMissionShown(offered), reduced ? 0 : MISSION_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [offered, reduced]);
+
+  useEffect(() => {
+    if ((location.state as { intro?: boolean } | null)?.intro) navigate(".", { replace: true, state: null });
+  }, [location.state, navigate]);
+
+  useEffect(() => {
+    if (!intro) return;
+    const timer = window.setTimeout(() => setIntro(false), INTRO_MS);
+    return () => window.clearTimeout(timer);
+  }, [intro]);
 
   if (!adventure || adventure.items.length === 0) return <Navigate to="/" replace />;
   if (adventure.phase === "draft") return <Navigate to="/controleren" replace />;
@@ -259,6 +273,23 @@ export function ShopScreen() {
             onGo={() => dispatch({ type: "mission-accept" })}
             onSkip={() => dispatch({ type: "mission-skip" })}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {intro && (
+          <motion.button
+            type="button"
+            className="shop-intro"
+            data-testid="shop-intro"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+            onClick={() => setIntro(false)}
+          >
+            <Karrie mood="greeting" enter={reduced ? "none" : "pop"} className="shop-intro-karrie" />
+            <span className="speech">Alles verzameld? Nu gaan we ze zoeken!</span>
+          </motion.button>
         )}
       </AnimatePresence>
 

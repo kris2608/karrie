@@ -297,6 +297,22 @@ Een eerdere ronde liet zien waarom de controle op "het hele product" nodig is: z
 
 Een product dat van een foto is herkend en een merk heeft, of dat niet in de catalogus staat, onthoudt Karrie op dit toestel als **Mijn producten**: naam, merk, afdeling, foto en eventuele bonusmissie. In **Toevoegen** staat het met een hartje onder zijn eigen afdeling, onder **Alles** en in de zoekresultaten. Tikken zet het op de lijst (of telt er één bij). Lang drukken haalt het van de lijst en vergeet het, met **Ongedaan maken**. Een herkende AH Terra pindakaas telt op zijn eigen tegel, niet ook op de tegel Pindakaas. Karrie onthoudt hoogstens 120 producten.
 
+## Thuis verzamelen (Lijstjesavontuur)
+
+In **Toevoegen** staat boven de tegels **Help jij Karrie boodschappen verzamelen?** met **Ga op ontdekking!**. Dat opent dezelfde camera als de cameraknop, maar met een eenvoudig resultaat voor het kind. De cameraknop naast het zoekveld blijft het gewone ouderscherm.
+
+- **Zeker** (een losse banaan met de tekening uit de catalogus, of een streepjescode met een volledig record bij Open Food Facts of uit Mijn producten): **Banaan gevonden!** met de tekening of de productfoto en één grote knop **In het mandje!**. Daarna vliegt het product in Karrie's mandje, telt Karrie mee ("1 product ontdekt!", "3 producten verzameld!") en brengt **Zoek de volgende!** de camera terug.
+- **Twijfel bij een los product**: **Is dit een appel?** met **Ja!**.
+- **Onbekend of twijfelachtig** (geen herkenning, een webpagina of een merk dat niet klopt): **Vraag een ouder** opent het gewone ouderscherm met hetzelfde resultaat. Karrie verzint nooit een product.
+- **Staat al op de lijst**: **Die hebben we al!**. Dat telt niet mee; **Nog één erbij** verhoogt het aantal.
+- Bij 5 verzamelde producten: **Hoera! Karrie heeft al 5 producten verzameld!** met confetti, één keer per lijstje.
+- In de camera staat een zoekidee ("Zoek iets uit de fruitmand!"). Past het product, dan zegt Karrie **Gelukt!**. Het telt nergens voor mee.
+- Bij **Start avontuur** zegt Karrie kort **Alles verzameld? Nu gaan we ze zoeken!**. Tikken of even wachten sluit het. Sterren komen alleen in de winkel, zoals altijd.
+
+**Geluid.** Met geluid aan klinkt een korte "biep" als een streepjescode gelezen is (één keer per code) of als een foto herkend is, niet bij de ontspanknop. In het mandje doen geeft een "plop", de mijlpaal een fanfare. Er zijn geen geluidsbestanden; de tonen worden op het toestel gemaakt.
+
+**Privacy.** Een losse banaan krijgt de tekening; de foto van het kind wordt dan niet bewaard. Een merkproduct houdt het bestaande gedrag (foto van Open Food Facts of jouw foto, alleen op dit toestel). Camerabeeld verlaat het toestel alleen bij de ontspanknop, net als voorheen. Statistieken tellen alleen het bestaande `product_added` met `photo` of `barcode`; het aantal verzamelde producten en de mijlpaal sturen niets. Er is geen account en Karrie bewaart niets over het kind: alleen welke items van dit lijstje thuis verzameld zijn.
+
 ## Aanbiedingen (PrijsProfeet)
 
 Kies per lijstje één supermarkt: **Jumbo**, **Albert Heijn** of **Lidl**. Dat kan in **Controleren** (onder de titel) en in **Toevoegen** (het knopje rechtsboven, met een labeltje). Nog een keer tikken op de gekozen supermarkt zet het weer uit. Zonder supermarkt zoekt Karrie niets op. Een nieuw lijstje begint met de supermarkt die je het laatst koos; een bewaard lijstje houdt zijn eigen supermarkt.
@@ -420,6 +436,20 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - Bewaar het lijstje, maak een nieuw lijstje met **Lidl** en open het bewaarde lijstje: dat staat nog op Albert Heijn.
 - Zet vliegtuigmodus aan en open het lijstje: bewaarde labels blijven, er komt geen foutmelding. **Start avontuur** werkt en in het avontuur staan geen labels.
 
+**Thuis verzamelen (iPhone Safari en Android Chrome)**
+
+- Zet het geluid aan (beginscherm → **Voor ouders**). **Toevoegen → Ga op ontdekking!**: de camera opent met een zoekidee onderin.
+- Scan de streepjescode van een bekend merkproduct. Eén keer "biep", ook als je de code langer in beeld houdt. Het scherm toont **… gevonden!** met de productfoto. Tik **In het mandje!**: het product vliegt in het mandje, Karrie springt, "1 product ontdekt!".
+- Tik **Zoek de volgende!**: de camera komt terug en de pot die nog in beeld is, springt niet meteen weer op.
+- Fotografeer een losse banaan: na het herkennen één "biep" (niet bij de ontspanknop), **Banaan gevonden!** met de tekening. Na **In het mandje!** staat Banaan met de tekening in **Controleren** en in het winkelavontuur.
+- Fotografeer de banaan nog eens: **Die hebben we al!**, en de teller gaat niet omhoog.
+- Fotografeer iets vaags of onbekends: **Wat is dit?** met **Vraag een ouder**. Dat opent het gewone scherm om zelf in te vullen.
+- Verzamel vijf verschillende producten: één keer **Hoera!** met confetti en fanfare. Sluit de app en open hem weer: geen tweede keer.
+- Zet het geluid uit en herhaal een scan: geen biep, de rest werkt hetzelfde.
+- Zet op de telefoon "Beweging beperken" (iPhone) of "Animaties verwijderen" (Android) aan: er vliegt niets en er is geen confetti, maar alle knoppen werken meteen.
+- **Controleren**: aantallen, verwijderen, **Ongedaan maken** en de supermarkt werken als voorheen. **Start avontuur** toont kort **Alles verzameld? Nu gaan we ze zoeken!**; tikken sluit het meteen.
+- Tik snel twee keer op **In het mandje!**: het product staat maar één keer op de lijst.
+
 ## Bekende beperkingen
 
 - Camera, foto herkennen en bonusmissies zijn niet getest op een echte iPhone of Android-telefoon. Ze zijn getest in een desktopbrowser (met een nagebootste camera en met de galerijknop), met echte productfoto's en echte OpenAI-aanroepen.
@@ -439,6 +469,7 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 - Voorbeeldfoto's van merkproducten komen bijna altijd van winkelsites met onbekende rechten. Ze worden alleen op het eigen toestel bewaard en getoond; of dat voor jouw gebruik mag, is aan de eigenaar van de app.
 - De zoekresultaten verschillen per keer: hetzelfde product vond de ene keer wel en de andere keer geen foto. **Opnieuw zoeken** helpt soms.
 - Het geheugen van de server met open-licentiefoto's is leeg na een herstart of slaapstand; dan wordt opnieuw (betaald) gezocht.
+- Thuis verzamelen is alleen in een desktopbrowser getest (met een galerijfoto van een streepjescode), niet op een echte telefoon. Het geluid, de trilfunctie en het herkennen van een echte banaanfoto zijn daar niet nagelopen.
 - Aanbiedingen zijn alleen in een desktopbrowser getest (met de echte PrijsProfeet en een lokale server), niet op een echte telefoon.
 - De matching is bewust streng: een standaardproduct krijgt alleen **Aanbieding** bij een huismerkproduct met precies die naam. Bij A-merken of extra woorden wordt het hoogstens **Mogelijke aanbieding**, en onbekende woorden ("bananen ontbijtje") betekenen niets. Echte aanbiedingen worden daardoor soms gemist. Geeft PrijsProfeet geen merk bij een product, dan behandelt Karrie het als huismerk.
 - PrijsProfeet haalt de acties zelf bij de supermarkten op. Een fout of vertraging daar (een actie die al voorbij is, een verkeerde prijs) neemt Karrie over; daarom staan de einddatum en de link naar de supermarkt erbij.

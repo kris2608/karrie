@@ -45,6 +45,13 @@ export function playPop() {
   tone(ctx, { freq: 420, to: 880, start: 0, length: 0.09, type: "triangle", gain: 0.22 });
 }
 
+/** The scanner "biep!": once when a code is read or a photo is recognised, never on the shutter. */
+export function playBeep() {
+  const ctx = ready();
+  if (!ctx) return;
+  tone(ctx, { freq: 1250, start: 0, length: 0.08, type: "square", gain: 0.07 });
+}
+
 export function playStar() {
   const ctx = ready();
   if (!ctx) return;

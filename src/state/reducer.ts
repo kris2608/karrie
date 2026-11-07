@@ -98,7 +98,10 @@ export type Action =
       pack?: VisionPack;
       /** How the product was identified; only used for anonymous statistics. */
       via?: "photo" | "barcode" | "manual";
+      /** Collected by the child at home; counts towards the home progress. */
+      discovered?: boolean;
     }
+  | { type: "cheer"; milestone: number }
   | { type: "set-photo"; itemId: string; photoId: string }
   | { type: "apply-recognition"; itemId: string; photoId?: string; pack: VisionPack }
   | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }
@@ -131,6 +134,16 @@ function blankDraft(order: CategoryId[], retailer?: RetailerId): Adventure {
 function withRetailer(adventure: Adventure, retailer: RetailerId | undefined): Adventure {
   const { retailer: _previous, ...rest } = adventure;
   return retailer ? { ...rest, retailer } : rest;
+}
+
+/** Lists from before the home adventure have neither field; anything malformed is dropped. */
+function withHomeProgress(adventure: Adventure): Adventure {
+  const { discovered, cheered, ...rest } = adventure;
+  return {
+    ...rest,
+    ...(Array.isArray(discovered) && { discovered: discovered.filter((id) => typeof id === "string") }),
+    ...(Array.isArray(cheered) && { cheered: cheered.filter((value) => typeof value === "number") }),
+  };
 }
 
 function remember(adventure: Adventure): { items: AdventureItem[]; phase: Adventure["phase"]; stickerId?: string; stickers: string[] } {
@@ -235,7 +248,7 @@ export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "hydrate": {
       const stored = action.data.adventure ?? null;
-      const adventure = isAdventure(stored) ? withRetailer({ ...stored, history: stored.history ?? [] }, isRetailer(stored.retailer) ? stored.retailer : undefined) : null;
+      const adventure = isAdventure(stored) ? withRetailer(withHomeProgress({ ...stored, history: stored.history ?? [] }), isRetailer(stored.retailer) ? stored.retailer : undefined) : null;
       const settings: Settings = { ...defaultSettings, ...action.data.settings };
       if (!isRetailer(settings.retailer)) delete settings.retailer;
       return {
@@ -394,7 +407,12 @@ export function reducer(state: AppState, action: Action): AppState {
           ? withParentPhoto({ source: "manual" as const }, action.photoId)
           : { source: "manual" };
       const item: AdventureItem = { id: crypto.randomUUID(), ...base, quantity: 1, status: "pending", ...pack };
-      return { ...state, mine: rememberMine(state.mine, item), adventure: touch(adventure, { items: [...adventure.items, item] }) };
+      const discovered = action.discovered ? { discovered: [...(adventure.discovered ?? []), item.id] } : {};
+      return { ...state, mine: rememberMine(state.mine, item), adventure: touch(adventure, { items: [...adventure.items, item], ...discovered }) };
+    }
+    case "cheer": {
+      if (!state.adventure || state.adventure.cheered?.includes(action.milestone)) return state;
+      return { ...state, adventure: touch(state.adventure, { cheered: [...(state.adventure.cheered ?? []), action.milestone] }) };
     }
     case "set-photo":
       return updateItem(state, action.itemId, (item) => withParentPhoto(item, action.photoId));

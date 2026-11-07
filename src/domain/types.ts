@@ -148,6 +148,10 @@ export type Adventure = {
   updatedAt: number;
   stickerId?: string;
   history: HistoryEntry[];
+  /** Ids of items the child collected with the camera at home; only counts progress, never stars. */
+  discovered?: string[];
+  /** Home milestones already celebrated for this list. */
+  cheered?: number[];
 };
 
 export type SavedItem = PackInfo & {

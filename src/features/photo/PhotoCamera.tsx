@@ -12,6 +12,8 @@ export type BarcodeStatus = "looking" | "unknown" | "failed" | null;
 
 type PhotoCameraProps = {
   title: string;
+  /** Replaces the scan instruction, for example a search idea for the child. */
+  hint?: string;
   /** True when the shutter only stores the photo on this device. */
   localOnly: boolean;
   busy: boolean;
@@ -40,7 +42,7 @@ function finePointer() {
   return typeof window !== "undefined" && window.matchMedia?.("(pointer: fine)").matches;
 }
 
-export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcodes, barcodeStatus, onBarcode, onManual, onCapture, onGallery, onClose }: PhotoCameraProps) {
+export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanBarcodes, barcodeStatus, onBarcode, onManual, onCapture, onGallery, onClose }: PhotoCameraProps) {
   const reduced = useReducedMotion() ?? false;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<CameraStatus>("opening");
@@ -136,7 +138,7 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcode
       <div className="scanner-message" aria-live="polite">
         {!problem && !busy && !(scanBarcodes && barcodeStatus) && (
           <p className="scanner-hint" data-testid="camera-hint">
-            {scanBarcodes ? "Scan streepjescode of maak foto" : "Zet één product in het kader"}
+            {hint ?? (scanBarcodes ? "Scan streepjescode of maak foto" : "Zet één product in het kader")}
           </p>
         )}
         {!problem && !busy && scanBarcodes && barcodeStatus && (

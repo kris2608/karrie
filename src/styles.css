@@ -1598,6 +1598,54 @@ h1, h2, p { margin: 0; }
 .offer-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .offer-links > a { font-weight: 900; }
 
+/* Home discovery adventure */
+
+.discover-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-l);
+  background: #fff6d6;
+  box-shadow: inset 0 0 0 2px var(--yellow);
+}
+.discover-banner-karrie { width: 72px; height: auto; flex: none; }
+.discover-banner-text { display: grid; justify-items: start; gap: var(--space-2); min-width: 0; }
+.discover-banner-text strong { font-weight: 900; line-height: 1.25; }
+.discover { display: grid; justify-items: center; gap: var(--space-3); text-align: center; }
+.discover h2 { text-wrap: balance; }
+.discover-stage { display: flex; align-items: flex-end; justify-content: center; gap: var(--space-2); width: 100%; }
+.discover-art { display: block; width: min(150px, 40vw); }
+.discover-art .product-art { width: 100%; }
+.discover-karrie { width: min(120px, 30vw); height: auto; flex: none; }
+.discover-note { color: var(--ink-soft); font-weight: 700; }
+.discover-fit {
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-pill);
+  font-weight: 900;
+  color: #fff;
+  background: var(--orange);
+  box-shadow: 0 3px 0 var(--orange-shade);
+}
+.discover-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); }
+.discover-small { font-size: 0.95rem; }
+.shop-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  padding: calc(var(--safe-top) + var(--space-4)) calc(var(--safe-right) + var(--space-4)) calc(var(--safe-bottom) + var(--space-4)) calc(var(--safe-left) + var(--space-4));
+  border: 0;
+  background: rgba(14, 53, 50, 0.55);
+  cursor: pointer;
+}
+.shop-intro-karrie { width: min(200px, 55vw); height: auto; }
+.shop-intro .speech { display: block; margin-bottom: 0; white-space: normal; text-align: center; font-size: 1.25rem; max-width: 320px; }
+
 /* Short screens */
 
 @media (max-height: 680px) {

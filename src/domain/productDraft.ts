@@ -86,6 +86,23 @@ function nutritionOf(answer: FoundAnswer | undefined): Nutrition | undefined {
 
 const differ = (a?: string | null, b?: string | null) => Boolean(a && b && normalize(a) !== normalize(b));
 
+export type AddVia = "photo" | "barcode" | "manual";
+
+export type NewItem = { name: string; category: CategoryId; icon: string; productId?: string; pack?: VisionPack; via: AddVia };
+
+/**
+ * The list item for a draft, used by the parent sheet and the child's basket alike. A catalog match in the chosen
+ * category keeps its drawing and needs no photo; anything else keeps the new photo, if there is one.
+ */
+export function newItemFor(draft: ProductDraft | null, name: string, category: CategoryId): { item: NewItem; withPhoto: boolean } {
+  const matched = draft?.match && draft.match.category === category ? draft.match : null;
+  const via: AddVia = draft?.from.photo ? "photo" : draft?.from.barcode || draft?.from.mine ? "barcode" : "manual";
+  return {
+    item: { name, category, icon: matched ? matched.id : categoryIcon(category), productId: matched?.id, pack: draft?.pack, via },
+    withPhoto: !draft || draft.keepPhoto || !matched,
+  };
+}
+
 export type DraftInput = { ean?: string; mine?: SavedItem; barcode?: FoundAnswer; photo?: RecognizedProduct };
 
 export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDraft {
