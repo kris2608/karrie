@@ -86,6 +86,7 @@ Het tabblad-icoon (`favicon.svg`) en de app-iconen zijn dezelfde Karrie als op h
 - **Terug** zet de laatste tik terug. **Later** bewaart het product voor straks. Het product naar links vegen doet hetzelfde als **Later**.
 - Op Android trilt de telefoon kort bij **Gevonden!** en bij lang drukken. Safari op iPhone ondersteunt trillen niet.
 - Vernieuw de pagina op `/winkel`. Hetzelfde lijstje staat er nog.
+- Draai de telefoon in de winkel op zijn kant: het product staat links, naam en **Gevonden!** rechts, en **Terug**, **Later**, de voortgang en de sterren blijven in beeld (ook met een bonusmissie). Terugdraaien geeft meteen de gewone indeling; sterren en het huidige product blijven hetzelfde. De geïnstalleerde app vraagt Android om staand te blijven; in een gewoon browsertabblad draait het scherm gewoon mee.
 - Maak een nieuw lijstje en tik op **Bewaren**. Geef het eventueel een naam. Het beginscherm meldt **Lijstje bewaard** en toont **Verder met lijstje** en een kaart met de naam (zonder naam: **Bewaard**). Open je de kaart, dan staat de naam bovenaan het lijstje. (Een veld voor de supermarkt is er al, maar verborgen tot een functie het gebruikt.)
 - Deel `https://karrieapp.onrender.com` in WhatsApp. De voorvertoning toont Karrie met **Speur, vind en vink af!** en een korte omschrijving. WhatsApp bewaart voorvertoningen een tijd; een link die je al eerder deelde, kan nog de oude (lege) versie tonen.
 - Plak een korte lijst, controleer hem en start het avontuur.

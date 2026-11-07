@@ -41,6 +41,8 @@ export default defineConfig({
         start_url: "/",
         scope: "/",
         display: "standalone",
+        // A preference for the installed app only; browser tabs still rotate, so the shop has a landscape layout too.
+        orientation: "portrait",
         background_color: "#fff6e8",
         theme_color: "#14c4b8",
         icons: [
