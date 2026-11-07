@@ -15,7 +15,10 @@ type ImagesClient = { images: { generate: (body: never) => Promise<unknown> } };
 const DEPARTMENT: Record<Candidate["category"], string> = {
   produce: "fruit or vegetable",
   bakery: "bakery product",
+  meat: "meat, fish or vegetarian product",
+  breakfast: "breakfast or spread product",
   pantry: "pantry product",
+  drinks: "drink",
   dairy: "dairy product",
   frozen: "frozen food",
   household: "household or care product",

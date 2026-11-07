@@ -1,11 +1,16 @@
-import { useState } from "react";
-import { hasOffPhoto, identityOf, wantsReference } from "../domain/imageIdentity";
-import type { PackInfo } from "../domain/types";
+import { useSyncExternalStore } from "react";
+import { hasOffPhoto, identityOf, wantsReference, wantsStoreImage } from "../domain/imageIdentity";
+import type { ImageSource, PackInfo } from "../domain/types";
+import type { StoreImage } from "../services/images/storeImage";
 import { usePhotoUrl } from "../storage/photos";
 import { useReferenceUrl } from "../storage/references";
+import { useStoreImage } from "../storage/storeImages";
 import { ProductArt } from "./ProductArt";
 
-type ArtItem = Pick<PackInfo, "imageUrl" | "imageKind" | "imageSource" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition" | "illustrationId"> & {
+type ArtItem = Pick<
+  PackInfo,
+  "ean" | "kind" | "imageUrl" | "imageKind" | "imageSource" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition" | "illustrationId"
+> & {
   icon: string;
   name: string;
 };
@@ -14,36 +19,84 @@ export function hasPhoto(item: Pick<PackInfo, "imageUrl" | "imageKind" | "photoI
   return item.imageKind === "photo" && Boolean(item.photoId || item.imageUrl);
 }
 
-/** The parent's choice first; otherwise a branded pack's reference picture beats the submitted photo, which beats the drawing. */
-export function pickArt(choice: PackInfo["imageChoice"], reference: string | null, photo: string | null, automatic: boolean): string | null {
+/** Where a shown picture came from: Open Food Facts, a retailer via PrijsProfeet, a found reference, or the parent. */
+export type ArtSource = ImageSource | "reference";
+export type ArtCandidates = Partial<Record<ArtSource, string | null>>;
+export type ArtPick = { source: ArtSource; url: string };
+
+/** Without a choice: Open Food Facts, then the retailer photo, then a found reference picture, then the parent's photo. */
+export const AUTOMATIC_ORDER: readonly ArtSource[] = ["off", "prijsprofeet", "reference", "parent"];
+
+/**
+ * The parent's choice wins; when the chosen picture is missing or broken the automatic order fills in, without
+ * changing the choice. "photo" is the item's own photo (the parent's, or the Open Food Facts front it replaced).
+ */
+export function pickArt(choice: PackInfo["imageChoice"], candidates: ArtCandidates): ArtPick | null {
   if (choice === "drawing") return null;
-  if (choice === "photo") return photo;
-  if (choice === "reference" || automatic) return reference ?? photo;
-  return photo;
+  const preferred: ArtSource[] = choice === "photo" ? ["parent", "off"] : choice === "reference" ? ["prijsprofeet", "reference"] : [];
+  for (const source of [...preferred, ...AUTOMATIC_ORDER]) {
+    const url = candidates[source];
+    if (url) return { source, url };
+  }
+  return null;
+}
+
+/** Picture URLs that failed to load in this session; every view of the same item skips them alike. */
+const broken = new Set<string>();
+const brokenListeners = new Set<() => void>();
+let brokenVersion = 0;
+
+export function markBroken(url: string) {
+  if (broken.has(url)) return;
+  broken.add(url);
+  brokenVersion += 1;
+  for (const listener of brokenListeners) listener();
+}
+
+export function useBroken(): (url: string | null | undefined) => string | null {
+  useSyncExternalStore(
+    (listener) => {
+      brokenListeners.add(listener);
+      return () => void brokenListeners.delete(listener);
+    },
+    () => brokenVersion,
+  );
+  return (url) => (url && !broken.has(url) ? url : null);
+}
+
+/** What ItemArt shows for an item, and where it came from; also used for the credit line. */
+export function useArt(item: ArtItem): { pick: ArtPick | null; drawing: string | null; store: StoreImage | null } {
+  const usable = useBroken();
+  const local = usePhotoUrl(item.imageKind === "photo" ? item.photoId : undefined);
+  const own = hasPhoto(item);
+  const store = useStoreImage(wantsStoreImage(item) ? item.ean : undefined);
+  const identity = identityOf(item);
+  const wanted = wantsReference(identity, item.imageChoice, hasOffPhoto(item), Boolean(store));
+  const reference = useReferenceUrl(wanted ? identity : null);
+  const pick = pickArt(item.imageChoice, {
+    off: usable(own && !item.photoId ? item.imageUrl : null),
+    prijsprofeet: usable(store?.imageUrl),
+    reference: usable(reference?.url),
+    parent: usable(own && item.photoId ? local : null),
+  });
+  const drawing = usable(usePhotoUrl(item.illustrationId));
+  return { pick, drawing, store: pick?.source === "prijsprofeet" ? store : null };
 }
 
 export function ItemArt({ item, className }: { item: ArtItem; className?: string }) {
-  const [failed, setFailed] = useState<string[]>([]);
-  const local = usePhotoUrl(item.imageKind === "photo" ? item.photoId : undefined);
-  const photo = !hasPhoto(item) ? null : item.photoId ? local : (item.imageUrl ?? null);
-  const identity = identityOf(item);
-  const wanted = wantsReference(identity, item.imageChoice, hasOffPhoto(item));
-  const reference = useReferenceUrl(wanted ? identity : null);
-  const usable = (url: string | null | undefined) => (url && !failed.includes(url) ? url : null);
-  const url = pickArt(item.imageChoice, usable(reference?.url), usable(photo), wanted);
-  const drawing = usable(usePhotoUrl(item.illustrationId));
+  const { pick, drawing } = useArt(item);
 
-  if (url) {
+  if (pick) {
     return (
-      <span className={className ? `product-art item-photo ${className}` : "product-art item-photo"}>
-        <img src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable={false} onError={() => setFailed((list) => [...list, url])} />
+      <span className={className ? `product-art item-photo ${className}` : "product-art item-photo"} data-source={pick.source}>
+        <img src={pick.url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(pick.url)} />
       </span>
     );
   }
   if (drawing) {
     return (
       <span className={className ? `product-art item-drawing ${className}` : "product-art item-drawing"}>
-        <img src={drawing} alt="" decoding="async" draggable={false} onError={() => setFailed((list) => [...list, drawing])} />
+        <img src={drawing} alt="" decoding="async" draggable={false} onError={() => markBroken(drawing)} />
       </span>
     );
   }

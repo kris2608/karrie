@@ -62,14 +62,14 @@ describe("identity", () => {
   });
 
   it("shows the parent's choice first, then a branded pack's reference picture, then the photo", () => {
-    expect(pickArt(undefined, "ref", "photo", true)).toBe("ref");
-    expect(pickArt(undefined, "ref", "photo", false)).toBe("photo");
-    expect(pickArt(undefined, "ref", null, false)).toBeNull();
-    expect(pickArt(undefined, null, "photo", true)).toBe("photo");
-    expect(pickArt("photo", "ref", "photo", true)).toBe("photo");
-    expect(pickArt("drawing", "ref", "photo", true)).toBeNull();
-    expect(pickArt("reference", null, "photo", true)).toBe("photo");
-    expect(pickArt("reference", "ref", null, true)).toBe("ref");
+    const url = (choice: Parameters<typeof pickArt>[0], candidates: Parameters<typeof pickArt>[1]) => pickArt(choice, candidates)?.url ?? null;
+    expect(url(undefined, { reference: "ref", parent: "photo" })).toBe("ref");
+    expect(url(undefined, { parent: "photo" })).toBe("photo");
+    expect(url(undefined, {})).toBeNull();
+    expect(url("photo", { reference: "ref", parent: "photo" })).toBe("photo");
+    expect(url("drawing", { reference: "ref", parent: "photo" })).toBeNull();
+    expect(url("reference", { parent: "photo" })).toBe("photo");
+    expect(url("reference", { reference: "ref" })).toBe("ref");
   });
 
   it("keeps the Open Food Facts front photo and only searches a barcode product without one, or on request", () => {

@@ -1,6 +1,8 @@
 import { useEffect } from "react";
-import { hasPhoto } from "../../components/ItemArt";
-import { hasOffPhoto, identityKey, identityOf, wantsReference } from "../../domain/imageIdentity";
+import { hasPhoto, useArt } from "../../components/ItemArt";
+import { hasOffPhoto, identityKey, identityOf, wantsReference, wantsStoreImage } from "../../domain/imageIdentity";
+import { storeCredit } from "../../services/images/storeImage";
+import { useStoreImage } from "../../storage/storeImages";
 import type { AdventureItem, ImageChoice } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { references, shownImage, useReference, useSearching } from "../../storage/references";
@@ -19,7 +21,9 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   const { settings, dispatch } = useAdventure();
   const identity = identityOf(item);
   const offPhoto = hasOffPhoto(item);
-  const wanted = wantsReference(identity, item.imageChoice, offPhoto);
+  const store = useStoreImage(wantsStoreImage(item) ? item.ean : undefined);
+  const art = useArt(item).pick;
+  const wanted = wantsReference(identity, item.imageChoice, offPhoto, Boolean(store));
   const entry = useReference(identity);
   const shown = wanted ? shownImage(entry) : null;
   const searching = useSearching(identity);
@@ -30,7 +34,7 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   }, [key, wanted, settings.referenceImages]);
   const candidates = wanted ? (entry?.discovery?.candidates ?? []) : [];
   const photo = hasPhoto(item);
-  const active: ImageChoice = item.imageChoice ?? (shown ? "reference" : photo ? "photo" : "drawing");
+  const active: ImageChoice = item.imageChoice ?? (art?.source === "prijsprofeet" || art?.source === "reference" ? "reference" : art ? "photo" : "drawing");
   const status = !wanted ? null : searching ? "searching" : entry?.chosen === null ? "removed" : shown ? null : entry?.state;
   /** A standard product, or a pack with an Open Food Facts photo, only searches when the parent asks for a picture. */
   const optIn = Boolean((identity?.generic || offPhoto) && settings.referenceImages);
@@ -41,12 +45,12 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
     choose(choice);
   };
   const choices: { id: ImageChoice; label: string; show: boolean }[] = [
-    { id: "reference", label: "Voorbeeldfoto", show: Boolean(shown) || optIn },
+    { id: "reference", label: "Voorbeeldfoto", show: Boolean(shown || store) || optIn },
     { id: "photo", label: offPhoto ? "Open Food Facts-foto" : "Eigen foto", show: photo },
     { id: "drawing", label: "Tekening", show: true },
   ];
 
-  if (!identity || (!settings.referenceImages && !entry)) return null;
+  if (!identity || (!settings.referenceImages && !entry && !store)) return null;
 
   return (
     <section className="picture-block" data-testid="picture-block">
@@ -91,6 +95,20 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
             </button>
           ))}
         </div>
+      )}
+
+      {art?.source === "prijsprofeet" && store && (
+        <small className="picture-source" data-testid="picture-source">
+          {storeCredit(store)}
+          {store.sourceUrl && (
+            <>
+              {" "}
+              <a href={store.sourceUrl} target="_blank" rel="noreferrer noopener">
+                Bron
+              </a>
+            </>
+          )}
+        </small>
       )}
 
       {shown && (

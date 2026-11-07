@@ -1,6 +1,7 @@
 import type { OfferRow } from "./prijsprofeet.js";
 
-export type ProductCategory = "produce" | "bakery" | "pantry" | "dairy" | "frozen" | "household";
+export const PRODUCT_CATEGORIES = ["produce", "bakery", "meat", "breakfast", "pantry", "dairy", "drinks", "frozen", "household"] as const;
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 
 /** What the app knows about one list item. `generic` items ("Banaan") have no brand or barcode. */
 export type OfferProduct = {
@@ -27,6 +28,9 @@ export const CATEGORY_MAP: Record<ProductCategory, readonly string[]> = {
   dairy: ["zuivel-eieren", "kaas", "zuivel", "eieren"],
   bakery: ["brood-bakkerij", "brood", "bakkerij"],
   frozen: ["diepvries"],
+  meat: ["vlees", "vis", "kaas", "vega", "maaltijden"],
+  breakfast: ["ontbijt", "ontbijtgranen-beleg", "snoep-koek-chips"],
+  drinks: ["frisdrank", "koffie-thee"],
   pantry: [
     "ontbijt",
     "pasta-rijst-wereldkeuken",
@@ -37,7 +41,7 @@ export const CATEGORY_MAP: Record<ProductCategory, readonly string[]> = {
     "ontbijtgranen-beleg",
     "conserven",
   ],
-  household: ["huishouden", "schoonmaak", "wasmiddel", "papier"],
+  household: ["huishouden", "schoonmaak", "wasmiddel", "papier", "baby-kind"],
 };
 
 /** Words that do not change what a generic product is. */

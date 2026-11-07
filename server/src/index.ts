@@ -10,6 +10,7 @@ import { createImageDiscovery } from "./images.js";
 import { createLimits } from "./limits.js";
 import { createOfferLookup } from "./offers/index.js";
 import { createPrijsProfeet } from "./offers/prijsprofeet.js";
+import { createStoreImageLookup } from "./storeImage.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
@@ -145,6 +146,7 @@ const handler = createHandler({
     : undefined,
   barcode: { lookup: barcode, limits: barcodeLimits, searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01) },
   offers: prijsProfeet ? { lookup: createOfferLookup(prijsProfeet), provider: prijsProfeet, limits: offerLimits } : undefined,
+  storeImages: prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off" ? { lookup: createStoreImageLookup(prijsProfeet), limits: offerLimits } : undefined,
   products: {
     normalize: (name) => normalizeProduct(client!, { model: env.OPENAI_PRODUCT_MODEL || config.model, maxOutputTokens: number("PRODUCT_MAX_OUTPUT_TOKENS", 600) }, name),
     candidates,

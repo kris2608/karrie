@@ -45,6 +45,8 @@ export type OfferRow = {
   validUntil?: string;
   validUntilEstimated?: boolean;
   sourceUrl?: string;
+  /** A link to the retailer's own product photo; never copied. */
+  imageUrl?: string;
 };
 
 export type SearchResult =
@@ -93,6 +95,7 @@ const RowSchema = z.object({
   valid_until: day,
   valid_until_estimated: flag,
   product_url: text,
+  image_url: z.string().trim().min(1).max(600).nullish().catch(undefined),
 });
 
 const SearchSchema = z.object({ results: z.array(z.unknown()).max(200) });
@@ -111,6 +114,21 @@ function httpsUrl(value: string | null | undefined): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Where each retailer serves its product photos; anything else in `image_url` is ignored. */
+export const RETAILER_IMAGE_HOSTS: Record<RetailerId, { host: string; path: string }> = {
+  albert_heijn: { host: "static.ah.nl", path: "/dam/product/" },
+  jumbo: { host: "www.jumbo.com", path: "/dam-images/" },
+  lidl: { host: "www.lidl.nl", path: "/assets/" },
+};
+
+export function retailerImage(retailer: RetailerId, value: string | null | undefined): string | undefined {
+  const href = httpsUrl(value);
+  if (!href) return undefined;
+  const url = new URL(href);
+  const allowed = RETAILER_IMAGE_HOSTS[retailer];
+  return url.hostname === allowed.host && url.pathname.startsWith(allowed.path) && !url.username && !url.password && !url.port ? url.href : undefined;
 }
 
 export function toOfferRow(row: Row): OfferRow {
@@ -141,6 +159,7 @@ export function toOfferRow(row: Row): OfferRow {
     validUntil: row.valid_until?.slice(0, 10),
     validUntilEstimated: row.valid_until_estimated ?? undefined,
     sourceUrl: httpsUrl(row.product_url),
+    imageUrl: retailerImage(row.retailer, row.image_url),
   });
 }
 
@@ -161,6 +180,12 @@ export function searchUrl(q: string, retailer: RetailerId): string {
     promotion_status: "active",
     page_size: String(PRIJSPROFEET_RULES.pageSize),
   });
+  return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
+}
+
+/** A product photo by barcode: every promotion status and every supported retailer in one call. */
+export function imageSearchUrl(ean: string): string {
+  const params = new URLSearchParams({ q: ean, retailer: RETAILERS.join(","), page_size: String(PRIJSPROFEET_RULES.pageSize) });
   return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
 }
 
@@ -201,7 +226,8 @@ export function createPrijsProfeet(config: PrijsProfeetConfig, fetchImpl: Fetch 
     };
   }
 
-  async function search(q: string, retailer: RetailerId): Promise<SearchResult> {
+  /** Every call, for offers or photos, shares the same minute ceiling, EAN budget and 429 pause. */
+  async function call(url: string, bareEan: boolean): Promise<SearchResult> {
     const at = now();
     if (at < pausedUntil) return { ok: false, code: "limit" };
     recent = recent.filter((time) => at - time < 60_000);
@@ -209,7 +235,7 @@ export function createPrijsProfeet(config: PrijsProfeetConfig, fetchImpl: Fetch 
       stats.limited += 1;
       return { ok: false, code: "limit" };
     }
-    if (isBareEan(q)) {
+    if (bareEan) {
       const today = amsterdamDay(at);
       if (today !== eanDay) {
         eanDay = today;
@@ -221,7 +247,7 @@ export function createPrijsProfeet(config: PrijsProfeetConfig, fetchImpl: Fetch 
     recent.push(at);
     stats.calls += 1;
     try {
-      const response = await fetchImpl(searchUrl(q, retailer), {
+      const response = await fetchImpl(url, {
         headers: headers(),
         signal: AbortSignal.timeout(PRIJSPROFEET_RULES.timeoutMs),
       });
@@ -248,7 +274,8 @@ export function createPrijsProfeet(config: PrijsProfeetConfig, fetchImpl: Fetch 
   }
 
   return {
-    search,
+    search: (q: string, retailer: RetailerId) => call(searchUrl(q, retailer), isBareEan(q)),
+    searchImage: (ean: string) => call(imageSearchUrl(ean), true),
     stats(): ProviderStats {
       return {
         ...stats,

@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { ItemArt } from "../../components/ItemArt";
+import { useEffect, useRef, useState } from "react";
+import { ItemArt, markBroken, useBroken } from "../../components/ItemArt";
 import { ProductArt } from "../../components/ProductArt";
 import { PressButton } from "../../components/ui/PressButton";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
@@ -9,6 +9,8 @@ import { newItemFor, type DraftField, type ProductDraft } from "../../domain/pro
 import type { AdventureItem, AlternativeAssessment, CategoryId } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { savePhoto, usePhotoUrl } from "../../storage/photos";
+import { storeCredit } from "../../services/images/storeImage";
+import { storeImages, useStoreImage } from "../../storage/storeImages";
 
 type PhotoResultSheetProps = {
   /** Null: nothing usable was found and the parent fills it in. */
@@ -78,7 +80,14 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   const keyed = draft ? { name: draft.name, brand: draft.pack.brand, alternative: assessment } : null;
   const missionDefault = Boolean(keyed && missionOn(keyed, declined));
   const missionState = missionDefault ? "on" : keyed && assessment?.evidence === "label" && declined.includes(declineKey(keyed)) ? "declined" : "off";
-  const picture = photoUrl ?? earlier ?? draft?.imageUrl ?? null;
+  const lookStore = Boolean(draft?.ean && !draft.imageUrl);
+  useEffect(() => {
+    if (lookStore) storeImages.request(draft?.ean);
+  }, [lookStore, draft?.ean]);
+  const store = useStoreImage(lookStore ? draft?.ean : undefined);
+  const usable = useBroken();
+  const picture = photoUrl ?? earlier ?? usable(draft?.imageUrl) ?? usable(store?.imageUrl);
+  const storeShown = Boolean(store && picture === store.imageUrl);
 
   /** The new photo is stored when asked for; without one, the parent's earlier photo stays with the product. */
   async function commit(run: (photoId?: string) => string, withPhoto: boolean, after: "scan" | "done" = "scan") {
@@ -132,7 +141,7 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
         <ProductArt id={drawing.id} className="scan-card-art" />
       ) : picture ? (
         <span className="product-art item-photo scan-card-art">
-          <img src={picture} alt="" referrerPolicy="no-referrer" />
+          <img src={picture} alt="" referrerPolicy="no-referrer" onError={() => markBroken(picture)} />
         </span>
       ) : (
         <ProductArt id={draft?.icon ?? categoryIcon(category)} className="scan-card-art" />
@@ -167,7 +176,12 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
     </>
   );
 
-  const footer = <p className="scan-attribution">{sourcesLine(draft, Boolean(photoUrl))}</p>;
+  const footer = (
+    <p className="scan-attribution">
+      {sourcesLine(draft, Boolean(photoUrl))}
+      {storeShown && store && <> {storeCredit(store)}</>}
+    </p>
+  );
   const retakeLabel = photo ? "Opnieuw fotograferen" : "Terug naar camera";
 
   if (picking && photo) {

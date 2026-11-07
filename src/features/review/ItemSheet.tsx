@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { hasPhoto, ItemArt } from "../../components/ItemArt";
+import { hasPhoto, ItemArt, useArt } from "../../components/ItemArt";
 import { CameraIcon } from "../../components/ui/PhotoButton";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
@@ -69,6 +69,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const [name, setName] = useState(item.name);
   const [editing, setEditing] = useState(false);
   const parentPhoto = item.imageSource === "parent" && Boolean(item.photoId);
+  const shown = useArt(item).pick;
   const variant = item.recognition?.variant;
   const detail = [item.brand, variant, item.packageSize].filter(Boolean).join(" · ");
 
@@ -95,7 +96,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
           {item.source === "vision" && <small>Herkend van een foto</small>}
         </div>
       </div>
-      {item.offAttribution && <p className="scan-attribution">Gegevens: Open Food Facts (ODbL){item.imageSource === "off" ? ", foto's CC BY-SA" : ""}</p>}
+      {item.offAttribution && <p className="scan-attribution">Gegevens: Open Food Facts (ODbL){shown?.source === "off" ? ", foto's CC BY-SA" : ""}</p>}
       <PictureBlock item={item} />
       <ProductInfo item={item} />
       <MissionBlock item={item} />

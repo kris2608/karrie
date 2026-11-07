@@ -5,7 +5,8 @@ import { loadPersisted, savePersisted } from "../storage/db";
 import { preparePhotos } from "../storage/photos";
 import { offerQueries, offers } from "../storage/offers";
 import { references } from "../storage/references";
-import { wantedReferences } from "../domain/referenceTargets";
+import { storeImages, useStoreImagesVersion } from "../storage/storeImages";
+import { wantedReferences, wantedStoreImages } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
 import { analyticsEvents } from "./analyticsEvents";
 import { useCustomEnrichment } from "./customEnrichment";
@@ -44,6 +45,7 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancel = false;
     void offers.hydrate();
+    void storeImages.hydrate();
     Promise.all([loadPersisted(), references.hydrate()])
       .then(async ([data]) => {
         const minePhotos = data.mine.flatMap((entry) => [entry.photoId, entry.illustrationId].filter((id): id is string => Boolean(id)));
@@ -68,7 +70,17 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     setSoundEnabled(state.settings.soundEnabled);
   }, [state.settings.soundEnabled]);
 
-  const wanted = useMemo(() => (ready && state.settings.referenceImages ? wantedReferences(state.adventure) : []), [ready, state.adventure, state.settings.referenceImages]);
+  const storeVersion = useStoreImagesVersion();
+  const storeEans = useMemo(() => (ready ? wantedStoreImages(state.adventure) : []), [ready, state.adventure]);
+  useEffect(() => {
+    for (const ean of storeEans) storeImages.request(ean);
+  }, [storeEans]);
+
+  const wanted = useMemo(
+    () => (ready && state.settings.referenceImages ? wantedReferences(state.adventure, storeImages.status) : []),
+    /** storeVersion: a retailer photo answer decides whether a reference search is still needed. */
+    [ready, state.adventure, state.settings.referenceImages, storeVersion],
+  );
   useEffect(() => {
     references.setEnabled(state.settings.referenceImages);
     for (const identity of wanted) references.request(identity);

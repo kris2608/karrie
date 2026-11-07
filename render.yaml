@@ -87,6 +87,8 @@ services:
         value: Karrie/1.0 (+https://karrie.eu)
       - key: PRIJSPROFEET_API_KEY
         sync: false
+      - key: PRIJSPROFEET_IMAGES
+        value: "on"
       - key: OFFERS_LIMIT_PER_IP_HOUR
         value: "300"
       - key: OFFERS_LIMIT_PER_IP_DAY

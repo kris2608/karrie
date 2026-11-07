@@ -41,8 +41,11 @@ export type FieldSources = Partial<Record<"name" | "brand" | "variant" | "packag
 /** The barcode lookup behind an item. None of these is verified; off-exact only means name and brand were present. */
 export type BarcodeInfo = { status: "off-exact" | "off-partial" | "web-page"; sourceName: string; sourceUrl: string; at: number };
 
-/** Where the shown photo came from, independent of how the product was identified. */
-export type ImageSource = "off" | "parent";
+/**
+ * Where the shown photo came from, independent of how the product was identified. "prijsprofeet": a retailer's own
+ * photo for the exact barcode, found through PrijsProfeet; never stored on the item, only looked up by barcode.
+ */
+export type ImageSource = "off" | "parent" | "prijsprofeet";
 
 export type Confidence = "high" | "medium" | "low";
 

@@ -10,7 +10,9 @@ import { customName } from "./productName.js";
 import { ImageIdentitySchema, type ImageDiscovery } from "./images.js";
 import type { Limits } from "./limits.js";
 import type { OfferLookup } from "./offers/index.js";
+import { PRODUCT_CATEGORIES } from "./offers/match.js";
 import { RETAILERS, type PrijsProfeet } from "./offers/prijsprofeet.js";
+import type { StoreImageLookup, StoreImageResult } from "./storeImage.js";
 import type { RecognizeResult } from "./recognize.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
 
@@ -33,6 +35,12 @@ export type OfferDeps = {
   lookup: Pick<OfferLookup, "find" | "stats">;
   provider?: Pick<PrijsProfeet, "stats">;
   /** Per-IP limits; PrijsProfeet's own limits are kept by the provider for the whole server. */
+  limits: Limits;
+};
+
+export type StoreImageDeps = {
+  lookup: Pick<StoreImageLookup, "find" | "cached" | "stats">;
+  /** The offers' per-IP limits; PrijsProfeet's own limits are shared with the offers by the provider. */
   limits: Limits;
 };
 
@@ -62,6 +70,7 @@ export type AppDeps = {
   images?: ImageDeps;
   barcode?: BarcodeDeps;
   offers?: OfferDeps;
+  storeImages?: StoreImageDeps;
   products?: ProductDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
@@ -70,6 +79,7 @@ export type AppDeps = {
 const ROUTES = [
   "/api/products/recognize-photo",
   "/api/images/discover",
+  "/api/images/ean",
   "/api/products/barcode",
   "/api/offers/match",
   "/api/products/normalize",
@@ -145,6 +155,7 @@ export function createHandler(deps: AppDeps) {
   const barcodeFailures: Record<string, number> = {};
   const barcodeOutcomes: Record<string, number> = {};
   const offerOutcomes: Record<string, number> = {};
+  const storeImageOutcomes: Record<string, number> = {};
   const productOutcomes: Record<string, number> = {};
   const illustrationOutcomes: Record<string, number> = {};
   const count = (into: Record<string, number>, key: string) => (into[key] = (into[key] ?? 0) + 1);
@@ -192,6 +203,7 @@ export function createHandler(deps: AppDeps) {
         offers: deps.offers
           ? { stats: deps.offers.limits.stats(), cache: deps.offers.lookup.stats(), provider: deps.offers.provider?.stats(), outcomes: offerOutcomes }
           : undefined,
+        storeImages: deps.storeImages ? { stats: deps.storeImages.limits.stats(), cache: deps.storeImages.lookup.stats(), outcomes: storeImageOutcomes } : undefined,
         products: deps.products
           ? {
               stats: deps.products.limits.stats(),
@@ -234,6 +246,7 @@ export function createHandler(deps: AppDeps) {
       return send(400, { status: "error", code: "bad-request" });
     }
     if (url.pathname === "/api/images/discover") return discoverImages(body);
+    if (url.pathname === "/api/images/ean") return storeImage(body);
     if (url.pathname === "/api/products/barcode") return lookupBarcode(body);
     if (url.pathname === "/api/offers/match") return matchOffer(body);
     if (url.pathname === "/api/products/normalize") return normalizeTyped(body);
@@ -322,6 +335,37 @@ export function createHandler(deps: AppDeps) {
       Object.assign(entry, { lookupMs: latencyMs, searchCalls: result.ok ? result.searchCalls : undefined });
       for (const failure of result.failures) count(barcodeFailures, failure);
       count(barcodeOutcomes, result.ok ? result.answer.status : `error-${result.code}`);
+      return reply(result);
+    }
+
+    /** Only the barcode goes to PrijsProfeet. The answer is a link to the retailer's photo, never the photo itself. */
+    async function storeImage(body: unknown) {
+      const images = deps.storeImages;
+      if (!images) return send(503, { status: "error", code: "misconfigured" });
+      const request = BarcodeRequestSchema.safeParse(body);
+      const ean = request.success ? canonicalEan(request.data.ean) : null;
+      if (!ean) return send(400, { status: "error", code: "bad-request" });
+
+      const reply = (result: StoreImageResult) => {
+        if (!result.ok) {
+          count(storeImageOutcomes, `error-${result.code}`);
+          return send(result.code === "limit" ? 429 : 502, { status: "error", code: result.code === "limit" ? "rate-limited" : "unavailable" });
+        }
+        entry.found = result.image ? "found" : "none";
+        count(storeImageOutcomes, result.image ? `found-${result.image.retailer}` : "none");
+        return send(200, { status: "ok", image: result.image });
+      };
+      const hit = images.lookup.cached(ean);
+      if (hit) {
+        entry.cached = true;
+        return reply(hit);
+      }
+      const denial = images.limits.admit(clientIp(req));
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const callStarted = now();
+      const result = await images.lookup.find(ean);
+      images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+      entry.lookupMs = now() - callStarted;
       return reply(result);
     }
 
@@ -460,7 +504,7 @@ const OfferRequestSchema = z
       .object({
         name: OfferText,
         aliases: z.array(OfferText).max(8).optional(),
-        category: z.enum(["produce", "bakery", "pantry", "dairy", "frozen", "household"]),
+        category: z.enum(PRODUCT_CATEGORIES),
         generic: z.boolean(),
         brand: OfferText.optional(),
         variant: OfferText.optional(),

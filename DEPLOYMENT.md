@@ -402,6 +402,18 @@ Live gemeten in november 2026 (`node scripts/check-offers.mjs`, 24 zoekopdrachte
 
 **Privacy.** Er gaat alleen productinformatie naar de server en PrijsProfeet: geen foto's, geen namen of leeftijden, geen lijstnaam, geen locatie. De server logt alleen de supermarkt, of het een standaardproduct was en de uitkomst, niet de productnaam.
 
+### Productfoto's via PrijsProfeet
+
+**Wat het doet.** Heeft een gescand product geen voorpagina-foto van Open Food Facts, dan vraagt de app op de achtergrond `POST /api/images/ean` met alleen `{ ean }`. De server zoekt bij PrijsProfeet `GET /api/v1/search?q=<ean>&retailer=jumbo,albert_heijn,lidl&page_size=20`, zonder `promotion_status`, dus ook verlopen en komende acties. Een rij telt alleen als haar `ean` precies de gescande code is (ook met of zonder voorloopnul); een gelijkende naam is nooit genoeg. Van die rij neemt Karrie alleen `image_url` over, en alleen van de eigen fotoserver van de supermarkt: `static.ah.nl/dam/product/`, `www.jumbo.com/dam-images/` of `www.lidl.nl/assets/`, altijd via https. De app controleert dat opnieuw. Er komt geen OpenAI-aanroep aan te pas.
+
+**Welke foto je kind ziet.** Zonder keuze van de ouder: Open Food Facts, dan de supermarktfoto via PrijsProfeet, dan een gevonden voorbeeldfoto, dan de eigen foto van de ouder, dan de Karrie-tekening. Kiest de ouder bij het product **Eigen foto**, **Voorbeeldfoto** (dat is ook de supermarktfoto) of **Tekening**, dan wint die keuze altijd, ook in bewaarde lijstjes. Laadt de gekozen foto niet, dan valt Karrie terug op de volgorde hierboven; de keuze zelf blijft bewaard. Met een supermarktfoto zoekt Karrie geen voorbeeldfoto meer. Standaardproducten zonder streepjescode houden hun tekening; het toevoegen wacht nooit op de foto.
+
+**Dekking.** De gratis zoekfunctie bevat alleen producten die in de aanbieding zijn, waren of komen. Een product dat nooit in de aanbieding was, heeft dus geen foto. Lidl geeft geen streepjescodes door, dus in de praktijk komen de foto's van Albert Heijn en Jumbo.
+
+**Limieten en geheugen.** De zoekopdracht telt mee voor dezelfde limieten als de aanbiedingen: hoogstens 60 per minuut en 400 streepjescodes per dag voor de hele server, dezelfde pauze na een `429`, en per IP de aanbiedingslimieten. De server onthoudt een gevonden foto 14 dagen, "geen foto" 1 dag en een fout 5 minuten (hoogstens 5000 codes). De app onthoudt de link per streepjescode op het apparaat, vraagt "geen foto" na 7 dagen opnieuw en controleert een gevonden foto na 30 dagen. `/api/health` toont onder `storeImages` de uitkomsten per supermarkt. De server logt nooit de link.
+
+**Rechten.** De foto's zijn van de supermarkt. PrijsProfeet zegt: "Een productfoto komt alleen mee als link naar de keten zelf." Karrie linkt daarom alleen (met `referrerPolicy="no-referrer"`), kopieert de foto nooit naar de server of het apparaat en deelt hem niet met andere gezinnen. Bij de foto staat altijd "Foto: Albert Heijn, via PrijsProfeet" (of Jumbo, Lidl) met een link naar de productpagina; nooit Open Food Facts. **Lees vóór gebruik de [API-voorwaarden](https://www.prijsprofeet.nl/api-voorwaarden)**; die konden bij het bouwen niet automatisch worden opgehaald. Mag het niet, zet dan `PRIJSPROFEET_IMAGES=off` op `karrie-api`: het eindpunt verdwijnt en de app valt terug op voorbeeldfoto's en tekeningen.
+
 ## Statistieken (Umami)
 
 Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.is). Umami zet geen cookies en maakt geen gebruikersprofiel; Karrie roept nooit `umami.identify()` aan.

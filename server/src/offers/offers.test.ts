@@ -5,7 +5,7 @@ import { createHandler } from "../app.js";
 import { createLimits } from "../limits.js";
 import { createOfferLookup, nameQuery } from "./index.js";
 import type { OfferProduct } from "./match.js";
-import { createPrijsProfeet, searchUrl, type OfferRow, type SearchResult } from "./prijsprofeet.js";
+import { createPrijsProfeet, imageSearchUrl, parseSearch, retailerImage, searchUrl, type OfferRow, type SearchResult } from "./prijsprofeet.js";
 
 const NOW = Date.parse("2026-11-07T10:00:00Z");
 const HOUR = 60 * 60_000;
@@ -113,6 +113,36 @@ describe("PrijsProfeet adapter", () => {
     expect(await provider.search("8718166011021", "albert_heijn")).toEqual({ ok: false, code: "ean-limit" });
     expect(await provider.search("melk", "albert_heijn")).toMatchObject({ ok: true });
     expect(provider.stats().eanToday).toBe(1);
+  });
+
+  it("keeps only retailer photo links from the retailer's own image host", () => {
+    const row = (retailer: string, image_url: unknown) => parseSearch({ results: [{ ...ARLA_RAW, retailer, image_url }] })?.[0]?.imageUrl;
+    const ah = "https://static.ah.nl/dam/product/AHI_43545231?revLabel=1&rendition=800x800_WEBP&fileType=binary";
+    expect(row("albert_heijn", ah)).toBe(ah);
+    expect(row("jumbo", "https://www.jumbo.com/dam-images/fit-in/360x360/Products/8713788124340_H1N1.png")).toMatch(/^https:\/\/www\.jumbo\.com\/dam-images\//);
+    expect(row("lidl", "https://www.lidl.nl/assets/gcp2145aa892ba745debbdc4d907952461a.png")).toMatch(/^https:\/\/www\.lidl\.nl\/assets\//);
+    expect(row("albert_heijn", "http://static.ah.nl/dam/product/x")).toBeUndefined();
+    expect(row("albert_heijn", "https://www.jumbo.com/dam-images/x.png")).toBeUndefined();
+    expect(row("jumbo", "https://www.jumbo.com/elders/x.png")).toBeUndefined();
+    expect(row("albert_heijn", "https://static.ah.nl.evil.example/dam/product/x")).toBeUndefined();
+    expect(row("albert_heijn", "https://user:pw@static.ah.nl/dam/product/x")).toBeUndefined();
+    expect(row("albert_heijn", 42)).toBeUndefined();
+    expect(retailerImage("lidl", "javascript:alert(1)")).toBeUndefined();
+  });
+
+  it("asks for photos by barcode across all supported retailers and every promotion status, sharing the limits", async () => {
+    const urls: string[] = [];
+    const provider = createPrijsProfeet({ userAgent: "Karrie", eanPerDay: 2, perMinute: 3 }, async (url) => (urls.push(url), json({ results: [] })), () => NOW);
+    expect(await provider.searchImage("8718166011021")).toMatchObject({ ok: true });
+    const params = Object.fromEntries(new URL(urls[0]).searchParams);
+    expect(params).toEqual({ q: "8718166011021", retailer: "jumbo,albert_heijn,lidl", page_size: "20" });
+    expect(imageSearchUrl("8718166011021")).not.toContain("promotion_status");
+    expect(searchUrl("8718166011021", "jumbo")).toContain("promotion_status=active");
+    await provider.search("8718166011021", "jumbo");
+    expect(await provider.searchImage("8718166011021")).toEqual({ ok: false, code: "ean-limit" });
+    expect(provider.stats().eanToday).toBe(2);
+    await provider.search("melk", "jumbo");
+    expect(await provider.search("kaas", "jumbo")).toEqual({ ok: false, code: "limit" });
   });
 
   it("12. reports failures instead of throwing", async () => {
@@ -256,6 +286,13 @@ describe("POST /api/offers/match", () => {
     expect((await post({ ...body, family: "x" })).status).toBe(400);
     expect((await post({ ...body, product: { ...body.product, ean: "1234567890123" } })).status).toBe(400);
     expect((await post(body, "https://evil.example")).status).toBe(403);
+  });
+
+  it("accepts every app department, including meat, breakfast and drinks", async () => {
+    const { post } = await start(async () => ({ ok: true, match: { matchType: "none" } }));
+    for (const category of ["meat", "breakfast", "drinks", "household"]) {
+      expect((await post({ ...body, product: { ...body.product, category } })).status).toBe(200);
+    }
   });
 
   it("12. turns provider trouble into 502 or 429 without breaking anything", async () => {
