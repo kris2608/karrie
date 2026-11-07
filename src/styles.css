@@ -386,6 +386,76 @@ h1, h2, p { margin: 0; }
 .sheet-note { color: var(--ink-soft); font-size: 0.95rem; }
 .sheet-actions { display: flex; gap: var(--space-3); }
 .sheet-actions > * { flex: 1; }
+.sheet-card [tabindex="-1"]:focus { outline: none; }
+
+.settings-links {
+  display: grid;
+  margin: calc(var(--space-2) * -1) 0;
+}
+.settings-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-link + .settings-link { border-top: 1px solid rgba(43, 54, 64, 0.08); }
+.settings-link svg { flex: none; width: 18px; height: 18px; color: var(--ink-mute); }
+.sheet-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  justify-self: start;
+  margin-left: calc(var(--space-3) * -1);
+}
+.sheet-back svg { width: 20px; height: 20px; }
+
+.about-story,
+.privacy-info { display: grid; gap: var(--space-3); }
+.about-story p,
+.privacy-info p { line-height: 1.55; }
+.about-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-card);
+  background: var(--paper-deep);
+}
+.about-story strong { color: var(--teal-shade); font-weight: 900; }
+.about-pill {
+  justify-self: center;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--yellow);
+  box-shadow: 0 3px 0 var(--yellow-shade);
+  font-weight: 900;
+  transform: rotate(-2deg);
+}
+.privacy-info section {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.privacy-info h3 { margin: 0; font-size: 1.05rem; font-weight: 900; }
+.privacy-info p { color: var(--ink-soft); font-size: 0.98rem; }
+.privacy-link {
+  justify-self: start;
+  padding: var(--space-2) 0;
+  font-weight: 900;
+}
 .sheet textarea {
   width: 100%;
   padding: var(--space-4);

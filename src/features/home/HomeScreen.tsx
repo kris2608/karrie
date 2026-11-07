@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Karrie } from "../../components/mascot/Karrie";
 import { ItemArt } from "../../components/ItemArt";
@@ -19,6 +19,16 @@ import { RetailerPicker } from "../offers/RetailerPicker";
 import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
+import { AboutKarrie } from "./AboutKarrie";
+import { PrivacyInfo } from "./PrivacyInfo";
+
+type ParentView = "settings" | "about" | "privacy";
+
+const viewLabels: Record<ParentView, string> = {
+  settings: "Instellingen voor ouders",
+  about: "Over Karrie",
+  privacy: "Privacy en gegevens",
+};
 
 function ListCard({ list, label: fallback, onOpen, onForget }: { list: SavedList; label: string; onOpen: () => void; onForget: () => void }) {
   const { pressing, handlers } = useLongPress(onForget);
@@ -53,6 +63,10 @@ export function HomeScreen() {
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [view, setView] = useState<ParentView>("settings");
+  const lastView = useRef<ParentView>("settings");
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const rowRefs = useRef<Partial<Record<ParentView, HTMLButtonElement | null>>>({});
   const undo = useNotice();
   const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null);
 
@@ -62,6 +76,22 @@ export function HomeScreen() {
     const timer = window.setTimeout(() => setNotice(null), 2400);
     return () => window.clearTimeout(timer);
   }, [notice, navigate]);
+
+  useEffect(() => {
+    const from = lastView.current;
+    lastView.current = parentOpen ? view : "settings";
+    if (!parentOpen || from === view) return;
+    headingRef.current?.closest(".sheet-card")?.scrollTo({ top: 0 });
+    if (view === "settings") rowRefs.current[from]?.focus();
+    else headingRef.current?.focus();
+  }, [view, parentOpen]);
+
+  function closeParent() {
+    setParentOpen(false);
+    setConfirmClear(false);
+    setView("settings");
+  }
+
   const shopping = adventure?.phase === "shopping";
   const draft = adventure?.phase === "draft" && adventure.items.length > 0;
   const previous = adventure?.phase === "done" ? saved[0] : saved.find((list) => list.id !== adventure?.id);
@@ -176,63 +206,85 @@ export function HomeScreen() {
 
       <Toast notice={undo.notice} onDismiss={undo.dismiss} />
 
-      <Sheet
-        open={parentOpen}
-        onClose={() => {
-          setParentOpen(false);
-          setConfirmClear(false);
-        }}
-        label="Instellingen voor ouders"
-      >
-        <h2>Voor ouders</h2>
-        <SoundSwitch />
-        <DiscoverySwitch />
-        <ReferenceSwitch />
-        <div className="setting-block" data-testid="default-retailer">
-          <span className="switch-label">
-            <strong>Supermarkt</strong>
-            <small>{settings.retailer ? `Nieuwe lijstjes tonen aanbiedingen van ${retailerName(settings.retailer)}` : "Geen: Karrie zoekt geen aanbiedingen"}</small>
-          </span>
-          <RetailerPicker value={settings.retailer} onChange={(retailer) => dispatch({ type: "set-default-retailer", retailer })} />
-        </div>
-        {saved.length > 0 &&
-          (confirmClear ? (
-            <div className="clear-saved" data-testid="clear-saved-confirm">
-              <p>
-                Alle {saved.length} bewaarde {saved.length === 1 ? "lijstje" : "lijstjes"} wissen?
-              </p>
-              <div className="clear-saved-actions">
-                <PressButton variant="quiet" onClick={() => setConfirmClear(false)}>
-                  Annuleer
-                </PressButton>
-                <PressButton
-                  variant="secondary"
-                  data-testid="clear-saved-yes"
-                  onClick={() => {
-                    dispatch({ type: "clear-saved" });
-                    setConfirmClear(false);
-                  }}
-                >
-                  Wissen
-                </PressButton>
-              </div>
+      <Sheet open={parentOpen} onClose={closeParent} label={viewLabels[view]}>
+        {view === "settings" ? (
+          <>
+            <h2 ref={headingRef}>Voor ouders</h2>
+            <SoundSwitch />
+            <DiscoverySwitch />
+            <ReferenceSwitch />
+            <div className="setting-block" data-testid="default-retailer">
+              <span className="switch-label">
+                <strong>Supermarkt</strong>
+                <small>{settings.retailer ? `Nieuwe lijstjes tonen aanbiedingen van ${retailerName(settings.retailer)}` : "Geen: Karrie zoekt geen aanbiedingen"}</small>
+              </span>
+              <RetailerPicker value={settings.retailer} onChange={(retailer) => dispatch({ type: "set-default-retailer", retailer })} />
             </div>
-          ) : (
-            <button type="button" className="text-button" data-testid="clear-saved" onClick={() => setConfirmClear(true)}>
-              Bewaarde lijstjes wissen
+            {saved.length > 0 &&
+              (confirmClear ? (
+                <div className="clear-saved" data-testid="clear-saved-confirm">
+                  <p>
+                    Alle {saved.length} bewaarde {saved.length === 1 ? "lijstje" : "lijstjes"} wissen?
+                  </p>
+                  <div className="clear-saved-actions">
+                    <PressButton variant="quiet" onClick={() => setConfirmClear(false)}>
+                      Annuleer
+                    </PressButton>
+                    <PressButton
+                      variant="secondary"
+                      data-testid="clear-saved-yes"
+                      onClick={() => {
+                        dispatch({ type: "clear-saved" });
+                        setConfirmClear(false);
+                      }}
+                    >
+                      Wissen
+                    </PressButton>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="text-button" data-testid="clear-saved" onClick={() => setConfirmClear(true)}>
+                  Bewaarde lijstjes wissen
+                </button>
+              ))}
+            <nav className="settings-links" aria-label="Meer over Karrie">
+              {(["about", "privacy"] as const).map((target) => (
+                <button
+                  key={target}
+                  ref={(node) => {
+                    rowRefs.current[target] = node;
+                  }}
+                  type="button"
+                  className="settings-link"
+                  data-testid={`open-${target}`}
+                  onClick={() => setView(target)}
+                >
+                  {target === "about" ? "❤️ Over Karrie" : "Privacy en gegevens"}
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ))}
+            </nav>
+            <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome. Lang drukken op een lijstje wist het.</p>
+            <PressButton variant="secondary" wide onClick={closeParent}>
+              Klaar
+            </PressButton>
+          </>
+        ) : (
+          <>
+            <button type="button" className="text-button sheet-back" data-testid="sheet-back" onClick={() => setView("settings")}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Terug
             </button>
-          ))}
-        <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome. Lang drukken op een lijstje wist het.</p>
-        <PressButton
-          variant="secondary"
-          wide
-          onClick={() => {
-            setParentOpen(false);
-            setConfirmClear(false);
-          }}
-        >
-          Klaar
-        </PressButton>
+            {view === "about" ? <AboutKarrie headingRef={headingRef} /> : <PrivacyInfo headingRef={headingRef} />}
+            <PressButton variant="secondary" wide onClick={() => setView("settings")}>
+              Terug
+            </PressButton>
+          </>
+        )}
       </Sheet>
     </main>
   );

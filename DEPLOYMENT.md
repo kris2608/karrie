@@ -88,6 +88,8 @@ Gebruik het HTTPS-adres, niet een lokaal IP-adres zonder certificaat.
 - Plak een korte lijst, controleer hem en start het avontuur.
 - **Lang drukken** (ruim een halve seconde) op een product bij **Toevoegen** of **Controleren** haalt het van de lijst. **Ongedaan maken** staat daarna even in beeld. Een korte tik voegt nog steeds toe, en scrollen met de vinger erop verwijdert niets.
 - Geluid staat standaard uit. Zet het aan via het tandwiel op het beginscherm en hoor een plopje bij **Gevonden!**.
+- Tandwiel → **❤️ Over Karrie** toont de tekening van Thomas en het verhaal; **Terug** brengt je terug naar de instellingen. **Privacy en gegevens** scrollt tot **Lees de volledige privacyverklaring**, die in een nieuw venster opent.
+- `https://karrieapp.onrender.com/privacy.html` toont de privacyverklaring, ook als de app al op het beginscherm staat (niet het beginscherm van Karrie).
 - Zet het toestel daarna in vliegtuigmodus en open het beginscherm-icoon opnieuw. De winkelmodus werkt nog.
 - De eerste keer openen heeft internet nodig, zodat de app en de service worker binnenkomen.
 - Zie je na een nieuwe deploy nog de oude versie? Sluit de app helemaal en open hem opnieuw. De service worker werkt zichzelf bij.
@@ -370,6 +372,12 @@ Wat niet telt: een bewaard lijstje openen, terug naar een lopend avontuur, **Ong
 **Controleren in Umami Cloud.** Open Websites → Karrie. **Realtime** toont binnen enkele seconden een bezoek aan `karrieapp.onrender.com` en elke gebeurtenis. Onder **Events** staan de gebeurtenissen met hun aantallen; klik op een naam voor de verdeling van `method`, `source` of `choice`. In de browser (DevTools → Network, filter `api/send`) zie je per verzoek precies wat er wordt verstuurd.
 
 Faalt Umami (geblokkeerd, offline, traag), dan merkt Karrie daar niets van: er wordt niets opnieuw geprobeerd of bewaard.
+
+## Over Karrie en privacy
+
+Onder **Voor ouders** staan, onder **Bewaarde lijstjes wissen**, twee rustige regels: **❤️ Over Karrie** (het verhaal van Thomas met `public/images/karrie_thomas_over-ons.webp`) en **Privacy en gegevens** (een korte samenvatting). Ze openen in hetzelfde venster; **Terug** brengt je naar de instellingen, sluiten zet het venster weer op de instellingen.
+
+De volledige privacyverklaring is een losse pagina, `public/privacy.html` (`/privacy.html`). De service worker stuurt die niet naar de app (`navigateFallbackDenylist`), en Render levert bestaande bestanden voor de rewrite naar `/index.html`. De pagina is een feitelijk concept: **vul de naam en contactgegevens van de verantwoordelijke in** (gele blokken met *IN TE VULLEN* en *TE CONTROLEREN*) en laat hem juridisch nakijken. Verandert er iets aan welke gegevens Karrie verstuurt (in dit bestand onder Privacy, Umami of een nieuwe dienst), pas dan ook `privacy.html`, de samenvatting in `src/features/home/PrivacyInfo.tsx` en de datum bovenaan aan.
 
 ## Kosten (gemeten met `gpt-5.4-mini`, november 2026)
 

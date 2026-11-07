@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fff6e8" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Privacyverklaring – Karrie</title>
+    <style>
+      :root {
+        --paper: #fff6e8;
+        --card: #fffdf9;
+        --teal-shade: #0c8c84;
+        --yellow-soft: #fff1bf;
+        --yellow-shade: #e8ac10;
+        --ink: #2b3640;
+        --ink-soft: #5d6a74;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Nunito", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+        font-size: 1.02rem;
+        line-height: 1.6;
+        -webkit-text-size-adjust: 100%;
+      }
+      main {
+        width: min(680px, 100%);
+        margin: 0 auto;
+        padding: max(24px, env(safe-area-inset-top)) 20px max(40px, env(safe-area-inset-bottom));
+      }
+      h1 { margin: 8px 0 4px; font-size: clamp(1.7rem, 7vw, 2.2rem); font-weight: 900; line-height: 1.2; }
+      h2 { margin: 0 0 8px; font-size: 1.2rem; font-weight: 900; }
+      h3 { margin: 16px 0 4px; font-size: 1.02rem; font-weight: 900; }
+      p, ul { margin: 0 0 10px; }
+      ul { padding-left: 1.2em; }
+      li + li { margin-top: 4px; }
+      a { color: var(--teal-shade); font-weight: 800; }
+      section {
+        margin-top: 16px;
+        padding: 18px 20px;
+        border-radius: 24px;
+        background: var(--card);
+        box-shadow: 0 1px 0 rgba(120, 72, 20, 0.08), 0 6px 18px rgba(120, 72, 20, 0.08);
+      }
+      .lead { color: var(--ink-soft); }
+      .updated { color: var(--ink-soft); font-size: 0.92rem; }
+      .todo {
+        padding: 12px 14px;
+        border: 2px dashed var(--yellow-shade);
+        border-radius: 16px;
+        background: var(--yellow-soft);
+        font-weight: 700;
+      }
+      .back { display: inline-block; padding: 10px 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="/">‹ Terug naar Karrie</a>
+      <h1>Privacyverklaring Karrie</h1>
+      <p class="lead">
+        Karrie is een boodschappenspel voor ouders en kinderen. Je hebt geen account nodig en we vragen niet naar namen, leeftijden of andere
+        gegevens over je kind. In deze verklaring lees je welke gegevens op je eigen apparaat blijven, welke er naar onze server en andere diensten
+        gaan, en waarom.
+      </p>
+      <p class="updated">Laatst bijgewerkt: 7 november 2026</p>
+
+      <section>
+        <h2>Wie is verantwoordelijk?</h2>
+        <p class="todo">
+          [IN TE VULLEN: naam van de verwerkingsverantwoordelijke, vestigingsplaats en contactgegevens (e-mailadres) voor vragen over privacy.]
+        </p>
+      </section>
+
+      <section>
+        <h2>Op je eigen apparaat</h2>
+        <p>Karrie bewaart je gegevens in de opslag van je browser op je eigen telefoon of tablet (IndexedDB en localStorage):</p>
+        <ul>
+          <li>je boodschappenlijstjes, bewaarde lijstjes en de voortgang van een avontuur;</li>
+          <li>Mijn producten: producten die je eerder hebt toegevoegd;</li>
+          <li>productfoto's die je bewaart (verkleind tot 512 pixels);</li>
+          <li>je instellingen, zoals geluid en je supermarkt;</li>
+          <li>tijdelijke kopieën van antwoorden, zoals productgegevens en aanbiedingen, zodat Karrie niet alles opnieuw hoeft te vragen;</li>
+          <li>een teller van het aantal herkenningen per dag, voor de daglimiet;</li>
+          <li>de app zelf, zodat Karrie ook zonder internet opent.</li>
+        </ul>
+        <p>
+          Deze gegevens gaan niet naar ons. Ze blijven staan tot je ze zelf wist. Foto's die nergens meer gebruikt worden, ruimt Karrie bij het
+          opstarten zelf op.
+        </p>
+      </section>
+
+      <section>
+        <h2>Wat er naar de server van Karrie gaat</h2>
+        <p>
+          Sommige functies hebben internet nodig. Dan stuurt de app een vraag naar de server van Karrie. Die draait bij Render, in een datacenter in
+          Frankfurt (Duitsland). De server stuurt de vraag door naar de diensten hieronder.
+        </p>
+        <h3>Een product herkennen met een foto</h3>
+        <ul>
+          <li>
+            Er gaat pas iets weg als je op de ontspanknop tikt of een foto uit je galerij kiest. Het live camerabeeld en het lezen van
+            streepjescodes blijven op je toestel.
+          </li>
+          <li>
+            De app verkleint de foto eerst en maakt er een nieuw bestand van. Daardoor verdwijnen gegevens zoals je locatie (GPS) en het type
+            toestel.
+          </li>
+          <li>
+            Staat er een gezicht of lichaam op de foto, dan toont Karrie geen resultaat en vraagt om een nieuwe foto. Die foto is dan wel al
+            verstuurd. Een hand die het product vasthoudt is goed.
+          </li>
+        </ul>
+        <h3>Streepjescodes, voorbeeldfoto's en aanbiedingen</h3>
+        <p>
+          Hiervoor stuurt Karrie alleen productgegevens: de naam, het merk, de soort of de streepjescode van het product. Nooit je lijstje als
+          geheel, de naam van je lijstje, foto's of je locatie.
+        </p>
+        <h3>Wat de server bewaart</h3>
+        <ul>
+          <li>De server bewaart geen foto's en schrijft geen beelden of IP-adressen in zijn logboek.</li>
+          <li>
+            Het logboek bevat alleen technische gegevens: tijdstip, soort vraag, grootte, uitkomst, duur en het verbruik bij OpenAI. Bij
+            aanbiedingen staat er ook welke supermarkt het was, maar niet welk product.
+          </li>
+          <li>
+            Je IP-adres gebruikt de server alleen in zijn werkgeheugen, om te tellen hoeveel vragen er van één adres komen (zodat niemand de dienst
+            kan overbelasten). Alleen vragen van de laatste 24 uur tellen mee. Het adres wordt niet op schijf bewaard; bij een herstart van de
+            server is het weg.
+          </li>
+          <li>
+            De server onthoudt in zijn werkgeheugen alleen productgegevens: gevonden productinformatie en voorbeeldfoto's met een open licentie
+            hoogstens 30 dagen, aanbiedingen hoogstens 3 uur. Daar zit niets in over jou of je gezin.
+          </li>
+        </ul>
+        <p>
+          Render levert de website en de server. Zoals elke hostingpartij verwerkt Render daarvoor technische verbindingsgegevens, zoals je
+          IP-adres.
+        </p>
+      </section>
+
+      <section>
+        <h2>Andere diensten</h2>
+        <h3>OpenAI</h3>
+        <p>
+          De foto die je met de ontspanknop maakt, gaat via de server naar OpenAI om het product te herkennen. Ook als Karrie op internet zoekt naar
+          productgegevens of een voorbeeldfoto, gaan de naam en het merk van het product naar OpenAI. Karrie vraagt OpenAI om deze aanvragen niet
+          op te slaan (<code>store: false</code>). OpenAI kan aanvragen wel tijdelijk bewaren om misbruik te controleren, volgens de
+          <a href="https://platform.openai.com/docs/guides/your-data" rel="noopener">regels voor API-gegevens van OpenAI</a>. OpenAI is gevestigd in
+          de Verenigde Staten.
+        </p>
+        <h3>Open Food Facts</h3>
+        <p>
+          Bij een streepjescode vraagt de server de productgegevens op bij <a href="https://world.openfoodfacts.org" rel="noopener">Open Food
+          Facts</a>, een open productdatabase. Daarvoor gaat alleen de streepjescode mee.
+        </p>
+        <h3>PrijsProfeet</h3>
+        <p>
+          Kies je een supermarkt, dan vraagt de server bij <a href="https://www.prijsprofeet.nl" rel="noopener">PrijsProfeet</a> of er een
+          aanbieding is. Daarvoor gaan de supermarkt en de naam, soort of streepjescode van het product mee.
+        </p>
+        <h3>Brave Search, Wikimedia Commons en Openverse</h3>
+        <p>
+          Voor voorbeeldfoto's zoekt de server met de naam en het merk van het product bij Wikimedia Commons en Openverse, en bij Brave Search als
+          die is ingeschakeld. Laat Karrie je een paar voorbeeldfoto's zien om uit te kiezen, dan laadt je browser die rechtstreeks van de bron
+          (zoals Open Food Facts, Wikimedia of Openverse). Die dienst ziet dan je IP-adres, zoals bij elke afbeelding op internet. Karrie stuurt
+          daarbij geen verwijzing naar de app mee.
+        </p>
+        <h3>Umami Cloud (statistieken)</h3>
+        <p>
+          Met <a href="https://umami.is" rel="noopener">Umami Cloud</a> tellen we anoniem hoe Karrie wordt gebruikt, zodat we de app kunnen
+          verbeteren. Bijvoorbeeld welk scherm opent, hoe een product is toegevoegd (zoals met de camera of uit Mijn producten), de afdeling van
+          een product, en hoeveel producten een avontuur had. Umami ziet daarbij ook algemene gegevens zoals land, browser en type apparaat.
+        </p>
+        <ul>
+          <li>Umami zet geen cookies en maakt geen gebruikersprofiel.</li>
+          <li>We sturen geen namen, productnamen, streepjescodes, productfoto's of de inhoud van je boodschappenlijstjes naar Umami.</li>
+          <li>Staat <em>Do Not Track</em> aan in je browser, dan telt Karrie je niet.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Kinderen</h2>
+        <ul>
+          <li>Karrie heeft geen accounts en vraagt geen gegevens over je kind, zoals een naam of leeftijd.</li>
+          <li>Foto's zijn bedoeld voor producten. Staat er een persoon op, dan wordt de foto geweigerd en vraagt Karrie om een nieuwe.</li>
+          <li>De camera en de instellingen zijn bedoeld voor de ouder.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Waarom we deze gegevens gebruiken</h2>
+        <p>
+          We gebruiken gegevens alleen om te doen wat jij in de app vraagt (een product herkennen, productinformatie, een voorbeeldfoto of een
+          aanbieding opzoeken), om de dienst te beschermen tegen overbelasting, en om met anonieme tellingen de app te verbeteren. We verkopen geen
+          gegevens en tonen geen advertenties.
+        </p>
+        <p class="todo">[TE CONTROLEREN: de juridische grondslag per verwerking en de doorgifte van gegevens buiten de EU (OpenAI).]</p>
+      </section>
+
+      <section>
+        <h2>Jouw rechten en controle</h2>
+        <ul>
+          <li>Bewaarde lijstjes wis je in Karrie via <strong>Voor ouders → Bewaarde lijstjes wissen</strong>, of door lang op een lijstje te drukken.</li>
+          <li>Mijn producten vergeet je door lang op het product te drukken.</li>
+          <li>
+            Alles wat Karrie op je apparaat bewaart, wis je via de instellingen van je browser (sitegegevens wissen voor karrieapp.onrender.com).
+          </li>
+          <li>
+            Omdat er geen account is, kunnen wij gegevens op je apparaat niet inzien of aan jou koppelen. Heb je een vraag, of wil je een recht
+            uitoefenen zoals inzage of verwijdering? Neem dan contact op via de gegevens hierboven.
+          </li>
+          <li>
+            Ben je het niet eens met hoe we met gegevens omgaan, dan kun je een klacht indienen bij de
+            <a href="https://autoriteitpersoonsgegevens.nl" rel="noopener">Autoriteit Persoonsgegevens</a>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Wijzigingen</h2>
+        <p>Verandert er iets aan hoe Karrie met gegevens omgaat, dan passen we deze verklaring aan. Bovenaan staat wanneer dat voor het laatst was.</p>
+      </section>
+
+      <a class="back" href="/">‹ Terug naar Karrie</a>
+    </main>
+  </body>
+</html>
