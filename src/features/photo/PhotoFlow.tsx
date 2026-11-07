@@ -6,7 +6,8 @@ import { challengeFor } from "../../domain/challenges";
 import { createScanGate, discoveredCount } from "../../domain/homeAdventure";
 import { mergeDraft, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem } from "../../domain/types";
-import { playBeep } from "../../feedback/sound";
+import { buzz } from "../../feedback/haptics";
+import { playBeep, playPop } from "../../feedback/sound";
 import { trackEvent } from "../../services/analytics";
 import { lookupBarcode, type BarcodeOutcome } from "../../services/barcode/lookup";
 import { vision, type VisionResult } from "../../services/vision/client";
@@ -39,6 +40,9 @@ type Step =
 
 /** The last barcode the phone read in this camera session, and its lookup. */
 type Scan = { ean: string; outcome: Promise<BarcodeOutcome> };
+
+/** How long "Pindakaas staat op je lijst" stays over the camera after "Toevoegen en verder scannen". */
+const ADDED_MS = 1800;
 
 const UNREADABLE: Problem = { title: "Deze foto lukt niet", text: "Karrie kan deze foto niet openen. Maak een nieuwe foto.", retry: false, manual: false };
 const PEOPLE: Problem = { title: "Alleen het product graag", text: "Er staat iemand op de foto. Maak een nieuwe foto met alleen het product.", retry: false, manual: false };
@@ -84,6 +88,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
   const [photo, setPhoto] = useState<ProcessedPhoto | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [barcodeStatus, setBarcodeStatus] = useState<BarcodeStatus>(null);
+  const [added, setAdded] = useState<{ text: string; token: number } | null>(null);
   const scan = useRef<Scan | null>(null);
   const request = useRef<AbortController | null>(null);
   /** Counts camera openings, so one code read again and again in the same session is counted once. */
@@ -116,7 +121,10 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
   }));
 
   useEffect(() => {
-    if (!photo) return;
+    if (!photo) {
+      setPreviewUrl(null);
+      return;
+    }
     const url = URL.createObjectURL(photo.saved);
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
@@ -124,12 +132,19 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
 
   useEffect(() => () => request.current?.abort(), []);
 
+  useEffect(() => {
+    if (!added) return;
+    const timer = window.setTimeout(() => setAdded(null), ADDED_MS);
+    return () => window.clearTimeout(timer);
+  }, [added]);
+
   function close() {
     request.current?.abort();
     request.current = null;
     scan.current = null;
     gate.current.reset();
     setBarcodeStatus(null);
+    setAdded(null);
     setPhoto(null);
     setParentView(false);
     setStep({ kind: "idle" });
@@ -257,6 +272,14 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     retake();
   }
 
+  /** "Toevoegen en verder scannen": the product is saved, so back to the camera with a short confirmation. */
+  function scanMore(message: string, ean?: string) {
+    playPop();
+    buzz(8);
+    setAdded((current) => ({ text: message, token: (current?.token ?? 0) + 1 }));
+    next(ean);
+  }
+
   const cameraOpen = step.kind === "camera" || step.kind === "recognizing";
   const sheetOpen = step.kind === "problem" || step.kind === "result";
 
@@ -286,6 +309,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
             preview={previewUrl}
             scanBarcodes={!liveTarget}
             barcodeStatus={barcodeStatus}
+            added={added}
             onBarcode={barcode}
             onManual={manual}
             onCapture={(next) => void captured(next)}
@@ -351,7 +375,8 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
             items={items}
             onRetake={retake}
             onCancel={close}
-            onDone={(message) => {
+            onDone={(message, after) => {
+              if (after === "scan") return scanMore(message, step.draft?.ean);
               close();
               onDone(message);
             }}

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Karrie } from "../../components/mascot/Karrie";
 import { PressButton } from "../../components/ui/PressButton";
 import { buzz } from "../../feedback/haptics";
+import { spring } from "../../motion/variants";
 import { capturePhoto, type ProcessedPhoto } from "./imageProcessing";
 import { useBarcode } from "./useBarcode";
 import { useCamera, type CameraProblem } from "./useCamera";
@@ -22,6 +23,8 @@ type PhotoCameraProps = {
   /** Read barcodes from the live preview; off for a photo of a product already on the list. */
   scanBarcodes: boolean;
   barcodeStatus: BarcodeStatus;
+  /** The product just added with "Toevoegen en verder scannen"; shown briefly instead of the hint. */
+  added?: { text: string; token: number } | null;
   onBarcode: (ean: string) => void;
   /** Fill it in by hand, keeping the scanned code. */
   onManual: () => void;
@@ -42,7 +45,7 @@ function finePointer() {
   return typeof window !== "undefined" && window.matchMedia?.("(pointer: fine)").matches;
 }
 
-export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanBarcodes, barcodeStatus, onBarcode, onManual, onCapture, onGallery, onClose }: PhotoCameraProps) {
+export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanBarcodes, barcodeStatus, added, onBarcode, onManual, onCapture, onGallery, onClose }: PhotoCameraProps) {
   const reduced = useReducedMotion() ?? false;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<CameraStatus>("opening");
@@ -136,7 +139,22 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
       </div>
 
       <div className="scanner-message" aria-live="polite">
-        {!problem && !busy && !(scanBarcodes && barcodeStatus) && (
+        {!problem && !busy && !(scanBarcodes && barcodeStatus) && added && (
+          <motion.p
+            key={added.token}
+            className="camera-added"
+            data-testid="camera-added"
+            initial={reduced ? false : { scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={spring}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {added.text}
+          </motion.p>
+        )}
+        {!problem && !busy && !(scanBarcodes && barcodeStatus) && !added && (
           <p className="scanner-hint" data-testid="camera-hint">
             {hint ?? (scanBarcodes ? "Scan streepjescode of maak foto" : "Zet één product in het kader")}
           </p>

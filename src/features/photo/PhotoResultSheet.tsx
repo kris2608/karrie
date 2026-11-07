@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ItemArt } from "../../components/ItemArt";
 import { ProductArt } from "../../components/ProductArt";
 import { PressButton } from "../../components/ui/PressButton";
@@ -19,7 +19,8 @@ type PhotoResultSheetProps = {
   items: AdventureItem[];
   onRetake: () => void;
   onCancel: () => void;
-  onDone: (message: string) => void;
+  /** scan: straight back to the camera for the next product; done: close the camera. */
+  onDone: (message: string, after: "scan" | "done") => void;
 };
 
 const MISSION_STATE = {
@@ -67,6 +68,8 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   const [category, setCategory] = useState<CategoryId>(draft?.category ?? "pantry");
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Set in the same tap, so a quick second tap (even on the sheet as it slides away) does nothing. */
+  const settled = useRef(false);
   const earlier = usePhotoUrl(photoUrl ? undefined : draft?.photoId);
   const open = items.filter((item) => item.status !== "found");
   const candidates = draft?.match ? open.filter((item) => item.productId === draft.match!.id) : [];
@@ -78,13 +81,15 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   const picture = photoUrl ?? earlier ?? draft?.imageUrl ?? null;
 
   /** The new photo is stored when asked for; without one, the parent's earlier photo stays with the product. */
-  async function commit(run: (photoId?: string) => string, withPhoto: boolean) {
-    if (saving) return;
+  async function commit(run: (photoId?: string) => string, withPhoto: boolean, after: "scan" | "done" = "scan") {
+    if (settled.current) return;
+    settled.current = true;
     setSaving(true);
     try {
       const photoId = withPhoto && photo ? await savePhoto(photo) : photo ? undefined : draft?.photoId;
-      onDone(run(photoId));
+      onDone(run(photoId), after);
     } catch {
+      settled.current = false;
       setSaving(false);
     }
   }
@@ -99,18 +104,24 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   }
 
   function addOne(item: AdventureItem) {
-    dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 });
-    onDone(`Nog ${item.name} erbij`);
+    void commit(() => {
+      dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 });
+      return `Nog ${item.name} erbij`;
+    }, false);
   }
 
-  function addNew() {
+  function addNew(after: "scan" | "done" = "scan") {
     const finalName = name.trim();
     if (!finalName) return;
     const { item, withPhoto } = newItemFor(draft, finalName, category);
-    void commit((photoId) => {
-      dispatch({ type: "add-recognized", ...item, photoId });
-      return `${finalName} staat op je lijst`;
-    }, withPhoto);
+    void commit(
+      (photoId) => {
+        dispatch({ type: "add-recognized", ...item, photoId });
+        return `${finalName} staat op je lijst`;
+      },
+      withPhoto,
+      after,
+    );
   }
 
   const brandField = draft?.fields.brand ?? draft?.fields.variant;
@@ -189,14 +200,14 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
           <h2>{single.name} staat al op je lijst</h2>
           {card}
           {notes}
-          <PressButton variant="primary" wide data-testid="photo-add-one" onClick={() => addOne(single)}>
+          <PressButton variant="primary" wide data-testid="photo-add-one" disabled={saving} onClick={() => addOne(single)}>
             Nog één erbij
           </PressButton>
           <div className="sheet-actions scan-actions">
             <PressButton variant="quiet" onClick={onCancel}>
               Klaar
             </PressButton>
-            <PressButton variant="secondary" data-testid="photo-add-separate" disabled={saving || !name.trim()} onClick={addNew}>
+            <PressButton variant="secondary" data-testid="photo-add-separate" disabled={saving || !name.trim()} onClick={() => addNew()}>
               Als apart product
             </PressButton>
           </div>
@@ -230,7 +241,7 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
           <PressButton variant="quiet" onClick={onCancel}>
             Annuleren
           </PressButton>
-          <PressButton variant="secondary" data-testid="photo-add-separate" disabled={saving || !name.trim()} onClick={addNew}>
+          <PressButton variant="secondary" data-testid="photo-add-separate" disabled={saving || !name.trim()} onClick={() => addNew()}>
             Als apart product
           </PressButton>
         </div>
@@ -266,13 +277,16 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
           ))}
         </div>
       </fieldset>
-      <PressButton variant="primary" wide data-testid="photo-add" disabled={saving || !name.trim()} onClick={addNew}>
-        Toevoegen aan lijst
+      <PressButton variant="primary" wide data-testid="photo-add" disabled={saving || !name.trim()} onClick={() => addNew("scan")}>
+        Toevoegen en verder scannen
+      </PressButton>
+      <PressButton variant="secondary" wide data-testid="photo-add-done" disabled={saving || !name.trim()} onClick={() => addNew("done")}>
+        Toevoegen en klaar
       </PressButton>
       {open.length > 0 && photo && (
-        <PressButton variant="secondary" wide data-testid="photo-replace" disabled={saving} onClick={() => setPicking(true)}>
+        <button type="button" className="text-button photo-replace" data-testid="photo-replace" disabled={saving} onClick={() => setPicking(true)}>
           Vervang bestaande afbeelding
-        </PressButton>
+        </button>
       )}
       <div className="sheet-actions scan-actions">
         <PressButton variant="quiet" onClick={onCancel}>

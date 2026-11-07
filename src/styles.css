@@ -829,6 +829,7 @@ h1, h2, p { margin: 0; }
 }
 .scan-pick .product-art { width: 40px; flex: none; }
 .item-row .item-photo, .parent-list .item-photo, .scan-pick .item-photo, .list-card-art .item-photo { --photo-fill: 88%; border-radius: 22%; }
+.photo-replace { justify-self: center; }
 .scan-actions { flex-wrap: wrap; }
 .scan-actions > * { flex: 1 1 140px; white-space: nowrap; }
 .scan-attribution { font-size: 0.8rem; color: var(--ink-mute); text-align: center; }
@@ -1336,6 +1337,19 @@ h1, h2, p { margin: 0; }
 }
 .scanner-message { min-height: 2.6rem; display: grid; place-items: center; text-align: center; }
 .scanner-hint { font-size: 1.15rem; font-weight: 900; }
+.camera-added {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 340px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--green-shade);
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.4);
+}
+.camera-added svg { flex: none; width: 20px; height: 20px; }
 .camera-barcode { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 var(--space-2); max-width: 340px; font-size: 0.9rem; font-weight: 800; }
 .camera-barcode .text-button { color: inherit; text-decoration: underline; }
 .photo-ean { color: var(--ink-mute); font-variant-numeric: tabular-nums; }

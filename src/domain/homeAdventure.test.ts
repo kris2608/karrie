@@ -125,6 +125,19 @@ describe("scan gate", () => {
     gate.reset();
     expect(gate.read("2", 4200)).toBe("new");
   });
+
+  it("keeps one scanning session going: barcode, photo, barcode", () => {
+    const gate = createScanGate(3000);
+    expect(gate.read("A", 0)).toBe("new");
+    gate.hold("A", 500);
+    expect(gate.read("A", 800)).toBe("held");
+    // A photo product has no code, so nothing new is held and A is still ignored for a moment.
+    expect(gate.read("A", 3000)).toBe("held");
+    expect(gate.read("B", 3100)).toBe("new");
+    gate.hold("B", 4000);
+    expect(gate.read("B", 4500)).toBe("held");
+    expect(gate.read("A", 4600)).toBe("new");
+  });
 });
 
 describe("search ideas", () => {

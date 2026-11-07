@@ -116,6 +116,10 @@ De camera leest ook streepjescodes (zie **Streepjescode in de camera**). Een her
 - Een specifiek merkproduct (bijvoorbeeld AH Terra of een pot Calvé) krijgt de foto die de ouder maakte. Die vervangt de tekening op de lijst, bij **Toevoegen** en in de winkel.
 - Een algemeen product (een brood, een tros bananen, een pak melk zonder duidelijk merk) houdt de Karrie-tekening. OpenAI helpt dan alleen de lijst te vullen. Het resultaat zegt **Karrie gebruikt de tekening van …**.
 - Staat hetzelfde algemene product al op de lijst? Dan biedt Karrie **Nog één erbij** aan in plaats van een dubbele regel.
+
+**Verder scannen**
+
+Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen terug, met even een groene melding) en **Toevoegen en klaar** (de camera sluit). Ook **Nog één erbij**, **Ja, werk … bij**, **Als apart product** en een afbeelding vervangen gaan daarna terug naar de camera; sluiten kan met het kruisje. De streepjescode van het product dat je net bevestigde, wordt even genegeerd (minstens 3 seconden, en zolang de pot in beeld blijft). **Annuleren** en **Klaar** sluiten de camera zonder iets te bewaren, zoals voorheen.
 - In het productvenster bij **Controleren** zet **Gebruik Karrie-tekening** de tekening terug.
 
 **Opbouw**
@@ -407,7 +411,8 @@ Dit is nog niet op een echte iPhone of Android-telefoon getest. Loop deze lijst 
 
 - **Toevoegen**: tik op de camera naast het zoekveld. De telefoon vraagt één keer om camera-toegang. Het camerascherm toont live beeld van de achtercamera, niet de galerij.
 - Richt op een pot pindakaas en tik op de ontspanknop. Na ongeveer 3 seconden zie je **Herkend!** met naam, merk en afdeling. Er is geen bijsnijdstap.
-- Tik op **Toevoegen aan lijst**. Het product staat met jouw foto op de lijst, niet met een tekening. Binnen ongeveer 10 seconden kan die foto vervangen worden door een voorbeeldfoto; in het productvenster zie je welke en waarvandaan, en vaak ook **Productinformatie** (Nutri-Score, voedingswaarden, bron).
+- Tik op **Toevoegen en verder scannen**. De camera komt meteen terug met even **Pindakaas staat op je lijst** (en een plopje als geluid aan staat); de pot die nog in beeld is, springt niet meteen weer op. Scan daarna een streepjescode en fotografeer nog een product: beide werken in dezelfde camera. Snel twee keer tikken zet het product maar één keer op de lijst.
+- Tik bij het laatste product op **Toevoegen en klaar**: de camera sluit en je bent terug bij **Toevoegen**. Het product staat met jouw foto op de lijst, niet met een tekening. Binnen ongeveer 10 seconden kan die foto vervangen worden door een voorbeeldfoto; in het productvenster zie je welke en waarvandaan, en vaak ook **Productinformatie** (Nutri-Score, voedingswaarden, bron).
 - Zet **Banaan** uit de catalogus op de lijst. Hij houdt de tekening. In het productvenster zet **Voorbeeldfoto** een foto aan en **Geen voorbeeldfoto** de tekening terug.
 - Lang drukken op een lijstje op het beginscherm wist het, met **Ongedaan maken**. **Voor ouders → Bewaarde lijstjes wissen** wist ze allemaal na een bevestiging.
 - Ga terug naar **Toevoegen**. Het herkende product staat met een hartje onder zijn afdeling en vind je via het zoekveld. Lang drukken vergeet het; **Ongedaan maken** zet het terug.
