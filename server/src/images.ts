@@ -78,7 +78,7 @@ export const BLOCKED = [
   "ftcdn.net",
 ];
 const FREE_LICENSE = /^(cc0|public domain|pd\b|cc[ -]by(-sa)?[ -]\d)/i;
-const USER_AGENT = "KarrieImageCheck/1.0 (https://karrieapp.onrender.com; family grocery list app)";
+const USER_AGENT = "KarrieImageCheck/1.0 (https://karrie.eu; family grocery list app)";
 
 export const IMAGE_RULES = {
   maxCandidates: 3,

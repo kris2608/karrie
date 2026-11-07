@@ -3,8 +3,8 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-/** Only the production site counts; the tracker ignores localhost and previews. */
-const UMAMI_DOMAIN = "karrieapp.onrender.com";
+/** Only the production site counts; the tracker ignores localhost and previews. The old address stays for apps installed from it. */
+const UMAMI_DOMAINS = "karrie.eu,www.karrie.eu,karrieapp.onrender.com";
 
 /** Adds the Umami Cloud tracker to production builds only, when both public values are set. */
 function umami(): Plugin {
@@ -16,7 +16,7 @@ function umami(): Plugin {
       const env = loadEnv(config.mode, config.envDir || process.cwd(), "UMAMI_");
       const src = (process.env.UMAMI_SCRIPT_URL ?? env.UMAMI_SCRIPT_URL ?? "").trim();
       const id = (process.env.UMAMI_WEBSITE_ID ?? env.UMAMI_WEBSITE_ID ?? "").trim();
-      tag = /^https:\/\/[^\s"<>]+$/.test(src) && /^[0-9a-f-]{36}$/i.test(id) ? `<script defer src="${src}" data-website-id="${id}" data-domains="${UMAMI_DOMAIN}" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>` : null;
+      tag = /^https:\/\/[^\s"<>]+$/.test(src) && /^[0-9a-f-]{36}$/i.test(id) ? `<script defer src="${src}" data-website-id="${id}" data-domains="${UMAMI_DOMAINS}" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>` : null;
       if (!tag && (src || id)) config.logger.warn("Umami: UMAMI_SCRIPT_URL or UMAMI_WEBSITE_ID looks wrong; no tracker added.");
     },
     transformIndexHtml(html) {

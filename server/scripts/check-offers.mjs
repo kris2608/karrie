@@ -20,7 +20,7 @@ const PRODUCTS = [
 const RETAILERS = ["jumbo", "albert_heijn", "lidl"];
 
 const provider = createPrijsProfeet({
-  userAgent: process.env.PRIJSPROFEET_USER_AGENT || "Karrie/1.0 (+https://karrieapp.onrender.com)",
+  userAgent: process.env.PRIJSPROFEET_USER_AGENT || "Karrie/1.0 (+https://karrie.eu)",
   apiKey: process.env.PRIJSPROFEET_API_KEY || undefined,
 });
 const lookup = createOfferLookup(provider);

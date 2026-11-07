@@ -76,7 +76,7 @@ const barcodeLimits = createLimits({
 });
 
 const barcode = createBarcodeLookup({
-  userAgent: env.OFF_USER_AGENT || "Karrie/1.0 (https://karrieapp.onrender.com)",
+  userAgent: env.OFF_USER_AGENT || "Karrie/1.0 (https://karrie.eu)",
   web: client && env.BARCODE_WEB_SEARCH !== "off" ? { client, model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model } : undefined,
 });
 
@@ -93,7 +93,7 @@ const offerLimits = createLimits({
 const prijsProfeet =
   env.OFFERS !== "off"
     ? createPrijsProfeet({
-        userAgent: env.PRIJSPROFEET_USER_AGENT || "Karrie/1.0 (+https://karrieapp.onrender.com)",
+        userAgent: env.PRIJSPROFEET_USER_AGENT || "Karrie/1.0 (+https://karrie.eu)",
         apiKey: env.PRIJSPROFEET_API_KEY || undefined,
       })
     : null;
@@ -126,7 +126,7 @@ const illustrator =
     : null;
 
 const handler = createHandler({
-  allowedOrigins: (env.ALLOWED_ORIGINS ?? "https://karrieapp.onrender.com,http://localhost:5173,http://localhost:4173")
+  allowedOrigins: (env.ALLOWED_ORIGINS ?? "https://karrie.eu,https://www.karrie.eu,https://karrieapp.onrender.com,http://localhost:5173,http://localhost:4173")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),

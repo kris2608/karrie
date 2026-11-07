@@ -58,7 +58,7 @@ services:
       - key: OPENAI_REASONING_EFFORT
         value: low
       - key: ALLOWED_ORIGINS
-        value: https://karrieapp.onrender.com
+        value: https://karrie.eu,https://www.karrie.eu,https://karrieapp.onrender.com
       - key: REQUIRE_ORIGIN
         value: "true"
       - key: LIMIT_PER_IP_HOUR
@@ -70,7 +70,7 @@ services:
       - key: DAILY_BUDGET_USD
         value: "1"
       - key: OFF_USER_AGENT
-        value: Karrie/1.0 (https://karrieapp.onrender.com)
+        value: Karrie/1.0 (https://karrie.eu)
       - key: BARCODE_WEB_SEARCH
         value: "on"
       - key: BARCODE_DAILY_BUDGET_USD
@@ -84,7 +84,7 @@ services:
       - key: OFFERS
         value: "on"
       - key: PRIJSPROFEET_USER_AGENT
-        value: Karrie/1.0 (+https://karrieapp.onrender.com)
+        value: Karrie/1.0 (+https://karrie.eu)
       - key: PRIJSPROFEET_API_KEY
         sync: false
       - key: OFFERS_LIMIT_PER_IP_HOUR

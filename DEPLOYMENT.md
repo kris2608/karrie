@@ -42,10 +42,18 @@ Commit ook `package-lock.json`. Zonder dat bestand faalt `npm ci` op Render.
    - rewrite van `/*` naar `/index.html`, zodat `/winkel` bij verversen de app blijft
    - gratis web service `karrie-api` (map `server/`) voor foto herkennen
 4. Render vraagt om `OPENAI_API_KEY` voor `karrie-api`. Plak daar de sleutel. Hij staat alleen op Render, niet in GitHub en niet in de app.
-5. Bevestig het blueprint. De app staat op `https://karrieapp.onrender.com`, de server op `https://karrie-api.onrender.com`.
+5. Bevestig het blueprint. De app staat op `https://karrie.eu` (en nog steeds op `https://karrieapp.onrender.com`), de server op `https://karrie-api.onrender.com`.
 6. Elke push naar de gekoppelde branch publiceert beide services opnieuw. Deploy na een wijziging aan `server/src/schema.ts` altijd ook de server: de app verwacht de velden van het nieuwe schema.
 
 Bestaande bestanden (JavaScript, iconen, service worker) worden rechtstreeks geserveerd. Alleen paden zonder bestand vallen terug op `index.html`.
+
+## Eigen domein: karrie.eu
+
+- **DNS** bij de registrar: `A`-record `karrie.eu` → `216.24.57.1` en `CNAME` `www.karrie.eu` → `karrieapp.onrender.com`.
+- **Render**: `karrieapp` → Settings → Custom Domains bevat `karrie.eu` en `www.karrie.eu`. Beide moeten **Verified** zijn met een uitgegeven certificaat; tot dan geeft HTTPS op dat adres een fout.
+- **Server**: `ALLOWED_ORIGINS` van `karrie-api` bevat `https://karrie.eu,https://www.karrie.eu,https://karrieapp.onrender.com`. Zonder het nieuwe adres weigert de server foto, streepjescode, aanbiedingen en zelf toegevoegde producten (403). Staat de variabele in het dashboard op een andere waarde, pas hem daar aan.
+- **Oude adres**: `karrieapp.onrender.com` blijft werken. Lijstjes, stickers en eigen producten staan per adres op het toestel; wie Karrie vanaf het oude adres op het beginscherm zette, ziet op `karrie.eu` een lege app. Zet Karrie vanaf `karrie.eu` opnieuw op het beginscherm.
+- **Umami** telt bezoeken op alle drie adressen (`data-domains` in `vite.config.ts`).
 
 ## Handmatig, zonder blueprint
 
@@ -88,13 +96,13 @@ Het tabblad-icoon (`favicon.svg`) en de app-iconen zijn dezelfde Karrie als op h
 - Vernieuw de pagina op `/winkel`. Hetzelfde lijstje staat er nog.
 - Draai de telefoon in de winkel op zijn kant: het product staat links, naam en **Gevonden!** rechts, en **Terug**, **Later**, de voortgang en de sterren blijven in beeld (ook met een bonusmissie). Terugdraaien geeft meteen de gewone indeling; sterren en het huidige product blijven hetzelfde. De geïnstalleerde app vraagt Android om staand te blijven; in een gewoon browsertabblad draait het scherm gewoon mee.
 - Maak een nieuw lijstje en tik op **Bewaren**. Geef het eventueel een naam. Het beginscherm meldt **Lijstje bewaard** en toont **Verder met lijstje** en een kaart met de naam (zonder naam: **Bewaard**). Open je de kaart, dan staat de naam bovenaan het lijstje. (Een veld voor de supermarkt is er al, maar verborgen tot een functie het gebruikt.)
-- Deel `https://karrieapp.onrender.com` in WhatsApp. De voorvertoning toont Karrie met **Speur, vind en vink af!** en een korte omschrijving. WhatsApp bewaart voorvertoningen een tijd; een link die je al eerder deelde, kan nog de oude (lege) versie tonen.
+- Deel `https://karrie.eu` in WhatsApp. De voorvertoning toont Karrie met **Speur, vind en vink af!** en een korte omschrijving. WhatsApp bewaart voorvertoningen een tijd; een link die je al eerder deelde, kan nog de oude (lege) versie tonen.
 - Plak een korte lijst, controleer hem en start het avontuur.
 - **Lang drukken** (ruim een halve seconde) op een product bij **Toevoegen** of **Controleren** haalt het van de lijst. **Ongedaan maken** staat daarna even in beeld. Een korte tik voegt nog steeds toe, en scrollen met de vinger erop verwijdert niets.
 - Geluid staat standaard uit. Zet het aan via het tandwiel op het beginscherm en hoor een plopje bij **Gevonden!**.
 - Tandwiel → **❤️ Over Karrie** toont de tekening van Thomas en het verhaal; **Terug** brengt je terug naar de instellingen. **Privacy en gegevens** scrollt tot **Lees de volledige privacyverklaring**, die in een nieuw venster opent.
 - Met verdiende stickers staat onder **Nieuw avontuur** één rustige rij **Mijn stickers** (aantal, de nieuwste vijf en eventueel **+1**), ook op een smalle telefoon. Tikken opent het stickerboek met alle verdiende stickers en hun naam; **Klaar** sluit het.
-- `https://karrieapp.onrender.com/privacy.html` toont de privacyverklaring, ook als de app al op het beginscherm staat (niet het beginscherm van Karrie).
+- `https://karrie.eu/privacy.html` toont de privacyverklaring, ook als de app al op het beginscherm staat (niet het beginscherm van Karrie).
 - Zet het toestel daarna in vliegtuigmodus en open het beginscherm-icoon opnieuw. De winkelmodus werkt nog.
 - De eerste keer openen heeft internet nodig, zodat de app en de service worker binnenkomen.
 - Zie je na een nieuwe deploy nog de oude versie? Sluit de app helemaal en open hem opnieuw. De service worker werkt zichzelf bij.
@@ -142,7 +150,7 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `OPENAI_VISION_MODEL` | `gpt-5.4-mini` | Model voor herkennen |
 | `OPENAI_IMAGE_DETAIL` | `auto` | `low`, `high` of `auto` |
 | `OPENAI_REASONING_EFFORT` | `low` | `none`, `low`, `medium`, `high` |
-| `ALLOWED_ORIGINS` | `https://karrieapp.onrender.com` | Komma-lijst van toegestane app-adressen |
+| `ALLOWED_ORIGINS` | `https://karrie.eu,https://www.karrie.eu,https://karrieapp.onrender.com` | Komma-lijst van toegestane app-adressen |
 | `LIMIT_PER_IP_HOUR` / `LIMIT_PER_IP_DAY` | 20 / 60 | Per IP-adres |
 | `LIMIT_DAILY_REQUESTS` | 300 | Alle gebruikers samen, per UTC-dag |
 | `DAILY_BUDGET_USD` | 1 | Server stopt met herkennen boven dit bedrag per dag |
@@ -187,7 +195,7 @@ Het camerascherm zegt **Scan streepjescode of maak foto**. Er is geen apart scan
 
 **Open Food Facts**
 
-- Open en gratis, zonder sleutel. Karrie vraagt het via de server op (`/api/v3/product/{ean}`, Nederlandse namen voorop) met een eigen User-Agent (`OFF_USER_AGENT`, standaard `Karrie/1.0 (https://karrieapp.onrender.com)`), zoals Open Food Facts vraagt.
+- Open en gratis, zonder sleutel. Karrie vraagt het via de server op (`/api/v3/product/{ean}`, Nederlandse namen voorop) met een eigen User-Agent (`OFF_USER_AGENT`, standaard `Karrie/1.0 (https://karrie.eu)`), zoals Open Food Facts vraagt.
 - Open Food Facts staat 100 productopvragingen per minuut per IP-adres toe. De server houdt minstens 0,7 seconde tussen twee opvragingen, probeert na een `429` of `5xx` hoogstens twee keer opnieuw (na 1 en 3 seconden, of na `Retry-After`) en vraagt dezelfde code nooit twee keer tegelijk op.
 - Het geheugen van de server: gevonden 30 dagen, onbekend 7 dagen, fout 5 minuten. Het is leeg na een herstart of slaapstand.
 - Een record telt alleen als het een echte naam heeft en bij dezelfde code hoort. Naam en merk: **exact**. Alleen een naam of alleen een foto: **gedeeltelijk**, dan vraagt Karrie de ouder om te controleren. Foto's worden alleen van `images.openfoodfacts.org` overgenomen; ingrediënten alleen in het Nederlands.
@@ -204,7 +212,7 @@ Het camerascherm zegt **Scan streepjescode of maak foto**. Er is geen apart scan
 
 | Variabele | Standaard | Betekenis |
 |---|---|---|
-| `OFF_USER_AGENT` | `Karrie/1.0 (https://karrieapp.onrender.com)` | Naam en contactadres voor Open Food Facts |
+| `OFF_USER_AGENT` | `Karrie/1.0 (https://karrie.eu)` | Naam en contactadres voor Open Food Facts |
 | `BARCODE_WEB_SEARCH` | `on` | `off` = nooit webzoeken voor onbekende codes |
 | `BARCODE_DAILY_BUDGET_USD` | 0,5 | Webzoeken stopt boven dit bedrag per dag |
 | `BARCODE_LIMIT_PER_IP_HOUR` / `BARCODE_LIMIT_PER_IP_DAY` | 60 / 200 | Opzoekingen per IP-adres die niet uit het geheugen komen |
@@ -388,7 +396,7 @@ Live gemeten in november 2026 (`node scripts/check-offers.mjs`, 24 zoekopdrachte
 
 **Limieten.** Zonder sleutel staat PrijsProfeet 120 zoekopdrachten per minuut toe, en 500 zoekopdrachten op alleen een streepjescode per dag. Karrie blijft daar voor de hele server onder: hoogstens 60 per minuut en 400 streepjescodes per dag (daarna zoekt Karrie op naam). Bij een `429` stopt de server met vragen zolang `Retry-After` zegt. Per IP: 300 per uur en 1500 per dag (`OFFERS_LIMIT_PER_IP_HOUR`, `OFFERS_LIMIT_PER_IP_DAY`). `/api/health` toont onder `offers` de aantallen per supermarkt en uitkomst, het geheugen en of de server even pauzeert.
 
-**Instellen op Render (`karrie-api`).** Niets is verplicht. `OFFERS=off` zet het uit. `PRIJSPROFEET_USER_AGENT` (standaard `Karrie/1.0 (+https://karrieapp.onrender.com)`; PrijsProfeet weigert namen met "bot", "crawler", "spider" of "slurp"). **Aanbevolen:** vraag een gratis sleutel aan op prijsprofeet.nl en zet die als `PRIJSPROFEET_API_KEY` (geheim, alleen op de server). Daarmee wordt de limiet 150 per minuut en is Karrie herkenbaar voor PrijsProfeet. De gratis sleutel kost niets; een betaald abonnement is niet nodig en niet ingesteld.
+**Instellen op Render (`karrie-api`).** Niets is verplicht. `OFFERS=off` zet het uit. `PRIJSPROFEET_USER_AGENT` (standaard `Karrie/1.0 (+https://karrie.eu)`; PrijsProfeet weigert namen met "bot", "crawler", "spider" of "slurp"). **Aanbevolen:** vraag een gratis sleutel aan op prijsprofeet.nl en zet die als `PRIJSPROFEET_API_KEY` (geheim, alleen op de server). Daarmee wordt de limiet 150 per minuut en is Karrie herkenbaar voor PrijsProfeet. De gratis sleutel kost niets; een betaald abonnement is niet nodig en niet ingesteld.
 
 **Naamsvermelding.** Waar een label of het aanbiedingsvenster staat, staat ook "Aanbiedingen via PrijsProfeet" met een link naar https://www.prijsprofeet.nl, zoals PrijsProfeet vraagt.
 
@@ -400,7 +408,7 @@ Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.i
 
 **Instellen.** Zet `UMAMI_SCRIPT_URL` (bijvoorbeeld `https://cloud.umami.is/script.js`) en `UMAMI_WEBSITE_ID` bij de statische site **`karrieapp`** (Environment), niet alleen bij `karrie-api`. Kies daarna **Manual Deploy → Clear build cache & deploy**: de waarden worden tijdens het bouwen in `index.html` gezet. Ontbreekt er één, dan bouwt de site gewoon zonder statistieken. Beide waarden zijn openbaar; er is geen Umami-sleutel nodig.
 
-**Waar het niet telt.** `npm run dev` krijgt het script nooit. Een gebouwde versie telt alleen op `karrieapp.onrender.com` (`data-domains`), dus `vite preview` op localhost stuurt niets. Wie in de browser *Do Not Track* aan heeft, wordt niet geteld. Zoekparameters en `#` worden niet meegestuurd.
+**Waar het niet telt.** `npm run dev` krijgt het script nooit. Een gebouwde versie telt alleen op `karrie.eu`, `www.karrie.eu` en het oude `karrieapp.onrender.com` (`data-domains`), dus `vite preview` op localhost stuurt niets. Wie in de browser *Do Not Track* aan heeft, wordt niet geteld. Zoekparameters en `#` worden niet meegestuurd.
 
 **Paginaweergaven** komen automatisch: Umami ziet ook het wisselen van scherm binnen de app (`/`, `/toevoegen`, `/controleren`, `/winkel`, `/klaar`).
 
@@ -418,7 +426,7 @@ Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.i
 
 Wat niet telt: een bewaard lijstje openen, terug naar een lopend avontuur, **Ongedaan maken**, een streepjescode die de camera steeds opnieuw ziet (één keer per cameragebruik), een mislukte herkenning, een missie die alleen getoond of overgeslagen wordt, en het eindscherm opnieuw openen. Na **Terug** en opnieuw **Gevonden!** telt de voltooiing niet nog eens zolang de app open blijft.
 
-**Controleren in Umami Cloud.** Open Websites → Karrie. **Realtime** toont binnen enkele seconden een bezoek aan `karrieapp.onrender.com` en elke gebeurtenis. Onder **Events** staan de gebeurtenissen met hun aantallen; klik op een naam voor de verdeling van `method`, `source` of `choice`. In de browser (DevTools → Network, filter `api/send`) zie je per verzoek precies wat er wordt verstuurd.
+**Controleren in Umami Cloud.** Open Websites → Karrie. **Realtime** toont binnen enkele seconden een bezoek aan `karrie.eu` en elke gebeurtenis. Onder **Events** staan de gebeurtenissen met hun aantallen; klik op een naam voor de verdeling van `method`, `source` of `choice`. In de browser (DevTools → Network, filter `api/send`) zie je per verzoek precies wat er wordt verstuurd.
 
 Faalt Umami (geblokkeerd, offline, traag), dan merkt Karrie daar niets van: er wordt niets opnieuw geprobeerd of bewaard.
 
