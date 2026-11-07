@@ -136,7 +136,7 @@ export function PhotoCamera({ title, localOnly, busy, slow, preview, scanBarcode
       <div className="scanner-message" aria-live="polite">
         {!problem && !busy && !(scanBarcodes && barcodeStatus) && (
           <p className="scanner-hint" data-testid="camera-hint">
-            {scanBarcodes ? "Scan een streepjescode of maak een foto." : "Zet één product in het kader"}
+            {scanBarcodes ? "Scan streepjescode of maak foto" : "Zet één product in het kader"}
           </p>
         )}
         {!problem && !busy && scanBarcodes && barcodeStatus && (

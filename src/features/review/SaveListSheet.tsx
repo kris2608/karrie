@@ -11,7 +11,10 @@ type SaveListSheetProps = {
   onSave: (name: string, store: string) => void;
 };
 
-/** Bewaren asks for an optional name and supermarket; both may stay empty. */
+/** The supermarket field stays hidden until a feature uses it; a store saved earlier is kept. */
+const ASK_STORE = false;
+
+/** Bewaren asks for an optional name; it may stay empty. */
 export function SaveListSheet({ open, adventure, onClose, onSave }: SaveListSheetProps) {
   const [name, setName] = useState("");
   const [store, setStore] = useState("");
@@ -34,12 +37,14 @@ export function SaveListSheet({ open, adventure, onClose, onSave }: SaveListShee
         <h2>Lijstje bewaren</h2>
         <label className="scan-field">
           <span>Naam</span>
-          <input data-testid="save-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Bijvoorbeeld: Weekboodschappen" autoComplete="off" maxLength={40} enterKeyHint="next" />
+          <input data-testid="save-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Bijvoorbeeld: Weekboodschappen" autoComplete="off" maxLength={40} enterKeyHint={ASK_STORE ? "next" : "done"} />
         </label>
-        <label className="scan-field">
-          <span>Supermarkt</span>
-          <input data-testid="save-store" value={store} onChange={(event) => setStore(event.target.value)} placeholder="Bijvoorbeeld: Albert Heijn" autoComplete="off" maxLength={40} enterKeyHint="done" />
-        </label>
+        {ASK_STORE && (
+          <label className="scan-field">
+            <span>Supermarkt</span>
+            <input data-testid="save-store" value={store} onChange={(event) => setStore(event.target.value)} placeholder="Bijvoorbeeld: Albert Heijn" autoComplete="off" maxLength={40} enterKeyHint="done" />
+          </label>
+        )}
         <div className="sheet-actions">
           <PressButton type="button" variant="quiet" onClick={onClose}>
             Annuleer

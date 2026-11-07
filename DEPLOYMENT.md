@@ -83,7 +83,7 @@ Gebruik het HTTPS-adres, niet een lokaal IP-adres zonder certificaat.
 - **Terug** zet de laatste tik terug. **Later** bewaart het product voor straks. Het product naar links vegen doet hetzelfde als **Later**.
 - Op Android trilt de telefoon kort bij **Gevonden!** en bij lang drukken. Safari op iPhone ondersteunt trillen niet.
 - Vernieuw de pagina op `/winkel`. Hetzelfde lijstje staat er nog.
-- Maak een nieuw lijstje en tik op **Bewaren**. Geef het een naam en eventueel een supermarkt (allebei mag leeg blijven). Het beginscherm meldt **Lijstje bewaard** en toont **Verder met lijstje** en een kaart met de naam (zonder naam: **Bewaard**). Open je de kaart, dan staat de naam bovenaan het lijstje en de supermarkt eronder. De supermarkt doet verder nog niets.
+- Maak een nieuw lijstje en tik op **Bewaren**. Geef het eventueel een naam. Het beginscherm meldt **Lijstje bewaard** en toont **Verder met lijstje** en een kaart met de naam (zonder naam: **Bewaard**). Open je de kaart, dan staat de naam bovenaan het lijstje. (Een veld voor de supermarkt is er al, maar verborgen tot een functie het gebruikt.)
 - Deel `https://karrieapp.onrender.com` in WhatsApp. De voorvertoning toont Karrie met **Speur, vind en vink af!** en een korte omschrijving. WhatsApp bewaart voorvertoningen een tijd; een link die je al eerder deelde, kan nog de oude (lege) versie tonen.
 - Plak een korte lijst, controleer hem en start het avontuur.
 - **Lang drukken** (ruim een halve seconde) op een product bij **Toevoegen** of **Controleren** haalt het van de lijst. **Ongedaan maken** staat daarna even in beeld. Een korte tik voegt nog steeds toe, en scrollen met de vinger erop verwijdert niets.
@@ -161,7 +161,7 @@ De gratis web service slaapt na ongeveer 15 minuten zonder verkeer. De eerste he
 
 ## Streepjescode in de camera
 
-Het camerascherm zegt **Scan een streepjescode of maak een foto.** Er is geen apart scanscherm: dezelfde camera leest streepjescodes terwijl de ontspanknop gewoon werkt.
+Het camerascherm zegt **Scan streepjescode of maak foto**. Er is geen apart scanscherm: dezelfde camera leest streepjescodes terwijl de ontspanknop gewoon werkt.
 
 **Zo werkt het**
 

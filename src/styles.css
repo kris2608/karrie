@@ -475,7 +475,7 @@ h1, h2, p { margin: 0; }
   display: grid;
   place-items: center;
   flex: none;
-  width: 56px;
+  width: 88px;
   height: 52px;
   padding: 0;
   border: 0;
@@ -1095,8 +1095,8 @@ h1, h2, p { margin: 0; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding-top: calc(var(--safe-top) + var(--space-6));
+  gap: 10px;
+  padding-top: calc(var(--safe-top) + var(--space-2));
   text-align: center;
 }
 .complete-sky {
@@ -1108,8 +1108,8 @@ h1, h2, p { margin: 0; }
     linear-gradient(#d9f4f0, var(--paper) 60%);
 }
 .complete-stage { position: relative; display: grid; justify-items: center; }
-.complete-mascot { position: relative; z-index: 1; width: min(190px, 50vw); margin-bottom: -40px; }
-.chest-wrap { position: relative; width: min(220px, 58vw); }
+.complete-mascot { position: relative; z-index: 1; width: min(165px, 44vw); margin-bottom: -36px; }
+.chest-wrap { position: relative; width: min(195px, 52vw); }
 .chest { display: block; width: 100%; height: auto; overflow: visible; }
 .chest-star {
   position: absolute;
@@ -1287,15 +1287,16 @@ h1, h2, p { margin: 0; }
 
 /* Photo recognition */
 
-.scan-button .camera-icon { width: 27px; height: 27px; }
+.scan-button .camera-icon { width: 30px; height: 30px; }
 .item-sheet-actions .camera-icon { width: 24px; height: 24px; }
 @media (max-width: 400px) {
   .search-row { gap: 6px; }
-  .search-row .scan-button { width: 48px; }
+  .search-row .scan-button { width: 76px; }
   .search-row .search { padding: 0 var(--space-3); }
 }
 .camera { gap: var(--space-2); }
-.camera-frame { width: min(100%, 360px, 52dvh); aspect-ratio: 3 / 4; }
+.camera-frame { width: min(100%, 360px, 50dvh); aspect-ratio: 3 / 4; margin-top: var(--space-3); }
+.camera .scanner-hint { white-space: nowrap; font-size: clamp(1rem, 4.6vw, 1.15rem); }
 .camera-frame .scanner-corners { inset: 7% 8%; }
 .camera-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* The band the barcode reader looks at (READER_RULES: 85% wide, 50% high, centred). */
