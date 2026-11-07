@@ -19,15 +19,24 @@ import { RetailerPicker } from "../offers/RetailerPicker";
 import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
+import { needsIntro } from "../../domain/intro";
 import { AboutKarrie } from "./AboutKarrie";
+import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
 import { StickerBook } from "./StickerBook";
 
-type ParentView = "settings" | "about" | "privacy";
+type ParentView = "settings" | "howto" | "about" | "privacy";
 
 const viewLabels: Record<ParentView, string> = {
   settings: "Instellingen voor ouders",
+  howto: "Hoe werkt Karrie?",
   about: "Over Karrie",
+  privacy: "Privacy en gegevens",
+};
+
+const linkLabels: Record<Exclude<ParentView, "settings">, string> = {
+  howto: "❓ Hoe werkt Karrie?",
+  about: "❤️ Over Karrie",
   privacy: "Privacy en gegevens",
 };
 
@@ -59,7 +68,8 @@ function ListCard({ list, label: fallback, onOpen, onForget }: { list: SavedList
 }
 
 export function HomeScreen() {
-  const { adventure, saved, stickers, settings, dispatch } = useAdventure();
+  const state = useAdventure();
+  const { adventure, saved, stickers, settings, dispatch } = state;
   const navigate = useNavigate();
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
@@ -71,6 +81,9 @@ export function HomeScreen() {
   const lastView = useRef<ParentView>("settings");
   const headingRef = useRef<HTMLHeadingElement>(null);
   const rowRefs = useRef<Partial<Record<ParentView, HTMLButtonElement | null>>>({});
+  const [introOpen, setIntroOpen] = useState(false);
+  const introHeadingRef = useRef<HTMLHeadingElement>(null);
+  const newRef = useRef<HTMLButtonElement>(null);
   const undo = useNotice();
   const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null);
 
@@ -89,6 +102,26 @@ export function HomeScreen() {
     if (view === "settings") rowRefs.current[from]?.focus();
     else headingRef.current?.focus();
   }, [view, parentOpen]);
+
+  useEffect(() => {
+    if (introOpen) introHeadingRef.current?.focus();
+  }, [introOpen]);
+
+  function startAdventure() {
+    dispatch({ type: "new-draft" });
+    navigate("/toevoegen");
+  }
+
+  function continueFromIntro() {
+    dispatch({ type: "intro-seen" });
+    startAdventure();
+  }
+
+  function dismissIntro() {
+    dispatch({ type: "intro-seen" });
+    setIntroOpen(false);
+    newRef.current?.focus();
+  }
 
   function closeStickers() {
     setStickersOpen(false);
@@ -158,10 +191,8 @@ export function HomeScreen() {
           size="l"
           wide
           data-testid="new-adventure"
-          onClick={() => {
-            dispatch({ type: "new-draft" });
-            navigate("/toevoegen");
-          }}
+          ref={newRef}
+          onClick={() => (needsIntro(state) ? setIntroOpen(true) : startAdventure())}
         >
           Nieuw avontuur
         </PressButton>
@@ -230,6 +261,10 @@ export function HomeScreen() {
 
       <Toast notice={undo.notice} onDismiss={undo.dismiss} />
 
+      <Sheet open={introOpen} onClose={dismissIntro} label="Hoe werkt Karrie?">
+        <HowKarrieWorks headingRef={introHeadingRef} onStart={continueFromIntro} onSkip={continueFromIntro} />
+      </Sheet>
+
       <Sheet open={stickersOpen} onClose={closeStickers} label="Stickerboek">
         <StickerBook stickers={[...new Set(stickers)]} onClose={closeStickers} />
       </Sheet>
@@ -276,7 +311,7 @@ export function HomeScreen() {
                 </button>
               ))}
             <nav className="settings-links" aria-label="Meer over Karrie">
-              {(["about", "privacy"] as const).map((target) => (
+              {(["howto", "about", "privacy"] as const).map((target) => (
                 <button
                   key={target}
                   ref={(node) => {
@@ -287,7 +322,7 @@ export function HomeScreen() {
                   data-testid={`open-${target}`}
                   onClick={() => setView(target)}
                 >
-                  {target === "about" ? "❤️ Over Karrie" : "Privacy en gegevens"}
+                  {linkLabels[target]}
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -307,7 +342,13 @@ export function HomeScreen() {
               </svg>
               Terug
             </button>
-            {view === "about" ? <AboutKarrie headingRef={headingRef} /> : <PrivacyInfo headingRef={headingRef} />}
+            {view === "howto" ? (
+              <HowKarrieWorks headingRef={headingRef} />
+            ) : view === "about" ? (
+              <AboutKarrie headingRef={headingRef} />
+            ) : (
+              <PrivacyInfo headingRef={headingRef} />
+            )}
             <PressButton variant="secondary" wide onClick={() => setView("settings")}>
               Terug
             </PressButton>

@@ -40,6 +40,8 @@ export type Settings = {
   referenceImages: boolean;
   /** The supermarket picked last; new lists start with it. */
   retailer?: RetailerId;
+  /** "Hoe werkt Karrie?" was shown once before a first adventure; absent in data from before it existed. */
+  introSeen?: boolean;
 };
 
 /** What the server made of a typed-in product; never a brand, barcode or nutrition. */
@@ -89,6 +91,7 @@ export type Action =
   | { type: "set-retailer"; retailer: RetailerId | null }
   /** The parent's default for new lists; the current list keeps its own supermarket. */
   | { type: "set-default-retailer"; retailer: RetailerId | null }
+  | { type: "intro-seen" }
   | { type: "set-image-choice"; itemId: string; choice: ImageChoice | undefined }
   | { type: "add-mine"; key: string }
   | { type: "forget-mine"; key: string }
@@ -390,6 +393,8 @@ export function reducer(state: AppState, action: Action): AppState {
       const { retailer: _previous, ...rest } = state.settings;
       return { ...state, settings: action.retailer ? { ...rest, retailer: action.retailer } : rest };
     }
+    case "intro-seen":
+      return state.settings.introSeen ? state : { ...state, settings: { ...state.settings, introSeen: true } };
     case "set-image-choice":
       return updateItem(state, action.itemId, (item) => {
         const { imageChoice: _previous, ...rest } = item;
