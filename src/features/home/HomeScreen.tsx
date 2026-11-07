@@ -14,13 +14,14 @@ import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { softSpring } from "../../motion/variants";
 import { retailerName } from "../../domain/retailers";
-import { stickerLabel } from "../../domain/stickers";
+import { stickerPreview } from "../../domain/stickers";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
 import { AboutKarrie } from "./AboutKarrie";
 import { PrivacyInfo } from "./PrivacyInfo";
+import { StickerBook } from "./StickerBook";
 
 type ParentView = "settings" | "about" | "privacy";
 
@@ -63,6 +64,9 @@ export function HomeScreen() {
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [stickersOpen, setStickersOpen] = useState(false);
+  const preview = stickerPreview(stickers);
+  const previewRef = useRef<HTMLButtonElement>(null);
   const [view, setView] = useState<ParentView>("settings");
   const lastView = useRef<ParentView>("settings");
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -85,6 +89,11 @@ export function HomeScreen() {
     if (view === "settings") rowRefs.current[from]?.focus();
     else headingRef.current?.focus();
   }, [view, parentOpen]);
+
+  function closeStickers() {
+    setStickersOpen(false);
+    previewRef.current?.focus();
+  }
 
   function closeParent() {
     setParentOpen(false);
@@ -175,14 +184,29 @@ export function HomeScreen() {
         </section>
       )}
 
-      {stickers.length > 0 && (
-        <section className="sticker-shelf" aria-label={`Stickers: ${stickers.map(stickerLabel).join(", ")}`}>
-          {stickers.map((id) => (
-            <span key={id} className="sticker-slot">
-              <StickerBadge id={id} />
-            </span>
-          ))}
-        </section>
+      {preview.count > 0 && (
+        <motion.button
+          ref={previewRef}
+          type="button"
+          className="sticker-preview"
+          aria-label={`Mijn stickers: ${preview.count}. Open het stickerboek`}
+          data-testid="sticker-preview"
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setStickersOpen(true)}
+        >
+          <span className="sticker-preview-head" aria-hidden="true">
+            <strong>Mijn stickers</strong>
+            <span className="sticker-count">{preview.count}</span>
+          </span>
+          <span className="sticker-preview-row" aria-hidden="true">
+            {preview.shown.map((id) => (
+              <span key={id} className="sticker-slot sticker-mini">
+                <StickerBadge id={id} />
+              </span>
+            ))}
+            {preview.more > 0 && <span className="sticker-more">+{preview.more}</span>}
+          </span>
+        </motion.button>
       )}
 
       <AnimatePresence>
@@ -205,6 +229,10 @@ export function HomeScreen() {
       </AnimatePresence>
 
       <Toast notice={undo.notice} onDismiss={undo.dismiss} />
+
+      <Sheet open={stickersOpen} onClose={closeStickers} label="Stickerboek">
+        <StickerBook stickers={[...new Set(stickers)]} onClose={closeStickers} />
+      </Sheet>
 
       <Sheet open={parentOpen} onClose={closeParent} label={viewLabels[view]}>
         {view === "settings" ? (

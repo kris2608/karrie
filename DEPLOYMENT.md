@@ -89,6 +89,7 @@ Gebruik het HTTPS-adres, niet een lokaal IP-adres zonder certificaat.
 - **Lang drukken** (ruim een halve seconde) op een product bij **Toevoegen** of **Controleren** haalt het van de lijst. **Ongedaan maken** staat daarna even in beeld. Een korte tik voegt nog steeds toe, en scrollen met de vinger erop verwijdert niets.
 - Geluid staat standaard uit. Zet het aan via het tandwiel op het beginscherm en hoor een plopje bij **Gevonden!**.
 - Tandwiel → **❤️ Over Karrie** toont de tekening van Thomas en het verhaal; **Terug** brengt je terug naar de instellingen. **Privacy en gegevens** scrollt tot **Lees de volledige privacyverklaring**, die in een nieuw venster opent.
+- Met verdiende stickers staat onder **Nieuw avontuur** één rustige rij **Mijn stickers** (aantal, de nieuwste vijf en eventueel **+1**), ook op een smalle telefoon. Tikken opent het stickerboek met alle verdiende stickers en hun naam; **Klaar** sluit het.
 - `https://karrieapp.onrender.com/privacy.html` toont de privacyverklaring, ook als de app al op het beginscherm staat (niet het beginscherm van Karrie).
 - Zet het toestel daarna in vliegtuigmodus en open het beginscherm-icoon opnieuw. De winkelmodus werkt nog.
 - De eerste keer openen heeft internet nodig, zodat de app en de service worker binnenkomen.
