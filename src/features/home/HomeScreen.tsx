@@ -196,6 +196,12 @@ export function HomeScreen() {
         >
           Nieuw avontuur
         </PressButton>
+        {needsIntro(state) && (
+          <p className="home-teaser" data-testid="home-teaser">
+            <strong>Boodschappen doen wordt een spelletje!</strong>
+            Maak samen een lijstje. In de winkel speurt je kind naar de producten en verdient sterren en stickers.
+          </p>
+        )}
         {(shopping || draft) && (
           <PressButton variant="secondary" wide onClick={() => navigate(shopping ? "/winkel" : "/controleren")}>
             {shopping ? "Verder speuren" : "Verder met lijstje"}

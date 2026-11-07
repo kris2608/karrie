@@ -259,6 +259,24 @@ h1, h2, p { margin: 0; }
   width: min(100%, 340px);
 }
 .home-actions .pbtn-primary { margin-bottom: var(--space-2); }
+.home-teaser {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+}
+.home-teaser strong {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--ink);
+  font-weight: 900;
+}
 .home-shelf { width: 100%; }
 .home-shelf ul {
   display: flex;
