@@ -575,11 +575,13 @@ export function AddScreen() {
       <Sheet open={pasteOpen} onClose={() => setPasteOpen(false)} label="Lijst plakken">
         <h2>Plak je lijst</h2>
         <textarea
+          className="paste-field"
           value={pasteText}
           onChange={(event) => setPasteText(event.target.value)}
-          placeholder={"melk\n2x brood\n- 3 appels"}
+          placeholder="Plak hier je lijst…"
           rows={5}
         />
+        <p className="sheet-note paste-example">Bijvoorbeeld: melk · 2x brood · - 3 appels</p>
         <PressButton variant="secondary" wide data-testid="recognize" onClick={recognize}>
           Herken producten
         </PressButton>

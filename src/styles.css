@@ -598,6 +598,13 @@ a.settings-link { text-decoration: none; color: inherit; }
   font-size: 1.05rem;
   resize: vertical;
 }
+.sheet textarea::placeholder,
+.sheet input::placeholder,
+.search input::placeholder {
+  color: var(--ink-mute);
+  opacity: 1;
+}
+.paste-example { margin-top: calc(var(--space-2) * -1); }
 
 .switch-row {
   display: flex;

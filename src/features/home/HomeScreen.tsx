@@ -21,6 +21,7 @@ import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
 import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
+import { shareKarrie } from "../../domain/share";
 import { AboutKarrie } from "./AboutKarrie";
 import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
@@ -342,6 +343,25 @@ export function HomeScreen() {
                 </svg>
               </a>
               <button
+                type="button"
+                className="settings-link"
+                data-testid="share-karrie"
+                onClick={() => {
+                  void shareKarrie({
+                    share: navigator.share?.bind(navigator),
+                    canShare: navigator.canShare?.bind(navigator),
+                    copy: (text) => navigator.clipboard.writeText(text),
+                  }).then((outcome) => {
+                    if (outcome === "copied") undo.show("Link gekopieerd!");
+                  });
+                }}
+              >
+                📤 Deel Karrie
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3v12M8 7l4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
                 ref={(node) => {
                   rowRefs.current.privacy = node;
                 }}
@@ -356,7 +376,7 @@ export function HomeScreen() {
                 </svg>
               </button>
             </nav>
-            <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome. Lang drukken op een lijstje wist het.</p>
+            <p className="sheet-note">Zet Karrie op je beginscherm via Safari (deel-knop) of Chrome (menu). Lang drukken op een lijstje wist het.</p>
             <PressButton variant="secondary" wide onClick={closeParent}>
               Klaar
             </PressButton>

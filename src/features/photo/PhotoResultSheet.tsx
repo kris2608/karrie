@@ -294,7 +294,7 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
       <PressButton variant="primary" wide data-testid="photo-add" disabled={saving || !name.trim()} onClick={() => addNew("scan")}>
         Toevoegen en verder scannen
       </PressButton>
-      <PressButton variant="secondary" wide data-testid="photo-add-done" disabled={saving || !name.trim()} onClick={() => addNew("done")}>
+      <PressButton variant="quiet" wide data-testid="photo-add-done" disabled={saving || !name.trim()} onClick={() => addNew("done")}>
         Toevoegen en klaar
       </PressButton>
       {open.length > 0 && photo && (
@@ -306,7 +306,7 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
         <PressButton variant="quiet" onClick={onCancel}>
           Annuleren
         </PressButton>
-        <PressButton variant="secondary" data-testid="photo-retake" onClick={onRetake}>
+        <PressButton variant="quiet" data-testid="photo-retake" onClick={onRetake}>
           {retakeLabel}
         </PressButton>
       </div>
