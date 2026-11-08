@@ -266,7 +266,7 @@ const ROW_PACKAGING: Record<string, Packaging> = {
 const RETAILER_RANK: Record<string, number> = { albert_heijn: 0, jumbo: 1, lidl: 2 };
 
 /** longerBrandShare: a longer brand needs at least 1/n of the rows the best-supported brand has. */
-export const NAME_RULES = { alternatives: 6, sizeTolerance: 0.05, maxUnknownWords: 1, longerBrandShare: 2 };
+export const NAME_RULES = { alternatives: 6, sizeTolerance: 0.05, maxUnknownWords: 1, longerBrandShare: 2, otherBrandShare: 1 };
 
 /** Lowercase words without accents; "0%" stays one word and "plant-based" becomes two. */
 export function words(value: string): string[] {
@@ -313,9 +313,17 @@ function rowPackaging(row: NameRow): Packaging | undefined {
 
 const startsWith = (list: string[], prefix: string[]) => prefix.length > 0 && prefix.length <= list.length && prefix.every((word, index) => list[index] === word);
 
+const contains = (list: string[], sequence: string[]) => list.some((_, start) => startsWith(list.slice(start), sequence));
+
+/** Rows that sell a product by this name under another brand ("Cashewnoten" from AH, Jumbo and Lidl). */
+function otherBrandRows(brand: string[], rows: NameRow[]): number {
+  return rows.filter((row) => row.brands.length > 0 && !row.brands.some((entry) => startsWith(words(entry), brand)) && contains(words(row.name), brand)).length;
+}
+
 /**
  * The brand the typed name starts with ("calve pindakaas" -> ["calve"]). A longer brand ("AH Terra" over "AH") only
- * wins when enough rows carry it, so one row tagged "Calvé Pindakaas" does not swallow the product word.
+ * wins when enough rows carry it, so one row tagged "Calvé Pindakaas" does not swallow the product word. A product
+ * type that one row lists as its brand stays a product type when more rows sell it under other brands.
  */
 function brandOf(query: string[], rows: NameRow[]): string[] | null {
   const support = new Map<string, { brand: string[]; rows: number }>();
@@ -335,6 +343,7 @@ function brandOf(query: string[], rows: NameRow[]): string[] | null {
   let best: string[] | null = null;
   for (const entry of support.values()) {
     if (entry.rows * NAME_RULES.longerBrandShare < most) continue;
+    if (otherBrandRows(entry.brand, rows) > entry.rows * NAME_RULES.otherBrandShare) continue;
     if (!best || entry.brand.length > best.length) best = entry.brand;
   }
   return best;

@@ -17,6 +17,7 @@ import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { activeSection } from "./sectionSpy";
+import { NewProductSheet, type NewProductChoice } from "./NewProductSheet";
 import { Attribution, OfferTag, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { RETAILERS, retailerName, type RetailerId } from "../../domain/retailers";
@@ -149,6 +150,10 @@ export function AddScreen() {
   const [active, setActive] = useState<CategoryId>(CATEGORIES[0].id);
   const reduced = useReducedMotion() ?? false;
   const headRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [newName, setNewName] = useState<string | null>(null);
+  /** Keeps the sheet filled while it fades out. */
+  const [shown, setShown] = useState<{ name: string; token: number } | null>(null);
   const tabsRef = useRef<HTMLElement>(null);
   const sectionRefs = useRef<Partial<Record<CategoryId, HTMLElement | null>>>({});
   const jumping = useRef<(() => void) | null>(null);
@@ -323,6 +328,20 @@ export function AddScreen() {
     buzz(8);
   }
 
+  /** What the sheet already found goes straight onto the new item, so the background tidy-up has nothing left to ask. */
+  function confirmCustom(name: string, { tidy, answer }: NewProductChoice, after: "more" | "list") {
+    const productId = customProductId(name);
+    addCustom(name);
+    const branded = answer?.classification === "branded" && answer.brand ? answer : null;
+    if (branded) dispatch({ type: "brand-custom", productId, brand: branded.brand!, category: branded.category });
+    else if (tidy.status === "brand") dispatch({ type: "brand-custom", productId, brand: tidy.brand });
+    else if (tidy.status === "ok") dispatch({ type: "enrich-custom", productId, result: tidy.enrichment, illustrations: tidy.illustrations });
+    setNewName(null);
+    setQuery("");
+    if (after === "list") navigate("/controleren");
+    else searchRef.current?.focus();
+  }
+
   function addCustom(name: string) {
     const productId = customProductId(name);
     const key = mineKey({ name, kind: "custom_generic", productId });
@@ -444,6 +463,7 @@ export function AddScreen() {
             </svg>
             <span className="sr-only">Zoek een product</span>
             <input
+              ref={searchRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Zoek brood, melk…"
@@ -488,7 +508,10 @@ export function AddScreen() {
               data-testid="add-custom"
               whileTap={{ scale: 0.94 }}
               transition={{ duration: 0.09 }}
-              onClick={() => addCustom(custom)}
+              onClick={() => {
+                setNewName(custom);
+                setShown((current) => ({ name: custom, token: (current?.token ?? 0) + 1 }));
+              }}
             >
               <span className="card-art add-custom-art" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -521,7 +544,7 @@ export function AddScreen() {
       )}
       {deals > 0 && <Attribution className="add-attribution" />}
       {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
-      {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er daarna een foto of plaatje bij.</p>}
+      {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er meteen een foto of plaatje bij.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
       {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje onthoudt Karrie van eerder. Lang drukken vergeet ze.</p>}
 
@@ -542,6 +565,10 @@ export function AddScreen() {
           )}
         </PressButton>
       </div>
+
+      <Sheet open={newName !== null} onClose={() => setNewName(null)} label="Nieuw product">
+        {shown && <NewProductSheet key={shown.token} name={shown.name} onAdd={(choice, after) => confirmCustom(shown.name, choice, after)} onCancel={() => setNewName(null)} />}
+      </Sheet>
 
       <Sheet open={pasteOpen} onClose={() => setPasteOpen(false)} label="Lijst plakken">
         <h2>Plak je lijst</h2>

@@ -934,6 +934,12 @@ h1, h2, p { margin: 0; }
 .scan-card-text strong { font-size: 1.2rem; font-weight: 900; overflow-wrap: anywhere; }
 .scan-card-text span { color: var(--ink-soft); font-weight: 700; }
 .scan-card-text small { color: var(--ink-mute); font-variant-numeric: tabular-nums; }
+.new-product-wait { display: grid; place-items: center; aspect-ratio: 1; }
+.new-product-wait .karrie { width: 100%; height: auto; }
+.scan-card-text .new-product-status { display: flex; align-items: center; gap: var(--space-2); }
+.new-product-status .scanner-dots { flex: none; }
+.new-product-status .scanner-dots { gap: 5px; }
+.new-product-status .scanner-dots i { width: 9px; height: 9px; background: var(--teal-shade); }
 .scan-field { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
 .scan-field > span, .scan-field legend { padding: 0; font-weight: 800; }
 .scan-field input {

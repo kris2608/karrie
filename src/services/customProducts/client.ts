@@ -84,17 +84,28 @@ export function createCustomProductClient(deps: CustomProductDeps) {
     }
   }
 
+  async function normalizeOnce(name: string): Promise<NormalizeOutcome> {
+    if (!deps.online()) return { status: "retry" };
+    const reply = await post("/api/products/normalize", { name, createdFrom: "search" }, CUSTOM_RULES.timeoutMs);
+    if (!reply) return { status: "retry" };
+    if (reply.status === 422 && reply.body?.reason === "brand") return { status: "refused", brand: true };
+    if (reply.status === 422 || reply.status === 400) return { status: "refused" };
+    const enrichment = reply.status === 200 && reply.body?.status === "ok" ? enrichmentOf(reply.body.product) : null;
+    return enrichment ? { status: "ok", enrichment, illustrations: reply.body?.illustrations === true } : { status: "retry" };
+  }
+
+  /** The add sheet and the background tidy-up may ask for the same name at once; they share one request. */
+  const running = new Map<string, Promise<NormalizeOutcome>>();
+
   return {
     online: deps.online,
 
-    async normalize(name: string): Promise<NormalizeOutcome> {
-      if (!deps.online()) return { status: "retry" };
-      const reply = await post("/api/products/normalize", { name, createdFrom: "search" }, CUSTOM_RULES.timeoutMs);
-      if (!reply) return { status: "retry" };
-      if (reply.status === 422 && reply.body?.reason === "brand") return { status: "refused", brand: true };
-      if (reply.status === 422 || reply.status === 400) return { status: "refused" };
-      const enrichment = reply.status === 200 && reply.body?.status === "ok" ? enrichmentOf(reply.body.product) : null;
-      return enrichment ? { status: "ok", enrichment, illustrations: reply.body?.illustrations === true } : { status: "retry" };
+    normalize(name: string): Promise<NormalizeOutcome> {
+      const current = running.get(name);
+      if (current) return current;
+      const request = normalizeOnce(name).finally(() => running.delete(name));
+      running.set(name, request);
+      return request;
     },
 
     /** A Karrie-style drawing for a product the server knows; "none" when drawings are off or the device used its share today. */

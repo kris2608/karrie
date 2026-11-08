@@ -90,6 +90,14 @@ describe("matchName", () => {
     expect(matchName("AH walnoten", nuts)).toMatchObject({ classification: "branded", brand: "AH", match: { productName: "AH Walnoten" } });
   });
 
+  it("a product type that one Open Food Facts row lists as its brand stays a product type", () => {
+    const off = (name: string, brands: string) => ({ source: "off" as const, name, brands: [brands], quantity: "200 gram", imageUrl: `https://images.openfoodfacts.org/images/products/${encodeURIComponent(name)}.jpg` });
+    const cashews = [off("Cashewnoten par.kaas", "Cashewnoten"), off("Cashewnoten (gebrand gezout)", "Lidl"), off("Cashewnoten ongezouten", "Jumbo"), off("Cashewnoten ongebrand en ongezouten", "AH")];
+    expect(matchName("cashewnoten", cashews)).toEqual({ classification: "unknown", match: null, alternatives: [] });
+    const chocomel = [off("Chocomel Vol", "Chocomel"), off("Chocomel Light", "Chocomel"), off("Chocomel", "Nutricia")];
+    expect(matchName("Chocomel", chocomel)).toMatchObject({ classification: "branded", brand: "Chocomel" });
+  });
+
   it("finds Calvé in Open Food Facts rows and skips the pieces and 100% variants", () => {
     const rows = parseOffSearch({
       products: [

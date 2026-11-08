@@ -59,6 +59,15 @@ describe("custom product client", () => {
     expect(offline.calls).toHaveLength(0);
   });
 
+  it("shares one request when the add sheet and the background tidy-up ask at once, and asks again afterwards", async () => {
+    const { api, calls } = client(() => json(200, { status: "ok", product: PRODUCT, illustrations: true }));
+    const [sheet, background] = await Promise.all([api.normalize("Cashewnoten"), api.normalize("Cashewnoten")]);
+    expect(background).toBe(sheet);
+    expect(calls).toHaveLength(1);
+    await api.normalize("Cashewnoten");
+    expect(calls).toHaveLength(2);
+  });
+
   it("keeps the closest drawing and refuses names that are too long", () => {
     expect(enrichmentOf({ ...PRODUCT, closestDrawing: "pindakaas" })?.drawing).toBe("pindakaas");
     expect(enrichmentOf({ ...PRODUCT, displayName: "x".repeat(60) })).toBeNull();
