@@ -18,6 +18,7 @@ import { useFoundSequence, type Flight } from "../../motion/useFoundSequence";
 import { analyticsRetailer } from "../../domain/retailers";
 import { trackEvent } from "../../services/analytics";
 import { useOfferViews } from "../../storage/offers";
+import { useScreenWakeLock } from "../../hooks/useScreenWakeLock";
 import { useAdventure } from "../../state/AdventureContext";
 import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { OfferTag, offerLabel } from "../offers/OfferTag";
@@ -60,6 +61,7 @@ export function ShopScreen() {
     onUndo: () => dispatch({ type: "undo" }),
     onFinished: () => navigate("/klaar", { replace: true }),
   });
+  useScreenWakeLock(Boolean(adventure && (adventure.phase === "shopping" || sequence.finishing)));
 
   const current = adventure ? activeItem(adventure.items) : undefined;
   const retailer = adventure?.retailer;
