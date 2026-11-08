@@ -157,6 +157,8 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 
 Krijgt de server van Render een ander adres dan `https://karrie-api.onrender.com`? Zet dat adres dan in `VITE_API_ORIGIN` van `karrieapp` en bouw de site opnieuw.
 
+De officiële Nutri-Score-logo's (A–E) staan standaard aan in de ouder-schermen. Zet `VITE_NUTRISCORE_LOGOS=off` bij **karrieapp** alleen als het merklogo tijdelijk uit moet (daarna opnieuw bouwen).
+
 **Gratis plan: slaapstand**
 
 De gratis web service slaapt na ongeveer 15 minuten zonder verkeer. De eerste herkenning daarna duurt tot ongeveer een minuut. Karrie wekt de server al zodra de camera opengaat. Duurt het lang, dan staat in het camerascherm **Karrie wordt even wakker**; hij wacht tot 75 seconden. Wie dat niet wil, zet `karrie-api` op een betaald plan.

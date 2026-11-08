@@ -1700,6 +1700,12 @@ a.settings-link { text-decoration: none; color: inherit; }
 .product-info summary { cursor: pointer; font-weight: 700; }
 .product-info .picture-source { color: var(--ink-soft); }
 .nutri-score { padding: 2px 10px; border-radius: 999px; color: #fff; font-weight: 800; font-size: 0.85rem; }
+.nutri-score-logo {
+  display: block;
+  width: min(160px, 100%);
+  height: auto;
+  margin: 2px 0;
+}
 .nutri-a { background: #038141; }
 .nutri-b { background: #85bb2f; }
 .nutri-c { background: #fecb02; color: #3a2e00; }

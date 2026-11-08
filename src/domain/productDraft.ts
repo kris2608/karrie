@@ -52,15 +52,22 @@ function pick(...offers: Offer[]): DraftField | undefined {
 /** Open Food Facts tags that say clearly where a product is in the shop; anything else stays undecided. */
 const TAG_CATEGORY: [RegExp, CategoryId][] = [
   [/^en:frozen-/, "frozen"],
-  [/^en:(dairies|milks|yogurts|cheeses|eggs|creams|fresh-desserts)$/, "dairy"],
+  [/^en:(dairies|dairy-|milks?|yogurts?|cheeses?|eggs|creams?|fresh-desserts|custards?|puddings?)/, "dairy"],
   [/^en:(breads|pastries|cakes|viennoiseries)$/, "bakery"],
   [/^en:(fresh-fruits|fresh-vegetables)$/, "produce"],
   [/^en:(non-food-products|household-products|cleaning-products|detergents)$/, "household"],
 ];
 
+/** Dutch names that are clearly cooled dairy when Open Food Facts tags are thin or missing. */
+const DAIRY_NAME = /\b(vla|yoghurt|yogurt|kwark|karnemelk|slagroom|drinkyoghurt|roomkaas)\b/i;
+
 export function categoryFromTags(tags: string[] | undefined): CategoryId | undefined {
   for (const [pattern, category] of TAG_CATEGORY) if (tags?.some((tag) => pattern.test(tag))) return category;
   return undefined;
+}
+
+export function categoryFromName(name: string | undefined): CategoryId | undefined {
+  return name && DAIRY_NAME.test(name) ? "dairy" : undefined;
 }
 
 /** Only an exact catalog name or alias: "Chocoladereep melk" must not become "melk". */
@@ -126,7 +133,13 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
   );
 
   const match = (mine && products.find((product) => product.id === mine.productId)) || vision?.match || catalogByName(found?.name) || null;
-  const category = mine?.category ?? vision?.category ?? categoryFromTags(found?.categories) ?? match?.category ?? "pantry";
+  const category =
+    mine?.category ??
+    vision?.category ??
+    categoryFromTags(found?.categories) ??
+    categoryFromName(found?.name ?? fields.name?.value) ??
+    match?.category ??
+    "pantry";
   const offImage = mine?.imageSource === "off" ? mine.imageUrl : found?.imageUrl;
   const nutrition = mine?.nutrition ?? nutritionOf(barcode);
   const kept = (name: FieldName) => {

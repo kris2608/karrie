@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sourcesLine } from "../features/photo/PhotoResultSheet";
 import type { FoundAnswer } from "../services/barcode/lookup";
 import type { RecognizedProduct } from "../services/vision/types";
-import { catalogByName, categoryFromTags, mergeDraft } from "./productDraft";
+import { catalogByName, categoryFromName, categoryFromTags, mergeDraft } from "./productDraft";
 import type { SavedItem } from "./types";
 
 const CALVE = "8710400000006";
@@ -124,6 +124,11 @@ describe("merging barcode, photo and my products", () => {
     expect(catalogByName("Pindakaas")?.id).toBe("pindakaas");
     expect(catalogByName("Chocoladereep melk")).toBeNull();
     expect(categoryFromTags(["en:frozen-desserts", "en:ice-creams"])).toBe("frozen");
+    expect(categoryFromTags(["en:dairy-desserts", "en:custards"])).toBe("dairy");
     expect(categoryFromTags(["en:spreads", "en:peanut-butters"])).toBeUndefined();
+    expect(categoryFromName("Rum Rozijnen vla")).toBe("dairy");
+    expect(mergeDraft({ ean: CALVE, barcode: { ...OFF, product: { ...OFF.product, name: "Rum Rozijnen vla", categories: [] } } }).category).toBe(
+      "dairy",
+    );
   });
 });

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { hasPhoto, ItemArt, useArt } from "../../components/ItemArt";
+import { NutriScoreMark } from "../../components/NutriScoreLogo";
 import { CameraIcon } from "../../components/ui/PhotoButton";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
@@ -94,9 +95,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
         <div className="scan-card-text">
           <h2>{item.name}</h2>
           {detail && <span>{detail}</span>}
-          {item.nutrition?.nutriscore && /^[a-e]$/i.test(item.nutrition.nutriscore) && (
-            <small data-testid="nutri-score">Nutri-Score {item.nutrition.nutriscore.toUpperCase()}</small>
-          )}
+          <NutriScoreMark grade={item.nutrition?.nutriscore} />
           <span>{categoryLabel(item.category)}</span>
           {item.ean && <small>EAN {item.ean}</small>}
           {item.source === "vision" && <small>Herkend van een foto</small>}
