@@ -57,6 +57,14 @@ describe("custom generic products", () => {
     expect(state.mine).toHaveLength(0);
   });
 
+  it("an alias is not the product's name: Cola is its own product, not Frisdrank", () => {
+    const state = play([add("cola"), add("appelsap")]);
+    expect(state.adventure!.items.map((item) => [item.productId, item.name])).toEqual([
+      ["custom:cola", "Cola"],
+      ["custom:appelsap", "Appelsap"],
+    ]);
+  });
+
   it("refuses phrases and empty input", () => {
     expect(play([add("dingen voor ontbijt")])).toBe(initialState);
     expect(play([add("  ")])).toBe(initialState);

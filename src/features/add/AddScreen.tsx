@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../../domain/categories";
-import { customName, customProductId, suggestion } from "../../domain/customProduct";
+import { customName, customProductId, nameTaken, suggestion } from "../../domain/customProduct";
 import { normalize } from "../../domain/matchProduct";
 import { matchesMine, mineKey } from "../../domain/mine";
 import type { AdventureItem, CategoryId, Product, SavedItem } from "../../domain/types";
@@ -197,7 +197,9 @@ export function AddScreen() {
   const close = known?.kind === "catalog" ? known.product : null;
   const results = close ? [close, ...visible.filter((product) => product.id !== close.id)] : visible;
   const nothing = visible.length === 0 && extras.length === 0 && mineVisible.length === 0;
-  const custom = needle && nothing && (!known || (known.kind === "catalog" && known.close)) ? customName(query) : null;
+  /** Offered next to similar products too (Appelsap beside Sinaasappelsap), unless one already has this very name. */
+  const taken = needle && nameTaken(query, [...products.map((product) => product.name), ...mine.map((entry) => entry.name), ...extras.map(({ item }) => item.name)]);
+  const custom = needle && !taken ? customName(query) : null;
 
   useEffect(() => {
     if (needle) return;

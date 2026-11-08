@@ -49,6 +49,16 @@ export function customProductId(name: string): string {
   return `custom:${singularKey(name)}`;
 }
 
+/**
+ * True when a product by this very name already exists, so a new one would be a duplicate. Singular and plural
+ * count as the same name; an alias ("cola" for Frisdrank) or a typo does not, so the parent can still add it.
+ */
+export function nameTaken(query: string, names: string[]): boolean {
+  const needle = normalize(query);
+  const key = singularKey(query);
+  return Boolean(needle) && names.some((name) => normalize(name) === needle || singularKey(name) === key);
+}
+
 export type Suggestion = { kind: "catalog"; product: Product; close: boolean } | { kind: "mine"; entry: SavedItem };
 
 /**

@@ -16,7 +16,7 @@ import { SCORING } from "../domain/scoring";
 import { nextSticker } from "../domain/stickers";
 import { MINE_LIMIT, mineKey, remember as rememberMine } from "../domain/mine";
 import { categoryIcon } from "../domain/categoryIcon";
-import { customName, customProductId, singularKey, suggestion } from "../domain/customProduct";
+import { customName, customProductId, nameTaken, singularKey, suggestion } from "../domain/customProduct";
 import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, NamePhoto, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
 import { isRetailer, type RetailerId } from "../domain/retailers";
 import { productById, products } from "../data/catalog";
@@ -558,7 +558,7 @@ export function reducer(state: AppState, action: Action): AppState {
       const name = customName(action.name);
       if (!name) return state;
       const known = suggestion(name, state.mine);
-      if (known?.kind === "catalog" && !known.close) return reducer(state, { type: "add-product", product: known.product });
+      if (known?.kind === "catalog" && !known.close && nameTaken(name, [known.product.name])) return reducer(state, { type: "add-product", product: known.product });
       if (known?.kind === "mine" && known.entry.kind !== "custom_generic") return reducer(state, { type: "add-mine", key: mineKey(known.entry) });
       const adventure = ensureDraft(state);
       const productId = customProductId(name);

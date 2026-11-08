@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customName, customProductId, singularKey, suggestion } from "./customProduct";
+import { customName, customProductId, nameTaken, singularKey, suggestion } from "./customProduct";
 import { parseName, sizeLabel } from "./typedName";
 import type { SavedItem } from "./types";
 
@@ -107,5 +107,22 @@ describe("suggestion", () => {
     expect(suggestion("cashewnoten", [])).toBeNull();
     expect(suggestion("komijn", [])).toBeNull();
     expect(suggestion("rozijnen", [])).toBeNull();
+  });
+});
+
+describe("nameTaken", () => {
+  const names = ["Sinaasappelsap", "Frisdrank", "Walnoten", "Humus"];
+
+  it("blocks only the same name, in either form", () => {
+    expect(nameTaken("walnoot", names)).toBe(true);
+    expect(nameTaken("Frisdrank", names)).toBe(true);
+    expect(nameTaken("humus", names)).toBe(true);
+  });
+
+  it("leaves room for similar names, aliases and typos", () => {
+    expect(nameTaken("appelsap", names)).toBe(false);
+    expect(nameTaken("cola", names)).toBe(false);
+    expect(nameTaken("hummus", names)).toBe(false);
+    expect(nameTaken("", names)).toBe(false);
   });
 });
