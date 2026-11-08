@@ -1,5 +1,6 @@
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import type { PackSummary } from "./catalog/pack.js";
 import type { CatalogStore } from "./catalog/types.js";
 import { eanForms } from "./ean.js";
 import { cleanUrl, get, readLimited, stripHtml, usageOf, type Fetch, type RawResponse } from "./images.js";
@@ -29,7 +30,17 @@ export type BarcodeSource =
 /** off-exact: name and brand; off-partial: something to show, but the parent must confirm; web-page: the page prints this barcode. */
 export type BarcodeStatus = "off-exact" | "off-partial" | "web-page" | "none";
 
-export type BarcodeAnswer = { ean: string; status: BarcodeStatus; product?: BarcodeProduct; source?: BarcodeSource; at: number };
+export type BarcodeAnswer = {
+  ean: string;
+  status: BarcodeStatus;
+  product?: BarcodeProduct;
+  source?: BarcodeSource;
+  at: number;
+  /** Pack-size evidence from OFF / PrijsProfeet / parent; conflict means the parent should confirm. */
+  pack?: PackSummary;
+  /** Exact-EAN retailer image already in the catalog, so the client can skip PrijsProfeet. */
+  storeImage?: { ean: string; imageUrl: string; retailer: string; sourceUrl?: string; quantity?: string; productName?: string; brand?: string };
+};
 
 export type LookupResult =
   | { ok: true; answer: BarcodeAnswer; cached: boolean; usage?: Usage; searchCalls: number; failures: string[] }
@@ -245,7 +256,10 @@ export type BarcodeConfig = {
   /** OpenAI client and model for the web search; without them only Open Food Facts is asked. */
   web?: { client: ResponsesClient; model: string };
   /** Shared Postgres catalog; checked after the memory cache and before Open Food Facts. */
-  catalog?: Pick<CatalogStore, "byGtin" | "upsertBarcodeRecord" | "cacheGet" | "cachePut" | "rememberSeen">;
+  catalog?: Pick<
+    CatalogStore,
+    "byGtin" | "upsertBarcodeRecord" | "cacheGet" | "cachePut" | "rememberSeen" | "packForGtin"
+  >;
 };
 
 class OffError extends Error {
@@ -327,15 +341,17 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     cache.set(ean, entry);
   }
 
-  function persist(answer: BarcodeAnswer) {
-    if (!config.catalog || answer.status === "none" || !answer.product || !answer.source) return;
-    void config.catalog.upsertBarcodeRecord({
+  async function persist(answer: BarcodeAnswer): Promise<BarcodeAnswer> {
+    if (!config.catalog || answer.status === "none" || !answer.product || !answer.source) return answer;
+    await config.catalog.upsertBarcodeRecord({
       ean: answer.ean,
       status: answer.status,
       product: answer.product,
       source: answer.source,
       at: answer.at,
     });
+    const pack = await config.catalog.packForGtin(answer.ean).catch(() => null);
+    return pack ? { ...answer, pack } : answer;
   }
 
   function persistMiss(ean: string) {
@@ -347,12 +363,17 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     if (!config.catalog) return null;
     const hit = await config.catalog.byGtin(ean).catch(() => null);
     if (hit) {
-      remember(ean, { answer: hit.answer, until: now() + BARCODE_RULES.foundTtlMs });
+      const answer: BarcodeAnswer = {
+        ...hit.answer,
+        pack: hit.pack,
+        ...(hit.storeImage && { storeImage: hit.storeImage }),
+      };
+      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
       void config.catalog.rememberSeen(hit.productId);
       if (hit.stale) {
         void lookupFresh(ean, false, { refreshOnly: true }).catch(() => undefined);
       }
-      return { ok: true, answer: hit.answer, cached: true, searchCalls: 0, failures: [] };
+      return { ok: true, answer, cached: true, searchCalls: 0, failures: [] };
     }
     const miss = await config.catalog.cacheGet<{ status: "none" }>(`barcode:${ean}`).catch(() => null);
     if (miss?.status === "none") {
@@ -376,9 +397,9 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     const off = raw ? fromOff(ean, raw) : null;
     if (off) {
       const source: BarcodeSource = { kind: "off", name: "Open Food Facts", url: `${BARCODE_RULES.offOrigin}/product/${ean}`, dataLicense: "ODbL", ...(off.product.imageUrl && { imageLicense: "CC BY-SA" as const }) };
-      const answer: BarcodeAnswer = { ean, status: off.status, product: off.product, source, at: now() };
+      let answer: BarcodeAnswer = { ean, status: off.status, product: off.product, source, at: now() };
+      answer = await persist(answer);
       remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
-      persist(answer);
       return { ok: true, answer, cached: false, searchCalls: 0, failures };
     }
     failures.push(raw ? "off:not-credible" : "off:not-found");
@@ -392,10 +413,10 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       return { ok: true, answer, cached: false, searchCalls: 0, failures };
     }
     const web = await askWeb(ean, failures);
-    const answer = web.answer ?? { ean, status: "none" as const, at: now() };
-    remember(ean, { answer, until: now() + (web.answer ? BARCODE_RULES.foundTtlMs : BARCODE_RULES.missTtlMs) });
-    if (web.answer) persist(answer);
+    let answer = web.answer ?? { ean, status: "none" as const, at: now() };
+    if (web.answer) answer = await persist(answer);
     else persistMiss(ean);
+    remember(ean, { answer, until: now() + (web.answer ? BARCODE_RULES.foundTtlMs : BARCODE_RULES.missTtlMs) });
     return { ok: true, answer, cached: false, usage: web.usage, searchCalls: web.searchCalls, failures };
   }
 

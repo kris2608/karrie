@@ -43,11 +43,11 @@ export function hasOffPhoto(item: Pictured): boolean {
 }
 
 /**
- * A scanned pack without an Open Food Facts front photo may have a retailer photo for its exact barcode. Products
- * without a barcode, and standard products a parent typed in, keep their drawing.
+ * A scanned pack may have a retailer photo for its exact barcode, even when Open Food Facts already has a front
+ * photo. Products without a barcode, and standard products a parent typed in, keep their drawing.
  */
 export function wantsStoreImage(item: Pictured & Pick<PackInfo, "ean" | "kind">): boolean {
-  return Boolean(item.ean) && item.kind !== "custom_generic" && !hasOffPhoto(item);
+  return Boolean(item.ean) && item.kind !== "custom_generic";
 }
 
 /** A product the parent typed is looked up by its name: a brand may have a retailer or Open Food Facts photo. */
@@ -66,7 +66,7 @@ export function nameImageKey(name: string): string {
  * photo for the exact barcode already is the "Voorbeeldfoto", so nothing is searched.
  */
 export function wantsReference(identity: ImageIdentity | null, choice: PackInfo["imageChoice"], offPhoto = false, storePhoto = false): boolean {
-  if (!identity || storePhoto || choice === "photo" || choice === "drawing") return false;
+  if (!identity || storePhoto || choice === "photo" || choice === "off" || choice === "drawing") return false;
   return choice === "reference" || (!identity.generic && !offPhoto);
 }
 

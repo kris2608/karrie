@@ -7,10 +7,12 @@ import { categoryIcon } from "../../domain/categoryIcon";
 import { declineKey, missionOn } from "../../domain/discovery";
 import { newItemFor, type DraftField, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem, AlternativeAssessment, CategoryId } from "../../domain/types";
+import { confirmPackSize } from "../../services/barcode/pack";
+import { storeCredit } from "../../services/images/storeImage";
 import { useAdventure } from "../../state/AdventureContext";
 import { savePhoto, usePhotoUrl } from "../../storage/photos";
-import { storeCredit } from "../../services/images/storeImage";
 import { storeImages, useStoreImage } from "../../storage/storeImages";
+import { PackConflict } from "./PackConflict";
 
 type PhotoResultSheetProps = {
   /** Null: nothing usable was found and the parent fills it in. */
@@ -70,6 +72,8 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   const [category, setCategory] = useState<CategoryId>(draft?.category ?? "pantry");
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [packSize, setPackSize] = useState(draft?.fields.packageSize?.value);
+  const [conflictResolved, setConflictResolved] = useState(!draft?.packConflict);
   /** Set in the same tap, so a quick second tap (even on the sheet as it slides away) does nothing. */
   const settled = useRef(false);
   const earlier = usePhotoUrl(photoUrl ? undefined : draft?.photoId);
@@ -80,14 +84,22 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   const keyed = draft ? { name: draft.name, brand: draft.pack.brand, alternative: assessment } : null;
   const missionDefault = Boolean(keyed && missionOn(keyed, declined));
   const missionState = missionDefault ? "on" : keyed && assessment?.evidence === "label" && declined.includes(declineKey(keyed)) ? "declined" : "off";
-  const lookStore = Boolean(draft?.ean && !draft.imageUrl);
+  const lookStore = Boolean(draft?.ean);
   useEffect(() => {
     if (lookStore) storeImages.request(draft?.ean);
   }, [lookStore, draft?.ean]);
   const store = useStoreImage(lookStore ? draft?.ean : undefined);
   const usable = useBroken();
-  const picture = photoUrl ?? earlier ?? usable(draft?.imageUrl) ?? usable(store?.imageUrl);
-  const storeShown = Boolean(store && picture === store.imageUrl);
+  const hinted = draft?.from.barcode?.storeImage?.imageUrl;
+  const picture = photoUrl ?? earlier ?? usable(store?.imageUrl) ?? usable(hinted) ?? usable(draft?.imageUrl);
+  const storeShown = Boolean((store && picture === store.imageUrl) || (hinted && picture === hinted));
+  const nutriScore = draft?.from.barcode?.product.nutriScore ?? draft?.pack.nutrition?.nutriscore?.toUpperCase();
+
+  function choosePack(quantity: string) {
+    setPackSize(quantity);
+    setConflictResolved(true);
+    if (draft?.ean) void confirmPackSize(draft.ean, quantity);
+  }
 
   /** The new photo is stored when asked for; without one, the parent's earlier photo stays with the product. */
   async function commit(run: (photoId?: string) => string, withPhoto: boolean, after: "scan" | "done" = "scan") {
@@ -123,9 +135,16 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
     const finalName = name.trim();
     if (!finalName) return;
     const { item, withPhoto } = newItemFor(draft, finalName, category);
+    const pack = item.pack
+      ? (() => {
+          const { packConflict: _cleared, ...rest } = item.pack;
+          if (!packSize || !conflictResolved) return item.pack;
+          return { ...rest, packageSize: packSize, fieldSources: { ...item.pack.fieldSources, packageSize: "parent" as const } };
+        })()
+      : item.pack;
     void commit(
       (photoId) => {
-        dispatch({ type: "add-recognized", ...item, photoId });
+        dispatch({ type: "add-recognized", ...item, pack, photoId });
         return `${finalName} staat op je lijst`;
       },
       withPhoto,
@@ -153,7 +172,10 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
             {brandLine} <em className="photo-source">{sourceLabel(brandField, draft)}</em>
           </span>
         )}
-        {draft?.fields.packageSize && <span>{draft.fields.packageSize.value}</span>}
+        {packSize && <span>{packSize}</span>}
+        {nutriScore && /^[A-E]$/i.test(nutriScore) && (
+          <small data-testid="nutri-score">Nutri-Score {nutriScore.toUpperCase()}</small>
+        )}
         {drawing ? (
           <small data-testid="photo-drawing">Karrie gebruikt de tekening van {drawing.name.toLowerCase()}</small>
         ) : (
@@ -171,7 +193,10 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   const notes = draft && (
     <>
       {!draft.recognized && draft.from.photo && <p className="sheet-note">Karrie ziet niet goed welk product dit is. Maak een nieuwe foto van één product, of vul het zelf in.</p>}
-      {draft.recognized && draft.unsure && <p className="sheet-note">Karrie weet het niet helemaal zeker. Kijk even of het klopt.</p>}
+      {draft.recognized && draft.unsure && !draft.packConflict && <p className="sheet-note">Karrie weet het niet helemaal zeker. Kijk even of het klopt.</p>}
+      {draft.packConflict && !conflictResolved && (
+        <PackConflict choices={draft.packConflict.choices} raw={draft.packConflict.raw} onConfirm={choosePack} />
+      )}
       <MissionNote assessment={assessment} state={missionState} />
     </>
   );

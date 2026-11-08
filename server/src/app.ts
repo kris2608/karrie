@@ -96,6 +96,7 @@ const ROUTES = [
   "/api/images/ean",
   "/api/images/name",
   "/api/products/barcode",
+  "/api/products/pack",
   "/api/offers/match",
   "/api/products/normalize",
   "/api/products/illustration",
@@ -273,6 +274,7 @@ export function createHandler(deps: AppDeps) {
     if (url.pathname === "/api/images/ean") return storeImage(body);
     if (url.pathname === "/api/images/name") return nameImage(body);
     if (url.pathname === "/api/products/barcode") return lookupBarcode(body);
+    if (url.pathname === "/api/products/pack") return recordPack(body);
     if (url.pathname === "/api/offers/match") return matchOffer(body);
     if (url.pathname === "/api/products/normalize") return normalizeTyped(body);
     if (url.pathname === "/api/products/illustration") return illustrate(body);
@@ -392,6 +394,20 @@ export function createHandler(deps: AppDeps) {
       images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
       entry.lookupMs = now() - callStarted;
       return reply(result);
+    }
+
+    /** Anonymous pack-size confirmation for a GTIN; never moves the shared variant on its own. */
+    async function recordPack(body: unknown) {
+      if (!deps.catalog?.enabled) return send(503, { status: "error", code: "misconfigured" });
+      const request = PackRequestSchema.safeParse(body);
+      const ean = request.success ? canonicalEan(request.data.ean) : null;
+      const quantity = request.success ? request.data.quantity.trim() : "";
+      if (!ean || quantity.length < 1 || quantity.length > 24) return send(400, { status: "error", code: "bad-request" });
+      const denial = deps.limits.admit(clientIp(req));
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const pack = await deps.catalog.recordParentPack({ ean, quantity });
+      deps.limits.record({ ok: Boolean(pack), latencyMs: 0 });
+      return pack ? send(200, { status: "ok", pack }) : send(502, { status: "error", code: "unavailable" });
     }
 
     /**
@@ -625,6 +641,8 @@ function packagingLabel(parsed: ParsedName): string | undefined {
 }
 
 const ReviewSchema = z.object({ approvalStatus: z.enum(APPROVAL) }).strict();
+
+const PackRequestSchema = z.object({ ean: z.string().max(20), quantity: z.string().max(24) }).strict();
 
 const CatalogAdminSchema = z
   .object({

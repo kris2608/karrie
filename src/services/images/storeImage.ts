@@ -4,7 +4,15 @@ import { isRetailer, retailerName, type RetailerId } from "../../domain/retailer
  * Mirrors StoreImage on the server: a link to a retailer's own product photo for one exact barcode, found through
  * PrijsProfeet. The photo belongs to the retailer; Karrie only links to it and never keeps a copy.
  */
-export type StoreImage = { ean: string; imageUrl: string; retailer: RetailerId; sourceUrl?: string };
+export type StoreImage = {
+  ean: string;
+  imageUrl: string;
+  retailer: RetailerId;
+  sourceUrl?: string;
+  quantity?: string;
+  productName?: string;
+  brand?: string;
+};
 
 export type StoreImageOutcome =
   | { status: "ok"; image: StoreImage | null }

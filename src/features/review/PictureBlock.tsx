@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { hasPhoto, markBroken, useArt, useNamePhoto } from "../../components/ItemArt";
+import { markBroken, useArt, useNamePhoto } from "../../components/ItemArt";
 import { hasOffPhoto, identityKey, identityOf, nameImageKey, wantsNameImage, wantsReference, wantsStoreImage } from "../../domain/imageIdentity";
 import { namePhotoCredit } from "../../services/images/nameImage";
 import { storeCredit } from "../../services/images/storeImage";
@@ -38,11 +38,18 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
     if (settings.referenceImages && wanted) references.request(identity);
   }, [key, wanted, settings.referenceImages]);
   const candidates = wanted ? (entry?.discovery?.candidates ?? []) : [];
-  const photo = hasPhoto(item);
-  const active: ImageChoice = item.imageChoice ?? (art?.source === "prijsprofeet" || art?.source === "name" || art?.source === "reference" ? "reference" : art ? "photo" : "drawing");
+  const active: ImageChoice =
+    item.imageChoice ??
+    (art?.source === "prijsprofeet" || art?.source === "name" || art?.source === "reference"
+      ? "reference"
+      : art?.source === "off"
+        ? "off"
+        : art?.source === "parent"
+          ? "photo"
+          : "drawing");
   const status = !wanted ? null : searching ? "searching" : entry?.chosen === null ? "removed" : shown ? null : entry?.state;
   /** A standard product, or a pack with an Open Food Facts photo, only searches when the parent asks for a picture. */
-  const optIn = Boolean((identity?.generic || offPhoto) && settings.referenceImages);
+  const optIn = Boolean((identity?.generic || offPhoto) && settings.referenceImages && !store);
 
   const choose = (choice: ImageChoice | undefined) => dispatch({ type: "set-image-choice", itemId: item.id, choice });
   const pick = (choice: ImageChoice) => {
@@ -50,8 +57,9 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
     choose(choice);
   };
   const choices: { id: ImageChoice; label: string; show: boolean }[] = [
-    { id: "reference", label: "Voorbeeldfoto", show: Boolean(shown || store || named) || optIn },
-    { id: "photo", label: offPhoto ? "Open Food Facts-foto" : "Eigen foto", show: photo },
+    { id: "reference", label: store ? "Winkelfoto" : "Voorbeeldfoto", show: Boolean(shown || store || named) || optIn },
+    { id: "off", label: "Open Food Facts-foto", show: offPhoto },
+    { id: "photo", label: "Eigen foto", show: Boolean(item.photoId) },
     { id: "drawing", label: "Tekening", show: true },
   ];
 

@@ -129,6 +129,7 @@ if (pgPool) {
       refreshDays: number("CATALOG_REFRESH_DAYS", 90),
       migrations: catalogMigrations,
     });
+    await catalog.repairPackConflicts().catch(() => 0);
     if (env.CATALOG_IMAGE_HEALTH !== "off") startImageHealth(catalog);
   } catch (error) {
     console.log(JSON.stringify({ event: "catalog-init-failed", error: error instanceof Error ? error.message : "unknown" }));

@@ -100,6 +100,7 @@ export type Action =
   | { type: "set-default-retailer"; retailer: RetailerId | null }
   | { type: "intro-seen" }
   | { type: "set-image-choice"; itemId: string; choice: ImageChoice | undefined }
+  | { type: "confirm-pack-size"; itemId: string; packageSize: string }
   | { type: "add-mine"; key: string }
   | { type: "forget-mine"; key: string }
   | { type: "restore-mine"; entry: SavedItem; index: number }
@@ -420,6 +421,15 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "intro-seen":
       return state.settings.introSeen ? state : { ...state, settings: { ...state.settings, introSeen: true } };
+    case "confirm-pack-size":
+      return updateItem(state, action.itemId, (item) => {
+        const { packConflict: _cleared, ...rest } = item;
+        return {
+          ...rest,
+          packageSize: action.packageSize.slice(0, 24),
+          fieldSources: { ...item.fieldSources, packageSize: "parent" as const },
+        };
+      });
     case "set-image-choice":
       return updateItem(state, action.itemId, (item) => {
         const { imageChoice: _previous, ...rest } = item;

@@ -9,7 +9,9 @@ import { brandLabel } from "../../domain/customProduct";
 import { hasSuggestion, missionOn } from "../../domain/discovery";
 import type { AdventureItem } from "../../domain/types";
 import { productById } from "../../data/catalog";
+import { confirmPackSize } from "../../services/barcode/pack";
 import { useAdventure } from "../../state/AdventureContext";
+import { PackConflict } from "../photo/PackConflict";
 import { DrawingPicker } from "./DrawingPicker";
 import { PictureBlock } from "./PictureBlock";
 import { ProductInfo } from "./ProductInfo";
@@ -92,12 +94,25 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
         <div className="scan-card-text">
           <h2>{item.name}</h2>
           {detail && <span>{detail}</span>}
+          {item.nutrition?.nutriscore && /^[a-e]$/i.test(item.nutrition.nutriscore) && (
+            <small data-testid="nutri-score">Nutri-Score {item.nutrition.nutriscore.toUpperCase()}</small>
+          )}
           <span>{categoryLabel(item.category)}</span>
           {item.ean && <small>EAN {item.ean}</small>}
           {item.source === "vision" && <small>Herkend van een foto</small>}
         </div>
       </div>
       {item.offAttribution && <p className="scan-attribution">Gegevens: Open Food Facts (ODbL){shown?.source === "off" ? ", foto's CC BY-SA" : ""}</p>}
+      {item.packConflict && item.fieldSources?.packageSize !== "parent" && (
+        <PackConflict
+          choices={item.packConflict.choices}
+          raw={item.packConflict.raw}
+          onConfirm={(quantity) => {
+            dispatch({ type: "confirm-pack-size", itemId: item.id, packageSize: quantity });
+            if (item.ean) void confirmPackSize(item.ean, quantity);
+          }}
+        />
+      )}
       <PictureBlock item={item} />
       <ProductInfo item={item} />
       <MissionBlock item={item} />

@@ -18,6 +18,10 @@ type CacheEntry = { answer: BarcodeAnswer; savedAt: number };
 const DAY = 24 * 60 * 60 * 1000;
 export const BARCODE_CLIENT_RULES = {
   foundTtlMs: 30 * DAY,
+  /** Conflicted pack sizes should not stick for a month after the catalog is repaired. */
+  conflictTtlMs: DAY,
+  /** When online, refresh a still-fresh cache entry after this age so central repairs arrive. */
+  revalidateAfterMs: 6 * 60 * 60 * 1000,
   /** The server remembers misses for a week; a day here lets a newly added Open Food Facts record show up sooner. */
   missTtlMs: DAY,
   /** A sleeping Render instance can take half a minute to answer. */
@@ -72,7 +76,15 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
     const entry = await deps.readCache(ean);
     const cached = entry && cleanAnswer(entry.answer, ean);
     const age = entry ? deps.now() - entry.savedAt : Infinity;
-    if (cached && cached.status !== "none" && age < BARCODE_CLIENT_RULES.foundTtlMs) return { status: "found", ean, answer: cached, cached: true };
+    if (cached && cached.status !== "none") {
+      const ttl = cached.pack?.conflict ? BARCODE_CLIENT_RULES.conflictTtlMs : BARCODE_CLIENT_RULES.foundTtlMs;
+      if (age < ttl) {
+        if (deps.online() && age > BARCODE_CLIENT_RULES.revalidateAfterMs) {
+          void remote(ean, entry).catch(() => undefined);
+        }
+        return { status: "found", ean, answer: cached, cached: true };
+      }
+    }
     if (cached?.status === "none" && age < BARCODE_CLIENT_RULES.missTtlMs) return { status: "none", ean };
     return remote(ean, cached && entry ? { answer: cached, savedAt: entry.savedAt } : undefined);
   }

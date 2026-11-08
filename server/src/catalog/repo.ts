@@ -7,6 +7,7 @@ import type { NameImage } from "../nameMatch.js";
 import type { ProductCategory } from "../offers/match.js";
 import { PRODUCT_CATEGORIES } from "../offers/match.js";
 import { aliasKey, normalizedKey, packFromQuantity, packKey, sizeMatches } from "./keys.js";
+import { quantityMlOf, summarizePack, type PackEvidence, type PackEvidenceSource } from "./pack.js";
 import type {
   Catalog,
   CatalogChange,
@@ -14,6 +15,7 @@ import type {
   CatalogStats,
   CatalogStore,
   NameLookupRequest,
+  ParentPackInput,
   SetDefaultInput,
   StoredBarcodeHit,
   StoredNameHit,
@@ -219,16 +221,27 @@ export function createCatalogStore(
           const { rows: images } = await db.query(
             `SELECT url, usage_status, source FROM product_images
              WHERE product_id = $1 AND usage_status <> 'unavailable'
-             ORDER BY preferred DESC, created_at ASC
+             ORDER BY CASE WHEN variant_id = $2 THEN 0 ELSE 1 END, preferred DESC, created_at ASC
              LIMIT 1`,
-            [base.product_id],
+            [base.product_id, base.variant_id],
+          );
+          const { rows: storeRows } = await db.query(
+            `SELECT url, retailer, source_url FROM product_images
+             WHERE product_id = $1 AND usage_status = 'link_only' AND source = 'prijsprofeet'
+             ORDER BY CASE WHEN variant_id = $2 THEN 0 ELSE 1 END, preferred DESC, created_at ASC
+             LIMIT 1`,
+            [base.product_id, base.variant_id],
           );
           const img = images[0];
+          const store = storeRows[0];
           return {
             ...base,
             image_url: img?.url,
             usage_status: img?.usage_status,
             image_source: img?.source,
+            store_url: store?.url,
+            store_retailer: store?.retailer,
+            store_source_url: store?.source_url,
             source_kind: String(base.confidence) === "web-page" ? "web" : "off",
             source_url:
               asString(base.facts_url) ??
@@ -240,11 +253,29 @@ export function createCatalogStore(
         counters.centralHits += 1;
         const verified = new Date(String(row.last_verified_at ?? row.refreshed_at ?? 0)).getTime();
         const stale = !Number.isFinite(verified) || now() - verified > refreshMs;
+        const pack = await loadPackSummary(pool, ean, now).catch(() => summarizePack([]));
+        const answer = rebuildAnswer(row);
+        if (answer.product) {
+          if (pack.displayQuantity) answer.product = { ...answer.product, quantity: pack.displayQuantity };
+          else if (pack.conflict) answer.product = { ...answer.product, quantity: undefined };
+        }
+        answer.pack = pack;
+        const storeImage = asString(row.store_url)
+          ? {
+              ean,
+              imageUrl: String(row.store_url),
+              retailer: String(row.store_retailer ?? "unknown"),
+              ...(asString(row.store_source_url) && { sourceUrl: asString(row.store_source_url) }),
+            }
+          : undefined;
+        if (storeImage) answer.storeImage = storeImage;
         return {
-          answer: rebuildAnswer(row),
+          answer,
           stale,
           variantId: String(row.variant_id),
           productId: String(row.product_id),
+          pack,
+          ...(storeImage && { storeImage }),
         } satisfies StoredBarcodeHit;
       } catch {
         return null;
@@ -387,18 +418,59 @@ export function createCatalogStore(
             );
             const finalVariantId = String(variantRows[0]?.id ?? resolvedVariantId);
 
+            const { rows: existingId } = await db.query(
+              `SELECT variant_id, pack_conflict FROM product_identifiers WHERE gtin = $1`,
+              [input.ean],
+            );
+            const priorVariant = asString(existingId[0]?.variant_id);
+            let bindVariantId = finalVariantId;
+            let packConflict = false;
+            if (priorVariant && priorVariant !== finalVariantId) {
+              const { rows: priorPack } = await db.query(
+                `SELECT package_quantity, package_unit, multipack_count, label FROM product_variants WHERE id = $1`,
+                [priorVariant],
+              );
+              const priorMl = priorPack[0]
+                ? quantityMlOf(
+                    asString(priorPack[0].label) ??
+                      (priorPack[0].package_quantity != null && priorPack[0].package_unit
+                        ? `${priorPack[0].package_quantity} ${priorPack[0].package_unit}`
+                        : undefined),
+                  )
+                : undefined;
+              const nextMl = quantityMlOf(input.product.quantity);
+              if (priorMl != null && nextMl != null && Math.abs(priorMl - nextMl) / Math.max(priorMl, nextMl) > 0.05) {
+                bindVariantId = priorVariant;
+                packConflict = true;
+              }
+            }
+
             await db.query(
-              `INSERT INTO product_identifiers (gtin, variant_id, source, confidence, first_seen_at, last_verified_at)
-               VALUES ($1, $2, $3, $4, now(), now())
+              `INSERT INTO product_identifiers (gtin, variant_id, source, confidence, pack_conflict, first_seen_at, last_verified_at)
+               VALUES ($1, $2, $3, $4, $5, now(), now())
                ON CONFLICT (gtin) DO UPDATE SET
-                 variant_id = EXCLUDED.variant_id,
+                 variant_id = CASE
+                   WHEN product_identifiers.pack_conflict OR $5 THEN product_identifiers.variant_id
+                   ELSE EXCLUDED.variant_id
+                 END,
                  source = EXCLUDED.source,
                  confidence = EXCLUDED.confidence,
+                 pack_conflict = product_identifiers.pack_conflict OR EXCLUDED.pack_conflict,
                  last_verified_at = now()`,
-              [input.ean, finalVariantId, input.source.kind === "off" ? "openfoodfacts" : "web", input.status],
+              [input.ean, bindVariantId, input.source.kind === "off" ? "openfoodfacts" : "web", input.status, packConflict],
             );
 
             if (input.source.kind === "off") {
+              await upsertEvidence(db, {
+                gtin: input.ean,
+                source: "openfoodfacts",
+                quantityRaw: input.product.quantity,
+                productName: input.product.name,
+                brand: input.product.brand,
+                at: input.at,
+              });
+              await refreshConflictFlag(db, input.ean);
+
               const when = new Date(input.at).toISOString();
               await db.query(
                 `INSERT INTO product_facts (
@@ -411,7 +483,7 @@ export function createCatalogStore(
                    ingredients = EXCLUDED.ingredients,
                    refreshed_at = EXCLUDED.refreshed_at`,
                 [
-                  finalVariantId,
+                  bindVariantId,
                   input.source.url,
                   input.product.nutriScore ?? null,
                   input.product.per100 ? JSON.stringify(input.product.per100) : null,
@@ -428,11 +500,11 @@ export function createCatalogStore(
                    id, product_id, variant_id, url, source, source_url, license, usage_status, preferred, last_checked_at
                  ) VALUES ($1, $2, $3, $4, 'openfoodfacts', $5, 'CC BY-SA', 'cc_by_sa', true, now())
                  ON CONFLICT (product_id, url) DO UPDATE SET
-                   variant_id = EXCLUDED.variant_id,
+                   variant_id = COALESCE(product_images.variant_id, EXCLUDED.variant_id),
                    preferred = true,
                    usage_status = 'cc_by_sa',
                    last_checked_at = now()`,
-                [imageId, resolvedProductId, finalVariantId, input.product.imageUrl, input.source.url],
+                [imageId, resolvedProductId, bindVariantId, input.product.imageUrl, input.source.url],
               );
             }
 
@@ -524,14 +596,24 @@ export function createCatalogStore(
             await db.query(
               `INSERT INTO product_images (
                  id, product_id, variant_id, url, source, retailer, source_url, license, usage_status, preferred, last_checked_at
-               ) VALUES ($1, $2, $3, $4, 'prijsprofeet', $5, $6, NULL, 'link_only', false, now())
+               ) VALUES ($1, $2, $3, $4, 'prijsprofeet', $5, $6, NULL, 'link_only', true, now())
                ON CONFLICT (product_id, url) DO UPDATE SET
                  retailer = EXCLUDED.retailer,
                  source_url = EXCLUDED.source_url,
                  usage_status = 'link_only',
+                 preferred = true,
                  last_checked_at = now()`,
               [id, hit.product_id, hit.variant_id, input.imageUrl, input.retailer, input.sourceUrl ?? null],
             );
+            await upsertEvidence(db, {
+              gtin: input.ean,
+              source: "prijsprofeet",
+              quantityRaw: input.quantity,
+              productName: input.productName,
+              brand: input.brand,
+              at: now(),
+            });
+            await refreshConflictFlag(db, input.ean);
             counters.writes += 1;
           }),
         );
@@ -544,14 +626,14 @@ export function createCatalogStore(
       try {
         const row = await run("storeImageByGtin", async (db) => {
           const { rows } = await db.query(
-            `SELECT i.gtin, img.url, img.retailer, img.source_url
+            `SELECT i.gtin, v.id AS variant_id, img.url, img.retailer, img.source_url
              FROM product_identifiers i
              JOIN product_variants v ON v.id = i.variant_id
              JOIN product_images img ON img.product_id = v.product_id
                AND img.usage_status = 'link_only'
                AND img.source = 'prijsprofeet'
              WHERE i.gtin = $1
-             ORDER BY img.preferred DESC, img.created_at ASC
+             ORDER BY CASE WHEN img.variant_id = v.id THEN 0 ELSE 1 END, img.preferred DESC, img.created_at ASC
              LIMIT 1`,
             [ean],
           );
@@ -559,14 +641,70 @@ export function createCatalogStore(
         });
         if (!row?.url) return null;
         counters.centralHits += 1;
+        const pack = await loadPackSummary(pool, ean, now).catch(() => summarizePack([]));
+        const retailerEvidence = pack.sources.find((entry) => entry.source === "prijsprofeet");
         return {
           ean,
           imageUrl: String(row.url),
           retailer: String(row.retailer ?? "unknown"),
           ...(asString(row.source_url) && { sourceUrl: asString(row.source_url) }),
+          ...(retailerEvidence?.quantityRaw && { quantity: retailerEvidence.quantityRaw }),
+          ...(retailerEvidence?.productName && { productName: retailerEvidence.productName }),
+          ...(retailerEvidence?.brand && { brand: retailerEvidence.brand }),
         };
       } catch {
         return null;
+      }
+    },
+
+    async packForGtin(ean) {
+      try {
+        return await loadPackSummary(pool, ean, now);
+      } catch {
+        return summarizePack([]);
+      }
+    },
+
+    async recordParentPack(input: ParentPackInput) {
+      try {
+        return await run("write:parentPack", () =>
+          tx(async (db) => {
+            await upsertEvidence(db, {
+              gtin: input.ean,
+              source: "parent_unverified",
+              quantityRaw: input.quantity,
+              at: now(),
+            });
+            await refreshConflictFlag(db, input.ean);
+            counters.writes += 1;
+            return loadPackSummary(db, input.ean, now);
+          }),
+        );
+      } catch {
+        counters.writeErrors += 1;
+        return null;
+      }
+    },
+
+    async repairPackConflicts() {
+      try {
+        return await run("write:repairPack", () =>
+          tx(async (db) => {
+            const { rows } = await db.query(`SELECT DISTINCT gtin FROM product_pack_evidence`);
+            let fixed = 0;
+            for (const row of rows) {
+              const before = await db.query(`SELECT pack_conflict FROM product_identifiers WHERE gtin = $1`, [row.gtin]);
+              await refreshConflictFlag(db, String(row.gtin));
+              const after = await db.query(`SELECT pack_conflict FROM product_identifiers WHERE gtin = $1`, [row.gtin]);
+              if (Boolean(after.rows[0]?.pack_conflict) && !before.rows[0]?.pack_conflict) fixed += 1;
+            }
+            counters.writes += 1;
+            return fixed;
+          }),
+        );
+      } catch {
+        counters.writeErrors += 1;
+        return 0;
       }
     },
 
@@ -818,6 +956,61 @@ function emptyNameAnswer(): NameAnswer {
     alternatives: [],
     searched: { prijsprofeet: "skipped", off: "skipped" },
   };
+}
+
+async function upsertEvidence(
+  db: Queryable,
+  input: {
+    gtin: string;
+    source: PackEvidenceSource;
+    quantityRaw?: string;
+    productName?: string;
+    brand?: string;
+    at: number;
+  },
+) {
+  await db.query(
+    `INSERT INTO product_pack_evidence (gtin, source, quantity_raw, quantity_ml, product_name, brand, retrieved_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz)
+     ON CONFLICT (gtin, source) DO UPDATE SET
+       quantity_raw = COALESCE(EXCLUDED.quantity_raw, product_pack_evidence.quantity_raw),
+       quantity_ml = COALESCE(EXCLUDED.quantity_ml, product_pack_evidence.quantity_ml),
+       product_name = COALESCE(EXCLUDED.product_name, product_pack_evidence.product_name),
+       brand = COALESCE(EXCLUDED.brand, product_pack_evidence.brand),
+       retrieved_at = EXCLUDED.retrieved_at`,
+    [
+      input.gtin,
+      input.source,
+      input.quantityRaw ?? null,
+      quantityMlOf(input.quantityRaw) ?? null,
+      input.productName ?? null,
+      input.brand ?? null,
+      new Date(input.at).toISOString(),
+    ],
+  );
+}
+
+async function loadPackSummary(db: Queryable, gtin: string, clock: () => number) {
+  void clock;
+  const { rows } = await db.query(
+    `SELECT source, quantity_raw, quantity_ml, product_name, brand, retrieved_at
+     FROM product_pack_evidence WHERE gtin = $1`,
+    [gtin],
+  );
+  const evidence: PackEvidence[] = rows.map((row) => ({
+    source: String(row.source) as PackEvidenceSource,
+    ...(asString(row.quantity_raw) && { quantityRaw: asString(row.quantity_raw) }),
+    ...(asNumber(row.quantity_ml) != null && { quantityMl: asNumber(row.quantity_ml) }),
+    ...(asString(row.product_name) && { productName: asString(row.product_name) }),
+    ...(asString(row.brand) && { brand: asString(row.brand) }),
+    retrievedAt: new Date(String(row.retrieved_at)).getTime(),
+  }));
+  return summarizePack(evidence);
+}
+
+async function refreshConflictFlag(db: Queryable, gtin: string) {
+  const pack = await loadPackSummary(db, gtin, Date.now);
+  await db.query(`UPDATE product_identifiers SET pack_conflict = $2 WHERE gtin = $1`, [gtin, pack.conflict]);
 }
 
 async function ensureCategory(db: Queryable, id: string) {

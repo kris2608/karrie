@@ -6,7 +6,15 @@ import type { PrijsProfeet, RetailerId } from "./offers/prijsprofeet.js";
  * A retailer's product photo for one exact barcode, found through PrijsProfeet's free search. Only a link: the
  * photo stays on the retailer's server and belongs to the retailer. A similar name is never enough.
  */
-export type StoreImage = { ean: string; imageUrl: string; retailer: RetailerId; sourceUrl?: string };
+export type StoreImage = {
+  ean: string;
+  imageUrl: string;
+  retailer: RetailerId;
+  sourceUrl?: string;
+  quantity?: string;
+  productName?: string;
+  brand?: string;
+};
 
 export type StoreImageResult = { ok: true; image: StoreImage | null; cached: boolean } | { ok: false; code: "limit" | "unavailable" };
 
@@ -36,16 +44,23 @@ export function createStoreImageLookup(
     cache.set(ean, { result, until: now() + ttl });
   }
 
+  function fromStored(ean: string, stored: NonNullable<Awaited<ReturnType<NonNullable<typeof catalog>["storeImageByGtin"]>>>): StoreImage {
+    return {
+      ean,
+      imageUrl: stored.imageUrl,
+      retailer: stored.retailer as RetailerId,
+      ...(stored.sourceUrl && { sourceUrl: stored.sourceUrl }),
+      ...(stored.quantity && { quantity: stored.quantity }),
+      ...(stored.productName && { productName: stored.productName }),
+      ...(stored.brand && { brand: stored.brand }),
+    };
+  }
+
   async function fresh(ean: string): Promise<StoreImageResult> {
     if (catalog) {
       const stored = await catalog.storeImageByGtin(ean).catch(() => null);
       if (stored) {
-        const image: StoreImage = {
-          ean,
-          imageUrl: stored.imageUrl,
-          retailer: stored.retailer as RetailerId,
-          ...(stored.sourceUrl && { sourceUrl: stored.sourceUrl }),
-        };
+        const image = fromStored(ean, stored);
         remember(ean, { ok: true, image, cached: true }, STORE_IMAGE_RULES.foundTtlMs);
         return { ok: true, image, cached: true };
       }
@@ -58,9 +73,27 @@ export function createStoreImageLookup(
     }
     const forms = eanForms(ean);
     const row = answer.rows.find((candidate) => candidate.ean && forms.includes(candidate.ean.replace(/^0+(?=\d{13})/, "")) && candidate.imageUrl);
-    const image: StoreImage | null = row ? { ean, imageUrl: row.imageUrl!, retailer: row.retailer, ...(row.sourceUrl && { sourceUrl: row.sourceUrl }) } : null;
+    const image: StoreImage | null = row
+      ? {
+          ean,
+          imageUrl: row.imageUrl!,
+          retailer: row.retailer,
+          ...(row.sourceUrl && { sourceUrl: row.sourceUrl }),
+          ...(row.quantity && { quantity: row.quantity }),
+          ...(row.productName && { productName: row.productName }),
+          ...(row.brand && { brand: row.brand }),
+        }
+      : null;
     if (image && catalog) {
-      void catalog.upsertStoreImage({ ean, imageUrl: image.imageUrl, retailer: image.retailer, sourceUrl: image.sourceUrl });
+      void catalog.upsertStoreImage({
+        ean,
+        imageUrl: image.imageUrl,
+        retailer: image.retailer,
+        sourceUrl: image.sourceUrl,
+        quantity: image.quantity,
+        productName: image.productName,
+        brand: image.brand,
+      });
     }
     remember(ean, { ok: true, image, cached: false }, image ? STORE_IMAGE_RULES.foundTtlMs : STORE_IMAGE_RULES.missTtlMs);
     return { ok: true, image, cached: false };

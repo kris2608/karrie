@@ -85,6 +85,7 @@ export type VisionPack = {
   imageUrl?: string;
   nutrition?: Nutrition;
   fieldSources?: FieldSources;
+  packConflict?: { choices: string[]; raw: string[] };
 };
 
 export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
@@ -104,6 +105,7 @@ export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
     fieldSources: vision.fieldSources,
     recognition: vision.recognition,
     alternative: vision.alternative,
+    packConflict: vision.packConflict,
   });
 }
 

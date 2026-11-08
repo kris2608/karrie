@@ -485,8 +485,9 @@ a.settings-link { text-decoration: none; color: inherit; }
 .privacy-info p { line-height: 1.55; }
 .about-art {
   display: block;
-  width: 100%;
+  width: min(200px, 58%);
   height: auto;
+  justify-self: center;
   margin-bottom: var(--space-2);
   border-radius: var(--radius-m);
   box-shadow: var(--shadow-card);
@@ -1665,6 +1666,15 @@ a.settings-link { text-decoration: none; color: inherit; }
   border-radius: var(--radius-m);
   background: #fff6d6;
 }
+.pack-conflict {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-m);
+  background: #fff6d6;
+}
+.pack-conflict p { margin: 0; color: var(--ink-soft); }
+.pack-conflict-other { display: grid; gap: var(--space-2); }
 .picture-block { display: grid; gap: var(--space-2); }
 .picture-block > small { color: var(--ink-soft); font-weight: 700; }
 .picture-block .picture-source { font-weight: 600; overflow-wrap: anywhere; }

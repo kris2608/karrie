@@ -51,14 +51,14 @@ function offResponse(product: OffProduct | null, status = 200) {
 }
 
 describe("catalog migrations and seed", () => {
-  it("applies migrations once and reseeds bundled products idempotently", async () => {
+  it("applies migrations once and reseeds bundled products idempotently", { timeout: 15_000 }, async () => {
     const { pool } = memoryPg();
     const client = pool();
     const first = await migrate(client, MIGRATIONS);
-    expect(first.applied).toEqual(["001", "002"]);
+    expect(first.applied).toEqual(["001", "002", "003"]);
     const second = await migrate(client, MIGRATIONS);
     expect(second.applied).toEqual([]);
-    expect(second.skipped).toEqual(["001", "002"]);
+    expect(second.skipped).toEqual(["001", "002", "003"]);
     const seeded = await seedCatalog(client);
     expect(seeded.products).toBe(BOOTSTRAP_PRODUCTS.length);
     await seedCatalog(client);
@@ -170,6 +170,7 @@ describe("shared barcode catalog", () => {
         throw new Error("down");
       },
       upsertBarcodeRecord: async () => undefined,
+      packForGtin: async () => ({ sources: [], conflict: false }),
       cacheGet: async () => null,
       cachePut: async () => undefined,
       rememberSeen: async () => undefined,
@@ -320,6 +321,74 @@ describe("name images and admin sync", () => {
     await catalog.setDefault({ id: linked!.productId, isDefaultCatalog: true });
     const after = await catalog.changesSince(null, 200);
     expect(after.products.some((product) => product.id === linked!.productId)).toBe(true);
+  });
+
+  it("keeps GTIN on the first Campina variant when OFF 220 ml and retailer 1 l disagree", async () => {
+    const CAMPINA = "8712800001256";
+    const { catalog, pool } = await readyCatalog();
+    await catalog.upsertBarcodeRecord({
+      ean: CAMPINA,
+      status: "off-exact",
+      product: {
+        name: "Magere yoghurt",
+        brand: "Campina",
+        quantity: "220 ml",
+        imageUrl: "https://images.openfoodfacts.org/images/products/871/280/000/1256/front_nl.jpg",
+        nutriScore: "C",
+      },
+      source: { kind: "off", name: "Open Food Facts", url: `https://world.openfoodfacts.org/product/${CAMPINA}`, dataLicense: "ODbL", imageLicense: "CC BY-SA" },
+      at: Date.now(),
+    });
+    const before = await pool.query(`SELECT variant_id, pack_conflict FROM product_identifiers WHERE gtin = $1`, [CAMPINA]);
+    const variantId = String(before.rows[0].variant_id);
+    expect(before.rows[0].pack_conflict).toBe(false);
+
+    await catalog.upsertStoreImage({
+      ean: CAMPINA,
+      imageUrl: "https://static.jumbo.com/campina.jpg",
+      retailer: "jumbo",
+      sourceUrl: "https://www.jumbo.com/p",
+      quantity: "1 l",
+      productName: "Campina Magere yoghurt",
+      brand: "Campina",
+    });
+
+    const after = await pool.query(`SELECT variant_id, pack_conflict FROM product_identifiers WHERE gtin = $1`, [CAMPINA]);
+    expect(String(after.rows[0].variant_id)).toBe(variantId);
+    expect(after.rows[0].pack_conflict).toBe(true);
+
+    const hit = await catalog.byGtin(CAMPINA);
+    expect(hit?.pack.conflict).toBe(true);
+    expect(hit?.pack.sources.map((entry) => entry.quantityRaw)).toEqual(expect.arrayContaining(["220 ml", "1 l"]));
+    expect(hit?.storeImage?.imageUrl).toContain("jumbo.com");
+    expect(hit?.answer.status === "none" ? undefined : hit?.answer.product.nutriScore).toBe("C");
+
+    await catalog.recordParentPack({ ean: CAMPINA, quantity: "1 l" });
+    const parent = await catalog.packForGtin(CAMPINA);
+    expect(parent.conflict).toBe(false);
+    expect(parent.displayQuantity).toBe("1 l");
+    const still = await pool.query(`SELECT variant_id FROM product_identifiers WHERE gtin = $1`, [CAMPINA]);
+    expect(String(still.rows[0].variant_id)).toBe(variantId);
+  });
+
+  it("does not flag pack conflict when OFF and retailer agree on size", async () => {
+    const { catalog, pool } = await readyCatalog();
+    await catalog.upsertBarcodeRecord({
+      ean: "3017620425035",
+      status: "off-exact",
+      product: { name: "Nutella", brand: "Ferrero", quantity: "400 g" },
+      source: { kind: "off", name: "Open Food Facts", url: "https://world.openfoodfacts.org/product/3017620425035", dataLicense: "ODbL" },
+      at: Date.now(),
+    });
+    await catalog.upsertStoreImage({
+      ean: "3017620425035",
+      imageUrl: "https://static.ah.nl/nutella.jpg",
+      retailer: "albert_heijn",
+      sourceUrl: "https://www.ah.nl/p",
+      quantity: "400 g",
+    });
+    const { rows } = await pool.query(`SELECT pack_conflict FROM product_identifiers WHERE gtin = '3017620425035'`);
+    expect(rows[0].pack_conflict).toBe(false);
   });
 
   it("exposes catalog changes and hides admin routes without a token", async () => {

@@ -28,8 +28,8 @@ export type ArtSource = ImageSource | "name" | "reference";
 export type ArtCandidates = Partial<Record<ArtSource, string | null>>;
 export type ArtPick = { source: ArtSource; url: string };
 
-/** Without a choice: Open Food Facts, the retailer photo for the barcode, a photo by name, a found reference, the parent's photo. */
-export const AUTOMATIC_ORDER: readonly ArtSource[] = ["off", "prijsprofeet", "name", "reference", "parent"];
+/** Without a choice: exact-EAN retailer photo, Open Food Facts, a photo by name, a found reference, the parent's photo. */
+export const AUTOMATIC_ORDER: readonly ArtSource[] = ["prijsprofeet", "off", "name", "reference", "parent"];
 
 /**
  * The parent's choice wins; when the chosen picture is missing or broken the automatic order fills in, without
@@ -37,7 +37,14 @@ export const AUTOMATIC_ORDER: readonly ArtSource[] = ["off", "prijsprofeet", "na
  */
 export function pickArt(choice: PackInfo["imageChoice"], candidates: ArtCandidates): ArtPick | null {
   if (choice === "drawing") return null;
-  const preferred: ArtSource[] = choice === "photo" ? ["parent", "off"] : choice === "reference" ? ["prijsprofeet", "name", "reference"] : [];
+  const preferred: ArtSource[] =
+    choice === "photo"
+      ? ["parent", "off"]
+      : choice === "off"
+        ? ["off"]
+        : choice === "reference"
+          ? ["prijsprofeet", "name", "reference"]
+          : [];
   for (const source of [...preferred, ...AUTOMATIC_ORDER]) {
     const url = candidates[source];
     if (url) return { source, url };

@@ -31,6 +31,8 @@ export type ProductDraft = {
   /** Sure enough to offer the item already on the list; only a low-confidence photo without a barcode match is not. */
   confident: boolean;
   recognized: boolean;
+  /** Independent sources disagree on pack size; parent should confirm. */
+  packConflict?: { choices: string[]; raw: string[] };
 };
 
 /**
@@ -143,6 +145,7 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
   );
   const barcodeInfo: BarcodeInfo | undefined = barcode ? { status: barcode.status, sourceName: barcode.source.name, sourceUrl: barcode.source.url, at: barcode.at } : mine?.barcode;
 
+  const packConflict = packConflictOf(barcode);
   const pack: VisionPack = {
     recognition: vision?.pack.recognition ?? mine?.recognition,
     alternative: vision?.pack.alternative ?? mine?.alternative,
@@ -153,6 +156,7 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     imageUrl: offImage,
     nutrition,
     fieldSources,
+    ...(packConflict && { packConflict }),
   };
 
   const exact = barcode?.status === "off-exact" || Boolean(mine);
@@ -169,8 +173,24 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     pack,
     ean: pack.ean,
     from: { mine, barcode, photo },
-    unsure: disagree || (!exact && (Boolean(barcode) || !photo || needsCheck(photo))),
-    confident: !disagree && (exact || !photo || photo.confidence !== "low"),
+    unsure: disagree || Boolean(packConflict) || (!exact && (Boolean(barcode) || !photo || needsCheck(photo))),
+    confident: !disagree && !packConflict && (exact || !photo || photo.confidence !== "low"),
     recognized: Boolean(mine || found?.name || photo?.recognized),
+    ...(packConflict && { packConflict }),
   };
+}
+
+function packConflictOf(barcode?: FoundAnswer): ProductDraft["packConflict"] {
+  const pack = barcode?.pack;
+  if (!pack?.conflict) return undefined;
+  const raw = pack.sources.map((entry) => entry.quantityRaw).filter((value): value is string => Boolean(value));
+  const unique = [...new Set(raw)];
+  if (unique.length < 2) return undefined;
+  return { raw: unique, choices: unique.map(formatPackChoice) };
+}
+
+function formatPackChoice(raw: string): string {
+  const normalized = raw.replace(/\s+/g, " ").trim().toLowerCase();
+  if (/^(1|1\.0)\s*l(iter)?s?$/.test(normalized) || normalized === "1000 ml") return "1 liter";
+  return raw.replace(/\s+/g, " ").trim();
 }
