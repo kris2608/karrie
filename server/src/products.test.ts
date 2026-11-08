@@ -9,7 +9,7 @@ import { createCandidateStore } from "./candidates.js";
 import { createIllustrator, illustrationPrompt, illustrationRequest } from "./illustration.js";
 import { createLimits, type LimitConfig } from "./limits.js";
 import { guardNormalized, interpretNormalized, normalizeProduct, normalizeRequest, type NormalizedProduct, type RawNormalized } from "./normalize.js";
-import { customName, singularKey } from "./productName.js";
+import { customName, parseName, plainName, singularKey } from "./productName.js";
 
 const LIMITS: LimitConfig = { perIpPerHour: 20, perIpPerDay: 50, dailyRequests: 100, dailyBudgetUsd: 1, inputUsdPerMTok: 1, cachedInputUsdPerMTok: 0.1, outputUsdPerMTok: 4 };
 
@@ -37,7 +37,16 @@ function completed(value: unknown) {
 describe("product names", () => {
   it("refuses phrases, numbers and empty input like the app does", () => {
     expect(customName("walnoten")).toBe("Walnoten");
-    for (const input of ["", "dingen voor ontbijt", "2 kilo appels", "brood met kaas", "a"]) expect(customName(input), input).toBeNull();
+    for (const input of ["", "dingen voor ontbijt", "2 kilo appels", "brood met kaas", "a", "Chocomel 6", "blik chocomel"]) expect(customName(input), input).toBeNull();
+  });
+
+  it("accepts packaging and pack sizes, and gives the product without them", () => {
+    expect(parseName("Chocomel blik")).toEqual({ name: "Chocomel blik", base: "Chocomel", packaging: "can" });
+    expect(parseName("chocomel 1 liter")).toEqual({ name: "Chocomel 1 liter", base: "Chocomel", size: { unit: "ml", amount: 1000 } });
+    expect(parseName("Chocomel 6x200ml")).toMatchObject({ packaging: "multipack", size: { unit: "ml", amount: 200, count: 6 } });
+    expect(parseName("Chocomel 0% suiker")?.base).toBe("Chocomel 0% suiker");
+    expect(plainName("Walnoten 200 gram")).toBeNull();
+    expect(plainName("Walnoten")).toBe("Walnoten");
   });
 
   it("joins singular and plural", () => {
@@ -227,6 +236,15 @@ describe("product routes", () => {
     expect(calls).toBe(1);
     expect(deps.candidates.list()).toHaveLength(0);
     expect((await call("/api/products/normalize", { name: "walnoten", list: ["melk"] })).status).toBe(400);
+  });
+
+  it("keeps a brand that OpenAI recognises as a branded candidate and tells the app why", async () => {
+    const { call, deps } = await start({ normalize: async () => ({ ok: false, code: "not-a-product", brand: true }) });
+    const response = await call("/api/products/normalize", { name: "Optimel" });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ status: "error", code: "not-a-product", reason: "brand" });
+    expect(deps.candidates.list()).toEqual([expect.objectContaining({ classification: "branded", brand: "Optimel" })]);
+    expect(deps.candidates.find("optimel")).toBeNull();
   });
 
   it("answers a rejected candidate as not a product", async () => {

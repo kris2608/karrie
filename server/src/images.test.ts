@@ -341,6 +341,13 @@ describe("image discovery service", () => {
     expect(bodies.filter((body) => body.text?.format?.name === "product_facts")).toHaveLength(1);
     await service.searchProductReferenceImages(BANAAN);
     expect(bodies.filter((body) => body.text?.format?.name === "product_facts")).toHaveLength(1);
+
+    bodies.length = 0;
+    const typed = createImageDiscovery(client, { model: "m", maxConcurrent: 2 }, page);
+    const pictureOnly = await typed.searchProductReferenceImages({ ...TERRA, typed: true });
+    expect(pictureOnly).toMatchObject({ ok: true, discovery: { status: "personal" } });
+    expect(pictureOnly.ok && pictureOnly.discovery.facts).toBeFalsy();
+    expect(bodies.filter((body) => body.text?.format?.name === "product_facts")).toHaveLength(0);
   });
 
   it("treats an Openverse outage as one more failed source", async () => {

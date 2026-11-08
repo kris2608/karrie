@@ -43,6 +43,7 @@ const PACK_KEYS = [
   "enrichment",
   "illustrationId",
   "illustration",
+  "namePhoto",
 ] as const;
 const IMAGE_KEYS = ["imageUrl", "photoId", "imageKind", "imageSource", "imageChoice"] as const;
 

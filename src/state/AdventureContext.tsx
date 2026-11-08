@@ -5,6 +5,7 @@ import { loadPersisted, savePersisted } from "../storage/db";
 import { preparePhotos } from "../storage/photos";
 import { offerQueries, offers } from "../storage/offers";
 import { references } from "../storage/references";
+import { nameImages, useNameImagesVersion } from "../storage/nameImages";
 import { storeImages, useStoreImagesVersion } from "../storage/storeImages";
 import { wantedReferences, wantedStoreImages } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
@@ -46,6 +47,7 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     let cancel = false;
     void offers.hydrate();
     void storeImages.hydrate();
+    void nameImages.hydrate();
     Promise.all([loadPersisted(), references.hydrate()])
       .then(async ([data]) => {
         const minePhotos = data.mine.flatMap((entry) => [entry.photoId, entry.illustrationId].filter((id): id is string => Boolean(id)));
@@ -76,10 +78,11 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     for (const ean of storeEans) storeImages.request(ean);
   }, [storeEans]);
 
+  const nameVersion = useNameImagesVersion();
   const wanted = useMemo(
-    () => (ready && state.settings.referenceImages ? wantedReferences(state.adventure, storeImages.status) : []),
-    /** storeVersion: a retailer photo answer decides whether a reference search is still needed. */
-    [ready, state.adventure, state.settings.referenceImages, storeVersion],
+    () => (ready && state.settings.referenceImages ? wantedReferences(state.adventure, storeImages.status, nameImages.status) : []),
+    /** storeVersion, nameVersion: a retailer or name photo answer decides whether a reference search is still needed. */
+    [ready, state.adventure, state.settings.referenceImages, storeVersion, nameVersion],
   );
   useEffect(() => {
     references.setEnabled(state.settings.referenceImages);

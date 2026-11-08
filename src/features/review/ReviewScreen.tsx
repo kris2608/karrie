@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { categoryLabel } from "../../domain/categories";
+import { brandLabel } from "../../domain/customProduct";
 import type { AdventureItem, CategoryId } from "../../domain/types";
 import { ItemArt } from "../../components/ItemArt";
 import { TopBar } from "../../components/TopBar";
@@ -221,7 +222,7 @@ function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRo
   const { adventure, settings, declined, dispatch } = useAdventure();
   const retailer = adventure?.retailer;
   const { pressing, handlers } = useLongPress(onRemove);
-  const detail = [item.brand, item.packageSize].filter(Boolean).join(" · ");
+  const detail = [brandLabel(item), item.packageSize].filter(Boolean).join(" · ");
   const mission = settings.smartDiscovery && missionOn(item, declined);
   return (
     <motion.li

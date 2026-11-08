@@ -189,6 +189,12 @@ export function imageSearchUrl(ean: string): string {
   return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
 }
 
+/** A product photo by typed name: every promotion status and every supported retailer in one call. */
+export function nameSearchUrl(name: string): string {
+  const params = new URLSearchParams({ q: name, retailer: RETAILERS.join(","), page_size: String(PRIJSPROFEET_RULES.pageSize) });
+  return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
+}
+
 export function isBareEan(q: string): boolean {
   return /^\d{8,14}$/.test(q.trim());
 }
@@ -276,6 +282,7 @@ export function createPrijsProfeet(config: PrijsProfeetConfig, fetchImpl: Fetch 
   return {
     search: (q: string, retailer: RetailerId) => call(searchUrl(q, retailer), isBareEan(q)),
     searchImage: (ean: string) => call(imageSearchUrl(ean), true),
+    searchName: (name: string) => call(nameSearchUrl(name), isBareEan(name)),
     stats(): ProviderStats {
       return {
         ...stats,

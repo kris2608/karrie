@@ -17,7 +17,7 @@ import { nextSticker } from "../domain/stickers";
 import { MINE_LIMIT, mineKey, remember as rememberMine } from "../domain/mine";
 import { categoryIcon } from "../domain/categoryIcon";
 import { customName, customProductId, singularKey, suggestion } from "../domain/customProduct";
-import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
+import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, NamePhoto, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
 import { isRetailer, type RetailerId } from "../domain/retailers";
 import { productById, products } from "../data/catalog";
 import {
@@ -132,6 +132,9 @@ export type Action =
   /** The background tidy-up of a typed-in product; null counts as a failed try. */
   | { type: "enrich-custom"; productId: string; result: CustomEnrichment | null; final?: boolean; illustrations?: boolean }
   | { type: "set-illustration"; productId: string; illustrationId: string | null }
+  /** A name search found this typed product as a brand; no OpenAI tidy-up is needed for it. */
+  | { type: "brand-custom"; productId: string; brand: string; category?: CategoryId }
+  | { type: "choose-name-photo"; productId: string; photo: NamePhoto | null }
   | { type: "insert-item"; item: AdventureItem; index: number }
   | { type: "start-shopping" }
   | { type: "found" }
@@ -578,6 +581,22 @@ export function reducer(state: AppState, action: Action): AppState {
         }
         const tries = item.enrichment.tries + 1;
         return { ...item, enrichment: { status: action.final || tries >= ENRICH_TRIES ? "failed" : "pending", tries, at: Date.now() } };
+      });
+    case "brand-custom": {
+      const brand = action.brand.trim().slice(0, 40);
+      if (!brand) return state;
+      return updateCustom(state, action.productId, (item) => {
+        const untouched = item.enrichment?.status === "pending";
+        if (item.brand === brand && !untouched) return item;
+        const moved = untouched && action.category && action.category !== item.category ? { category: action.category, icon: categoryIcon(action.category) } : {};
+        return { ...item, brand, ...moved, enrichment: { status: "done" as const, tries: item.enrichment?.tries ?? 0, at: Date.now() } };
+      });
+    }
+    case "choose-name-photo":
+      return updateCustom(state, action.productId, (item) => {
+        if (action.photo) return { ...item, namePhoto: action.photo };
+        const { namePhoto: _photo, ...rest } = item;
+        return rest as typeof item;
       });
     case "set-illustration":
       return updateCustom(state, action.productId, (item) => {

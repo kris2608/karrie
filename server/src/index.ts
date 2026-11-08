@@ -4,12 +4,15 @@ import OpenAI from "openai";
 import { createHandler } from "./app.js";
 import { createBarcodeLookup } from "./barcode.js";
 import { createCandidateStore } from "./candidates.js";
+import { createPgPool, postgresStorage } from "./candidatesPg.js";
 import { createIllustrator } from "./illustration.js";
 import { normalizeProduct } from "./normalize.js";
 import { createImageDiscovery } from "./images.js";
 import { createLimits } from "./limits.js";
 import { createOfferLookup } from "./offers/index.js";
 import { createPrijsProfeet } from "./offers/prijsprofeet.js";
+import { createNameImageLookup } from "./nameImage.js";
+import { createOffSearch } from "./offSearch.js";
 import { createStoreImageLookup } from "./storeImage.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
 
@@ -99,6 +102,14 @@ const prijsProfeet =
       })
     : null;
 
+const userAgent = env.OFF_USER_AGENT || "Karrie/1.0 (https://karrie.eu)";
+const offSearch = env.OFF_NAME_SEARCH !== "off" ? createOffSearch({ userAgent }) : null;
+const namePrijsProfeet = prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off" ? prijsProfeet : null;
+const nameImages =
+  namePrijsProfeet || offSearch
+    ? { lookup: createNameImageLookup({ prijsProfeet: namePrijsProfeet ?? undefined, off: offSearch ?? undefined }), limits: offerLimits, off: offSearch ?? undefined }
+    : undefined;
+
 const productLimits = createLimits({
   perIpPerHour: number("PRODUCTS_LIMIT_PER_IP_HOUR", 30),
   perIpPerDay: number("PRODUCTS_LIMIT_PER_IP_DAY", 100),
@@ -109,7 +120,13 @@ const productLimits = createLimits({
   outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
 });
 
-const candidates = createCandidateStore({ file: env.CANDIDATES_FILE || undefined, maxCandidates: number("CANDIDATES_MAX", 5000) });
+/** Postgres when CANDIDATES_DATABASE_URL is set, else a JSON file (CANDIDATES_FILE), else memory only. */
+const candidates = createCandidateStore({
+  persistence: env.CANDIDATES_DATABASE_URL ? postgresStorage(createPgPool(env.CANDIDATES_DATABASE_URL)) : undefined,
+  file: env.CANDIDATES_FILE || undefined,
+  maxCandidates: number("CANDIDATES_MAX", 5000),
+});
+await candidates.load();
 
 /** Paid per picture; off unless ILLUSTRATIONS_ENABLED is "true". See DEPLOYMENT.md for the costs. */
 const illustrationLimits = createLimits({
@@ -147,6 +164,7 @@ const handler = createHandler({
   barcode: { lookup: barcode, limits: barcodeLimits, searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01) },
   offers: prijsProfeet ? { lookup: createOfferLookup(prijsProfeet), provider: prijsProfeet, limits: offerLimits } : undefined,
   storeImages: prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off" ? { lookup: createStoreImageLookup(prijsProfeet), limits: offerLimits } : undefined,
+  nameImages,
   products: {
     normalize: (name) => normalizeProduct(client!, { model: env.OPENAI_PRODUCT_MODEL || config.model, maxOutputTokens: number("PRODUCT_MAX_OUTPUT_TOKENS", 600) }, name),
     candidates,
@@ -171,7 +189,9 @@ createServer((req, res) => {
       model: config.model,
       configured: Boolean(client),
       imageProvider: discovery?.provider,
-      candidates: candidates.persistent ? "file" : "memory",
+      candidates: candidates.storage(),
+      ...(candidates.stats().loadError && { candidatesLoadError: candidates.stats().loadError }),
+      nameSearch: { prijsprofeet: Boolean(namePrijsProfeet), off: Boolean(offSearch) },
       illustrations: Boolean(illustrator),
     }),
   );

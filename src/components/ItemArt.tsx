@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
-import { hasOffPhoto, identityOf, wantsReference, wantsStoreImage } from "../domain/imageIdentity";
-import type { ImageSource, PackInfo } from "../domain/types";
+import { hasOffPhoto, identityOf, nameImageKey, wantsNameImage, wantsReference, wantsStoreImage } from "../domain/imageIdentity";
+import type { ImageSource, NamePhoto, PackInfo } from "../domain/types";
 import type { StoreImage } from "../services/images/storeImage";
+import { useNameAnswer } from "../storage/nameImages";
 import { usePhotoUrl } from "../storage/photos";
 import { useReferenceUrl } from "../storage/references";
 import { useStoreImage } from "../storage/storeImages";
@@ -9,7 +10,7 @@ import { ProductArt } from "./ProductArt";
 
 type ArtItem = Pick<
   PackInfo,
-  "ean" | "kind" | "imageUrl" | "imageKind" | "imageSource" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition" | "illustrationId"
+  "ean" | "kind" | "imageUrl" | "imageKind" | "imageSource" | "photoId" | "imageChoice" | "brand" | "packageSize" | "source" | "recognition" | "illustrationId" | "namePhoto"
 > & {
   icon: string;
   name: string;
@@ -19,13 +20,16 @@ export function hasPhoto(item: Pick<PackInfo, "imageUrl" | "imageKind" | "photoI
   return item.imageKind === "photo" && Boolean(item.photoId || item.imageUrl);
 }
 
-/** Where a shown picture came from: Open Food Facts, a retailer via PrijsProfeet, a found reference, or the parent. */
-export type ArtSource = ImageSource | "reference";
+/**
+ * Where a shown picture came from: Open Food Facts, a retailer via PrijsProfeet (exact barcode), a photo found by a
+ * typed product's name, a found reference, or the parent.
+ */
+export type ArtSource = ImageSource | "name" | "reference";
 export type ArtCandidates = Partial<Record<ArtSource, string | null>>;
 export type ArtPick = { source: ArtSource; url: string };
 
-/** Without a choice: Open Food Facts, then the retailer photo, then a found reference picture, then the parent's photo. */
-export const AUTOMATIC_ORDER: readonly ArtSource[] = ["off", "prijsprofeet", "reference", "parent"];
+/** Without a choice: Open Food Facts, the retailer photo for the barcode, a photo by name, a found reference, the parent's photo. */
+export const AUTOMATIC_ORDER: readonly ArtSource[] = ["off", "prijsprofeet", "name", "reference", "parent"];
 
 /**
  * The parent's choice wins; when the chosen picture is missing or broken the automatic order fills in, without
@@ -33,7 +37,7 @@ export const AUTOMATIC_ORDER: readonly ArtSource[] = ["off", "prijsprofeet", "re
  */
 export function pickArt(choice: PackInfo["imageChoice"], candidates: ArtCandidates): ArtPick | null {
   if (choice === "drawing") return null;
-  const preferred: ArtSource[] = choice === "photo" ? ["parent", "off"] : choice === "reference" ? ["prijsprofeet", "reference"] : [];
+  const preferred: ArtSource[] = choice === "photo" ? ["parent", "off"] : choice === "reference" ? ["prijsprofeet", "name", "reference"] : [];
   for (const source of [...preferred, ...AUTOMATIC_ORDER]) {
     const url = candidates[source];
     if (url) return { source, url };
@@ -64,23 +68,32 @@ export function useBroken(): (url: string | null | undefined) => string | null {
   return (url) => (url && !broken.has(url) ? url : null);
 }
 
+/** The photo for a typed product: the one the parent picked, else the reliable match from its name lookup. */
+export function useNamePhoto(item: Pick<PackInfo, "ean" | "kind" | "namePhoto"> & { name: string }): NamePhoto | null {
+  const answer = useNameAnswer(wantsNameImage(item) ? nameImageKey(item.name) : undefined);
+  if (!wantsNameImage(item)) return null;
+  return item.namePhoto ?? (answer?.classification === "branded" ? answer.match : null);
+}
+
 /** What ItemArt shows for an item, and where it came from; also used for the credit line. */
-export function useArt(item: ArtItem): { pick: ArtPick | null; drawing: string | null; store: StoreImage | null } {
+export function useArt(item: ArtItem): { pick: ArtPick | null; drawing: string | null; store: StoreImage | null; name: NamePhoto | null } {
   const usable = useBroken();
   const local = usePhotoUrl(item.imageKind === "photo" ? item.photoId : undefined);
   const own = hasPhoto(item);
   const store = useStoreImage(wantsStoreImage(item) ? item.ean : undefined);
+  const named = useNamePhoto(item);
   const identity = identityOf(item);
-  const wanted = wantsReference(identity, item.imageChoice, hasOffPhoto(item), Boolean(store));
+  const wanted = wantsReference(identity, item.imageChoice, hasOffPhoto(item), Boolean(store || (named && usable(named.imageUrl))));
   const reference = useReferenceUrl(wanted ? identity : null);
   const pick = pickArt(item.imageChoice, {
     off: usable(own && !item.photoId ? item.imageUrl : null),
     prijsprofeet: usable(store?.imageUrl),
+    name: usable(named?.imageUrl),
     reference: usable(reference?.url),
     parent: usable(own && item.photoId ? local : null),
   });
   const drawing = usable(usePhotoUrl(item.illustrationId));
-  return { pick, drawing, store: pick?.source === "prijsprofeet" ? store : null };
+  return { pick, drawing, store: pick?.source === "prijsprofeet" ? store : null, name: pick?.source === "name" ? named : null };
 }
 
 export function ItemArt({ item, className }: { item: ArtItem; className?: string }) {

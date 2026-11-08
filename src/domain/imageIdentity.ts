@@ -1,3 +1,4 @@
+import { parseName, sizeLabel } from "./typedName";
 import type { PackInfo } from "./types";
 
 /** What a reference picture must show. Mirrors ImageIdentitySchema on the server, including its length limits. */
@@ -7,9 +8,11 @@ export type ImageIdentity = {
   variant?: string;
   size?: string;
   generic: boolean;
+  /** A product the parent typed: only pictures are looked up, never facts from shop pages. */
+  typed?: boolean;
 };
 
-type Identifiable = Pick<PackInfo, "brand" | "packageSize" | "source" | "recognition"> & { name: string };
+type Identifiable = Pick<PackInfo, "brand" | "packageSize" | "source" | "recognition" | "kind"> & { name: string };
 type Pictured = Pick<PackInfo, "imageUrl" | "imageKind" | "imageSource">;
 
 const cut = (value: string | undefined, max: number) => {
@@ -22,6 +25,11 @@ export function identityOf(item: Identifiable): ImageIdentity | null {
   const name = cut(item.name, 60);
   if (!name) return null;
   const brand = cut(item.brand, 40);
+  if (item.kind === "custom_generic") {
+    if (!brand) return { name, generic: true };
+    const parsed = parseName(item.name);
+    return { name: cut(parsed?.base, 60) ?? name, brand, ...(parsed?.size && { size: sizeLabel(parsed.size) }), generic: false, typed: true };
+  }
   const branded = (item.source === "vision" && item.recognition?.specific) || item.source === "off" || item.source === "barcode";
   if (branded && brand) {
     return { name, brand, variant: cut(item.recognition?.variant, 40), size: cut(item.packageSize, 20), generic: false };
@@ -40,6 +48,16 @@ export function hasOffPhoto(item: Pictured): boolean {
  */
 export function wantsStoreImage(item: Pictured & Pick<PackInfo, "ean" | "kind">): boolean {
   return Boolean(item.ean) && item.kind !== "custom_generic" && !hasOffPhoto(item);
+}
+
+/** A product the parent typed is looked up by its name: a brand may have a retailer or Open Food Facts photo. */
+export function wantsNameImage(item: Pick<PackInfo, "ean" | "kind">): boolean {
+  return item.kind === "custom_generic" && !item.ean;
+}
+
+/** One lookup per typed name, whatever its capitals or spacing; packaging and sizes stay part of it. */
+export function nameImageKey(name: string): string {
+  return name.replace(/\s+/g, " ").trim().toLocaleLowerCase("nl");
 }
 
 /**

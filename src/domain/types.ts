@@ -129,6 +129,18 @@ export type PackInfo = {
   /** Key of a generated Karrie-style drawing in the photos store; never a parent photo. */
   illustrationId?: string;
   illustration?: "pending" | "ready" | "none";
+  /** A photo of this typed product the parent picked from a name search; only the link and where it came from. */
+  namePhoto?: NamePhoto;
+};
+
+/** A link to a photo of a typed product: a retailer's (via PrijsProfeet) or Open Food Facts'. Never a barcode match. */
+export type NamePhoto = {
+  source: "prijsprofeet" | "off";
+  imageUrl: string;
+  productName: string;
+  retailer?: RetailerId;
+  sourceUrl?: string;
+  packaging?: string;
 };
 
 /** Per-adventure state of a bonus mission: offered at start, active once the child goes looking. */

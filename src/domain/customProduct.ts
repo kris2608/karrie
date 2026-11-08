@@ -1,22 +1,17 @@
 import { products } from "../data/catalog";
 import { matchProduct, normalize } from "./matchProduct";
+import { parseName } from "./typedName";
 import type { Product, SavedItem } from "./types";
 
-const MAX_LENGTH = 32;
-const MAX_WORDS = 3;
-/** Words that turn a product into a phrase ("dingen voor ontbijt", "brood met kaas"). */
-const CONNECTORS = new Set(["voor", "met", "van", "en", "of", "zonder", "uit"]);
-const VAGUE = new Set(["ding", "dingen", "spul", "spullen", "iets", "boodschappen", "product", "producten"]);
+/** The brand to show next to a name, unless the name already starts with it ("Chocomel blik", brand "Chocomel"). */
+export function brandLabel(item: { name: string; brand?: string }): string | undefined {
+  if (!item.brand) return undefined;
+  return normalize(item.name).startsWith(normalize(item.brand)) ? undefined : item.brand;
+}
 
 /** A tidy product name from what the parent typed, or null when it is not something to put on a list. */
 export function customName(input: string): string | null {
-  const name = input.replace(/\s+/g, " ").trim();
-  if (name.length < 2 || name.length > MAX_LENGTH) return null;
-  if (!/\p{L}/u.test(name) || /\d/.test(name) || /[^\p{L}\s'-]/u.test(name)) return null;
-  const words = normalize(name).split(" ").filter(Boolean);
-  if (!words.length || words.length > MAX_WORDS) return null;
-  if (words.some((word) => CONNECTORS.has(word) || VAGUE.has(word))) return null;
-  return name.charAt(0).toLocaleUpperCase("nl") + name.slice(1);
+  return parseName(input)?.name ?? null;
 }
 
 const VOWEL = /[aeiouy]/;

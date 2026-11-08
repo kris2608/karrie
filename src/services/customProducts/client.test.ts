@@ -79,11 +79,11 @@ describe("custom product client", () => {
 describe("customWork", () => {
   it("lists each pending product once, then its drawing once the tidy-up is done", () => {
     let state = reducer(initialState, { type: "add-custom", name: "cashewnoten", itemId: crypto.randomUUID() });
-    expect(customWork(state)).toEqual({ normalize: [{ productId: "custom:cashewnoot", name: "Cashewnoten" }], illustrate: [] });
+    expect(customWork(state)).toMatchObject({ normalize: [{ productId: "custom:cashewnoot", name: "Cashewnoten" }], illustrate: [], brand: [] });
     state = reducer(state, { type: "enrich-custom", productId: "custom:cashewnoot", result: { displayName: "Cashewnoten", canonicalName: "cashewnoot", category: "pantry" }, illustrations: true });
-    expect(customWork(state)).toEqual({ normalize: [], illustrate: [{ productId: "custom:cashewnoot", name: "Cashewnoten" }] });
+    expect(customWork(state)).toMatchObject({ normalize: [], illustrate: [{ productId: "custom:cashewnoot", name: "Cashewnoten" }] });
     state = reducer(state, { type: "set-illustration", productId: "custom:cashewnoot", illustrationId: "drawing-1" });
-    expect(customWork(state)).toEqual({ normalize: [], illustrate: [] });
+    expect(customWork(state)).toMatchObject({ normalize: [], illustrate: [] });
   });
 
   it("stops at once when the server refuses the product", () => {

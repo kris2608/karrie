@@ -1,7 +1,7 @@
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import type { Usage } from "./limits.js";
-import { customName, normalizeName, singularKey } from "./productName.js";
+import { normalizeName, plainName, singularKey } from "./productName.js";
 import { errorCode, type RecognizeErrorCode } from "./recognize.js";
 import { CATALOG_TYPES } from "./schema.js";
 
@@ -59,7 +59,7 @@ export type NormalizeConfig = { model: string; maxOutputTokens: number };
 
 export type NormalizeResult =
   | { ok: true; product: NormalizedProduct; usage?: Usage }
-  | { ok: false; code: RecognizeErrorCode | "not-a-product"; usage?: Usage };
+  | { ok: false; code: RecognizeErrorCode | "not-a-product"; usage?: Usage; brand?: boolean };
 
 type ResponsesClient = { responses: { create: (body: never) => Promise<unknown> } };
 
@@ -106,7 +106,7 @@ const tidy = (value: string) => value.replace(/\s+/g, " ").trim();
 export function guardNormalized(raw: RawNormalized, typed: string): NormalizedProduct | null {
   if (!raw.isProduct || raw.reason !== "ok" || !raw.isGeneric || raw.confidence === "low") return null;
   const names = [raw.displayName, raw.singularName, raw.pluralName, raw.canonicalName].map(tidy);
-  if (names.some((name) => !customName(name))) return null;
+  if (names.some((name) => !plainName(name))) return null;
   const typedKey = singularKey(typed);
   const keys = names.map(singularKey);
   const near = keys.some((key) => key === typedKey || editDistance(key, typedKey) <= Math.max(1, Math.floor(typedKey.length / 6)));
@@ -115,12 +115,12 @@ export function guardNormalized(raw: RawNormalized, typed: string): NormalizedPr
   const subcategory = raw.subcategory ? tidy(raw.subcategory).slice(0, 30) : null;
   return {
     canonicalName: normalizeName(raw.canonicalName),
-    displayName: customName(raw.displayName)!,
+    displayName: plainName(raw.displayName)!,
     singularName: normalizeName(raw.singularName),
     pluralName: normalizeName(raw.pluralName),
-    childFriendlyLabel: customName(label) ? normalizeName(label) : normalizeName(raw.displayName),
+    childFriendlyLabel: plainName(label) ? normalizeName(label) : normalizeName(raw.displayName),
     category: raw.category,
-    subcategory: subcategory && customName(subcategory) ? subcategory.toLowerCase() : null,
+    subcategory: subcategory && plainName(subcategory) ? subcategory.toLowerCase() : null,
     closestDrawing: raw.closestDrawing === "none" ? null : raw.closestDrawing,
     confidence: raw.confidence,
   };
@@ -155,7 +155,9 @@ export function interpretNormalized(response: RawResponse, typed: string): Norma
   }
   if (!parsed.success) return { ok: false, code: "malformed", usage };
   const product = guardNormalized(parsed.data, typed);
-  return product ? { ok: true, product, usage } : { ok: false, code: "not-a-product", usage };
+  if (product) return { ok: true, product, usage };
+  const brand = parsed.data.reason === "brand" || (parsed.data.isProduct && !parsed.data.isGeneric);
+  return brand ? { ok: false, code: "not-a-product", usage, brand } : { ok: false, code: "not-a-product", usage };
 }
 
 export async function normalizeProduct(client: ResponsesClient, config: NormalizeConfig, name: string): Promise<NormalizeResult> {

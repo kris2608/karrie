@@ -89,6 +89,12 @@ services:
         sync: false
       - key: PRIJSPROFEET_IMAGES
         value: "on"
+      # Name photo search for typed products: Open Food Facts after PrijsProfeet ("off" switches it off).
+      - key: OFF_NAME_SEARCH
+        value: "on"
+      # Postgres for catalog candidates (e.g. a free Neon database); without it they live in memory.
+      - key: CANDIDATES_DATABASE_URL
+        sync: false
       - key: OFFERS_LIMIT_PER_IP_HOUR
         value: "300"
       - key: OFFERS_LIMIT_PER_IP_DAY

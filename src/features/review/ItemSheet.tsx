@@ -5,6 +5,7 @@ import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
+import { brandLabel } from "../../domain/customProduct";
 import { hasSuggestion, missionOn } from "../../domain/discovery";
 import type { AdventureItem } from "../../domain/types";
 import { productById } from "../../data/catalog";
@@ -71,7 +72,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const parentPhoto = item.imageSource === "parent" && Boolean(item.photoId);
   const shown = useArt(item).pick;
   const variant = item.recognition?.variant;
-  const detail = [item.brand, variant, item.packageSize].filter(Boolean).join(" · ");
+  const detail = [brandLabel(item), variant, item.packageSize].filter(Boolean).join(" · ");
 
   function saveName() {
     const next = name.trim();

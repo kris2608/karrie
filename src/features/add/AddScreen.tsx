@@ -521,7 +521,7 @@ export function AddScreen() {
       )}
       {deals > 0 && <Attribution className="add-attribution" />}
       {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
-      {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, dan zoekt Karrie er een plaatje bij.</p>}
+      {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er daarna een foto of plaatje bij.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
       {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje onthoudt Karrie van eerder. Lang drukken vergeet ze.</p>}
 

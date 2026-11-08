@@ -12,6 +12,8 @@ export const ImageIdentitySchema = z
     variant: z.string().trim().max(40).nullish(),
     size: z.string().trim().max(20).nullish(),
     generic: z.boolean(),
+    /** A product a parent typed: pictures only, nothing read from shop pages (no nutrition from a name). */
+    typed: z.boolean().optional(),
   })
   .strict();
 
@@ -806,7 +808,7 @@ export function createImageDiscovery(client: ResponsesClient, config: DiscoveryC
       if (!resolved.length) return { ok: true, discovery: { status: "none", candidates: [], provider: report.provider, searchedAt: now() }, ...base };
       const check = (await client.responses.create(verifyRequest(config.model, identity, resolved) as never)) as RawResponse;
       const decided = decide(identity, resolved, verdictsOf(check, resolved.length), report.provider, now());
-      const read = await productFacts(identity, decided);
+      const read = identity.typed ? { failures: [] as string[], facts: undefined, usage: undefined } : await productFacts(identity, decided);
       failures.push(...read.failures);
       const discovery = read.facts ? { ...decided, facts: read.facts } : decided;
       const chosen = discovery.selected === undefined ? undefined : discovery.candidates[discovery.selected];

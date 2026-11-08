@@ -5,7 +5,7 @@ import type { CustomEnrichment } from "../../state/reducer";
 export type NormalizeOutcome =
   | { status: "ok"; enrichment: CustomEnrichment; illustrations: boolean }
   /** The server says it is not one generic product; the item stays as typed and is not asked again. */
-  | { status: "refused" }
+  | { status: "refused"; brand?: boolean }
   | { status: "retry" };
 
 export type IllustrationOutcome = { status: "ok"; image: Blob } | { status: "none" } | { status: "retry" };
@@ -91,6 +91,7 @@ export function createCustomProductClient(deps: CustomProductDeps) {
       if (!deps.online()) return { status: "retry" };
       const reply = await post("/api/products/normalize", { name, createdFrom: "search" }, CUSTOM_RULES.timeoutMs);
       if (!reply) return { status: "retry" };
+      if (reply.status === 422 && reply.body?.reason === "brand") return { status: "refused", brand: true };
       if (reply.status === 422 || reply.status === 400) return { status: "refused" };
       const enrichment = reply.status === 200 && reply.body?.status === "ok" ? enrichmentOf(reply.body.product) : null;
       return enrichment ? { status: "ok", enrichment, illustrations: reply.body?.illustrations === true } : { status: "retry" };

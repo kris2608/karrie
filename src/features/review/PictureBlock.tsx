@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { hasPhoto, useArt } from "../../components/ItemArt";
-import { hasOffPhoto, identityKey, identityOf, wantsReference, wantsStoreImage } from "../../domain/imageIdentity";
+import { hasPhoto, markBroken, useArt, useNamePhoto } from "../../components/ItemArt";
+import { hasOffPhoto, identityKey, identityOf, nameImageKey, wantsNameImage, wantsReference, wantsStoreImage } from "../../domain/imageIdentity";
+import { namePhotoCredit } from "../../services/images/nameImage";
 import { storeCredit } from "../../services/images/storeImage";
+import { useNameAnswer } from "../../storage/nameImages";
 import { useStoreImage } from "../../storage/storeImages";
-import type { AdventureItem, ImageChoice } from "../../domain/types";
+import type { AdventureItem, ImageChoice, NamePhoto } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { references, shownImage, useReference, useSearching } from "../../storage/references";
 
@@ -22,8 +24,11 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   const identity = identityOf(item);
   const offPhoto = hasOffPhoto(item);
   const store = useStoreImage(wantsStoreImage(item) ? item.ean : undefined);
-  const art = useArt(item).pick;
-  const wanted = wantsReference(identity, item.imageChoice, offPhoto, Boolean(store));
+  const { pick: art, name: namePhoto } = useArt(item);
+  const named = useNamePhoto(item);
+  const answer = useNameAnswer(wantsNameImage(item) ? nameImageKey(item.name) : undefined);
+  const others = answer?.classification === "branded" ? [answer.match, ...answer.alternatives].filter((photo): photo is NamePhoto => Boolean(photo)) : [];
+  const wanted = wantsReference(identity, item.imageChoice, offPhoto, Boolean(store || named));
   const entry = useReference(identity);
   const shown = wanted ? shownImage(entry) : null;
   const searching = useSearching(identity);
@@ -34,7 +39,7 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   }, [key, wanted, settings.referenceImages]);
   const candidates = wanted ? (entry?.discovery?.candidates ?? []) : [];
   const photo = hasPhoto(item);
-  const active: ImageChoice = item.imageChoice ?? (art?.source === "prijsprofeet" || art?.source === "reference" ? "reference" : art ? "photo" : "drawing");
+  const active: ImageChoice = item.imageChoice ?? (art?.source === "prijsprofeet" || art?.source === "name" || art?.source === "reference" ? "reference" : art ? "photo" : "drawing");
   const status = !wanted ? null : searching ? "searching" : entry?.chosen === null ? "removed" : shown ? null : entry?.state;
   /** A standard product, or a pack with an Open Food Facts photo, only searches when the parent asks for a picture. */
   const optIn = Boolean((identity?.generic || offPhoto) && settings.referenceImages);
@@ -45,12 +50,13 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
     choose(choice);
   };
   const choices: { id: ImageChoice; label: string; show: boolean }[] = [
-    { id: "reference", label: "Voorbeeldfoto", show: Boolean(shown || store) || optIn },
+    { id: "reference", label: "Voorbeeldfoto", show: Boolean(shown || store || named) || optIn },
     { id: "photo", label: offPhoto ? "Open Food Facts-foto" : "Eigen foto", show: photo },
     { id: "drawing", label: "Tekening", show: true },
   ];
 
-  if (!identity || (!settings.referenceImages && !entry && !store)) return null;
+  if (!identity || (!settings.referenceImages && !entry && !store && !named && !others.length)) return null;
+  const chosenName = named?.imageUrl;
 
   return (
     <section className="picture-block" data-testid="picture-block">
@@ -95,6 +101,42 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
             </button>
           ))}
         </div>
+      )}
+
+      {others.length > 1 && (
+        <div className="picture-candidates" role="group" aria-label="Andere foto's van dit merk" data-testid="name-photos">
+          {others.map((photo) => (
+            <button
+              key={photo.imageUrl}
+              type="button"
+              className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
+              aria-pressed={photo.imageUrl === chosenName}
+              aria-label={photo.productName}
+              title={photo.productName}
+              data-testid="name-photo"
+              onClick={() => {
+                dispatch({ type: "choose-name-photo", productId: item.productId, photo });
+                choose("reference");
+              }}
+            >
+              <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {art?.source === "name" && namePhoto && (
+        <small className="picture-source" data-testid="picture-source">
+          {namePhotoCredit(namePhoto)}
+          {namePhoto.sourceUrl && (
+            <>
+              {" "}
+              <a href={namePhoto.sourceUrl} target="_blank" rel="noreferrer noopener">
+                Bron
+              </a>
+            </>
+          )}
+        </small>
       )}
 
       {art?.source === "prijsprofeet" && store && (

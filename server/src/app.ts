@@ -6,7 +6,9 @@ import { APPROVAL, CREATED_FROM, type Candidate, type CandidateStore } from "./c
 import { canonicalEan } from "./ean.js";
 import type { Illustrator } from "./illustration.js";
 import type { NormalizeResult } from "./normalize.js";
-import { customName } from "./productName.js";
+import type { NameImageLookup, NameImageResult } from "./nameImage.js";
+import type { OffSearch } from "./offSearch.js";
+import { parseName, type ParsedName } from "./productName.js";
 import { ImageIdentitySchema, type ImageDiscovery } from "./images.js";
 import type { Limits } from "./limits.js";
 import type { OfferLookup } from "./offers/index.js";
@@ -44,6 +46,13 @@ export type StoreImageDeps = {
   limits: Limits;
 };
 
+export type NameImageDeps = {
+  lookup: Pick<NameImageLookup, "find" | "cached" | "stats">;
+  /** The offers' per-IP limits; each source keeps its own server-wide limit. */
+  limits: Limits;
+  off?: Pick<OffSearch, "stats">;
+};
+
 export type IllustrationDeps = {
   illustrator: Pick<Illustrator, "draw" | "cached" | "stats" | "imageUsd" | "model">;
   /** Per-IP limits and the daily budget for generated pictures, separate from recognition. */
@@ -71,6 +80,7 @@ export type AppDeps = {
   barcode?: BarcodeDeps;
   offers?: OfferDeps;
   storeImages?: StoreImageDeps;
+  nameImages?: NameImageDeps;
   products?: ProductDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
@@ -80,6 +90,7 @@ const ROUTES = [
   "/api/products/recognize-photo",
   "/api/images/discover",
   "/api/images/ean",
+  "/api/images/name",
   "/api/products/barcode",
   "/api/offers/match",
   "/api/products/normalize",
@@ -156,6 +167,7 @@ export function createHandler(deps: AppDeps) {
   const barcodeOutcomes: Record<string, number> = {};
   const offerOutcomes: Record<string, number> = {};
   const storeImageOutcomes: Record<string, number> = {};
+  const nameImageOutcomes: Record<string, number> = {};
   const productOutcomes: Record<string, number> = {};
   const illustrationOutcomes: Record<string, number> = {};
   const count = (into: Record<string, number>, key: string) => (into[key] = (into[key] ?? 0) + 1);
@@ -204,6 +216,9 @@ export function createHandler(deps: AppDeps) {
           ? { stats: deps.offers.limits.stats(), cache: deps.offers.lookup.stats(), provider: deps.offers.provider?.stats(), outcomes: offerOutcomes }
           : undefined,
         storeImages: deps.storeImages ? { stats: deps.storeImages.limits.stats(), cache: deps.storeImages.lookup.stats(), outcomes: storeImageOutcomes } : undefined,
+        nameImages: deps.nameImages
+          ? { stats: deps.nameImages.limits.stats(), cache: deps.nameImages.lookup.stats(), off: deps.nameImages.off?.stats(), outcomes: nameImageOutcomes }
+          : undefined,
         products: deps.products
           ? {
               stats: deps.products.limits.stats(),
@@ -247,6 +262,7 @@ export function createHandler(deps: AppDeps) {
     }
     if (url.pathname === "/api/images/discover") return discoverImages(body);
     if (url.pathname === "/api/images/ean") return storeImage(body);
+    if (url.pathname === "/api/images/name") return nameImage(body);
     if (url.pathname === "/api/products/barcode") return lookupBarcode(body);
     if (url.pathname === "/api/offers/match") return matchOffer(body);
     if (url.pathname === "/api/products/normalize") return normalizeTyped(body);
@@ -369,6 +385,57 @@ export function createHandler(deps: AppDeps) {
       return reply(result);
     }
 
+    /**
+     * Only the typed product name goes to PrijsProfeet and Open Food Facts. The answer holds links and attribution;
+     * a name match never gives the item a barcode. Each answer also counts the product as a candidate.
+     */
+    async function nameImage(body: unknown) {
+      const images = deps.nameImages;
+      if (!images) return send(503, { status: "error", code: "misconfigured" });
+      const request = NameRequestSchema.safeParse(body);
+      if (!request.success) return send(400, { status: "error", code: "bad-request" });
+      const parsed = parseName(request.data.name);
+      if (!parsed) return send(422, { status: "error", code: "not-a-product" });
+      const ip = clientIp(req);
+
+      const reply = (result: NameImageResult) => {
+        if (!result.ok) {
+          count(nameImageOutcomes, `error-${result.code}`);
+          return send(result.code === "limit" ? 429 : 502, { status: "error", code: result.code === "limit" ? "rate-limited" : "unavailable" });
+        }
+        const { answer } = result;
+        count(nameImageOutcomes, `${answer.classification}-${answer.match ? answer.match.source : "none"}`);
+        entry.found = answer.match ? answer.match.source : answer.classification;
+        deps.products?.candidates.recordName(
+          {
+            base: parsed.base,
+            classification: answer.classification,
+            brand: answer.brand,
+            variant: answer.variant,
+            packaging: packagingLabel(parsed),
+            category: answer.category,
+            prijsprofeetMatch: answer.searched.prijsprofeet === "match",
+            offMatch: answer.searched.off === "match",
+            imageAvailable: Boolean(answer.match),
+          },
+          ip,
+        );
+        return send(200, { status: "ok", result: answer });
+      };
+      const hit = images.lookup.cached(parsed.name);
+      if (hit) {
+        entry.cached = true;
+        return reply(hit);
+      }
+      const denial = images.limits.admit(ip);
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const callStarted = now();
+      const result = await images.lookup.find(parsed.name);
+      images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+      entry.lookupMs = now() - callStarted;
+      return reply(result);
+    }
+
     /** Only the product's name, kind and barcode go to PrijsProfeet; nothing about the family. */
     async function matchOffer(body: unknown) {
       const offers = deps.offers;
@@ -400,7 +467,7 @@ export function createHandler(deps: AppDeps) {
       if (!products) return send(503, { status: "error", code: "misconfigured" });
       const request = NormalizeRequestSchema.safeParse(body);
       if (!request.success) return send(400, { status: "error", code: "bad-request" });
-      const name = customName(request.data.name);
+      const name = parseName(request.data.name)?.base;
       if (!name) {
         count(productOutcomes, "refused-input");
         return send(422, { status: "error", code: "not-a-product" });
@@ -427,8 +494,11 @@ export function createHandler(deps: AppDeps) {
       const latencyMs = now() - callStarted;
       products.limits.record({ ok: result.ok, latencyMs, usage: result.usage });
       Object.assign(entry, { model: deps.model, openaiMs: latencyMs, usage: result.usage, code: result.ok ? undefined : result.code });
-      count(productOutcomes, result.ok ? "normalized" : `error-${result.code}`);
-      if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
+      count(productOutcomes, result.ok ? "normalized" : result.brand ? "brand" : `error-${result.code}`);
+      if (!result.ok) {
+        if (result.brand) products.candidates.recordBrand(name, ip);
+        return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code, ...(result.brand && { reason: "brand" }) });
+      }
       const candidate = products.candidates.record(result.product, name, request.data.createdFrom ?? "search", ip);
       return send(200, { status: "ok", product: candidate ? productOf(candidate) : result.product, illustrations: illustrations && Boolean(candidate) });
     }
@@ -440,7 +510,7 @@ export function createHandler(deps: AppDeps) {
       if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
       const request = IllustrationRequestSchema.safeParse(body);
       if (!request.success) return send(400, { status: "error", code: "bad-request" });
-      const name = customName(request.data.name);
+      const name = parseName(request.data.name)?.base;
       const candidate = name ? products.candidates.find(name) : null;
       if (!candidate || candidate.approvalStatus === "rejected") return send(404, { status: "error", code: "unknown" });
       const hit = drawing.illustrator.cached(candidate);
@@ -492,6 +562,16 @@ export function createHandler(deps: AppDeps) {
 const NormalizeRequestSchema = z.object({ name: z.string().max(40), createdFrom: z.enum(CREATED_FROM).optional() }).strict();
 
 const IllustrationRequestSchema = z.object({ name: z.string().max(40) }).strict();
+
+const NameRequestSchema = z.object({ name: z.string().max(40) }).strict();
+
+/** "blik", "1 l", "6 x 200 ml": how a requested pack is kept on a candidate. */
+function packagingLabel(parsed: ParsedName): string | undefined {
+  const words: Record<string, string> = { can: "blik", bottle: "fles", carton: "pak", jar: "pot", bag: "zak", tube: "tube", multipack: "multipack" };
+  const size = parsed.size ? `${parsed.size.count ? `${parsed.size.count} x ` : ""}${parsed.size.amount} ${parsed.size.unit}` : "";
+  const label = [parsed.packaging && !(parsed.packaging === "multipack" && parsed.size?.count) ? words[parsed.packaging] : "", size].filter(Boolean).join(" ");
+  return label || undefined;
+}
 
 const ReviewSchema = z.object({ approvalStatus: z.enum(APPROVAL) }).strict();
 

@@ -29,7 +29,7 @@ describe("picture order", () => {
   const drop = (...sources: (keyof ArtCandidates)[]) => Object.fromEntries(Object.entries(all).filter(([key]) => !sources.includes(key as keyof ArtCandidates)));
 
   it("uses Open Food Facts, then PrijsProfeet, then a reference, then the parent's photo, then the drawing", () => {
-    expect(AUTOMATIC_ORDER).toEqual(["off", "prijsprofeet", "reference", "parent"]);
+    expect(AUTOMATIC_ORDER).toEqual(["off", "prijsprofeet", "name", "reference", "parent"]);
     expect(pickArt(undefined, all)).toEqual({ source: "off", url: "off" });
     expect(pickArt(undefined, drop("off"))).toEqual({ source: "prijsprofeet", url: "pp" });
     expect(pickArt(undefined, drop("off", "prijsprofeet"))).toEqual({ source: "reference", url: "ref" });

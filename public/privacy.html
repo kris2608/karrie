@@ -58,7 +58,7 @@
         gegevens over je kind. In deze verklaring lees je welke gegevens op je eigen apparaat blijven, welke er naar onze server en andere diensten
         gaan, en waarom.
       </p>
-      <p class="updated">Laatst bijgewerkt: 7 november 2026</p>
+      <p class="updated">Laatst bijgewerkt: 8 november 2026</p>
 
       <section>
         <h2>Wie is verantwoordelijk?</h2>
@@ -111,7 +111,8 @@
         <p>
           Hiervoor stuurt Karrie alleen productgegevens: de naam, het merk, de soort of de streepjescode van het product. Nooit je lijstje als
           geheel, de naam van je lijstje, foto's of je locatie. Voeg je zelf een product toe dat Karrie nog niet kent (bijvoorbeeld walnoten), dan
-          gaat alleen die productnaam naar de server, om de juiste naam, afdeling en een tekening te vinden.
+          gaat alleen die productnaam naar de server, om de juiste naam, afdeling en een tekening te vinden. Is het een merk (bijvoorbeeld
+          Chocomel), dan zoekt de server met die naam een foto bij PrijsProfeet en Open Food Facts, en anders met de voorbeeldfoto-zoekfunctie.
         </p>
         <h3>Wat de server bewaart</h3>
         <ul>
@@ -127,12 +128,14 @@
           </li>
           <li>
             De server onthoudt in zijn werkgeheugen alleen productgegevens: gevonden productinformatie en voorbeeldfoto's met een open licentie
-            hoogstens 30 dagen, aanbiedingen hoogstens 3 uur. Daar zit niets in over jou of je gezin.
+            hoogstens 30 dagen, links naar productfoto's op naam hoogstens 7 dagen, aanbiedingen hoogstens 3 uur. Daar zit niets in over jou of je
+            gezin.
           </li>
           <li>
             Zelf toegevoegde producten kunnen worden voorgesteld voor de vaste productlijst van Karrie. Daarvoor bewaart de server de productnaam,
-            de afdeling, wanneer het product voor het eerst en het laatst is toegevoegd, en op hoeveel verschillende dagen en toestellen. Een mens
-            beoordeelt die voorstellen. Er staat geen IP-adres, toestel of lijstje bij.
+            de afdeling, bij een merk het merk, de soort en de verpakking (zoals "blik"), of er een foto gevonden is, wanneer het product voor het
+            eerst en het laatst is toegevoegd, en op hoeveel verschillende dagen en toestellen. Een mens beoordeelt die voorstellen. Er staat geen
+            IP-adres, toestel, lijstje of naam van een persoon bij.
           </li>
         </ul>
         <p>
@@ -155,7 +158,8 @@
         <h3>Open Food Facts</h3>
         <p>
           Bij een streepjescode vraagt de server de productgegevens op bij <a href="https://world.openfoodfacts.org" rel="noopener">Open Food
-          Facts</a>, een open productdatabase. Daarvoor gaat alleen de streepjescode mee.
+          Facts</a>, een open productdatabase. Daarvoor gaat alleen de streepjescode mee. Voor een zelf getypt product zonder foto bij
+          PrijsProfeet zoekt de server daar ook op de getypte productnaam, en alleen die naam.
         </p>
         <h3>PrijsProfeet</h3>
         <p>
@@ -167,6 +171,11 @@
           heeft voor precies die code. Daarvoor gaat alleen de streepjescode mee. De foto zelf staat bij de supermarkt (zoals Albert Heijn of
           Jumbo): je browser laadt hem daar rechtstreeks, en die supermarkt ziet dan je IP-adres, zoals bij elke afbeelding op internet. Karrie
           stuurt daarbij geen verwijzing naar de app mee en bewaart de foto niet, alleen de link, op dit apparaat.
+        </p>
+        <p>
+          Typ je zelf een product dat Karrie niet kent, dan zoekt de server met alleen die productnaam bij PrijsProfeet (en daarna bij Open Food
+          Facts) of het een merk is en of er een foto van is. Ook dan bewaart Karrie alleen de link naar de foto, de naam van de bron en de
+          supermarkt, op dit apparaat; nooit de foto zelf, een streepjescode of voedingswaarden.
         </p>
         <h3>Brave Search, Wikimedia Commons en Openverse</h3>
         <p>

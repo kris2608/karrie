@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { customName, customProductId, singularKey, suggestion } from "./customProduct";
+import { parseName, sizeLabel } from "./typedName";
 import type { SavedItem } from "./types";
 
 describe("customName", () => {
@@ -21,6 +22,35 @@ describe("customName", () => {
     expect(customName("brood met kaas")).toBeNull();
     expect(customName("hele ongezouten cashewnoten van de notenmix afdeling")).toBeNull();
     expect(customName("vier hele grote cashewnoten")).toBeNull();
+  });
+
+  it("accepts packaging words and pack sizes after the product, keeping what was typed", () => {
+    expect(customName("chocomel blik")).toBe("Chocomel blik");
+    expect(customName("Chocomel 1 liter")).toBe("Chocomel 1 liter");
+    expect(customName("Chocomel 0% suiker")).toBe("Chocomel 0% suiker");
+    for (const input of ["Chocomel 6", "blik chocomel", "1 liter chocomel", "Chocomel 1 liter 2 liter", "Chocomel 12345 ml"]) expect(customName(input), input).toBeNull();
+  });
+});
+
+describe("parseName", () => {
+  it("splits the product from its packaging and pack size", () => {
+    expect(parseName("Chocomel")).toEqual({ name: "Chocomel", base: "Chocomel" });
+    expect(parseName("chocomel blik")).toEqual({ name: "Chocomel blik", base: "Chocomel", packaging: "can" });
+    expect(parseName("Chocomel 1 liter")).toEqual({ name: "Chocomel 1 liter", base: "Chocomel", size: { unit: "ml", amount: 1000 } });
+    expect(parseName("Chocomel 1,5l")?.size).toEqual({ unit: "ml", amount: 1500 });
+    expect(parseName("Chocomel 6 x 200 ml")).toMatchObject({ base: "Chocomel", packaging: "multipack", size: { unit: "ml", amount: 200, count: 6 } });
+    expect(parseName("Chocomel 4-pack")).toMatchObject({ base: "Chocomel", packaging: "multipack" });
+    expect(parseName("Chocomel 0% suiker")).toEqual({ name: "Chocomel 0% suiker", base: "Chocomel 0% suiker" });
+    expect(parseName("Calvé pindakaas 350 g")).toMatchObject({ base: "Calvé pindakaas", size: { unit: "g", amount: 350 } });
+    expect(parseName("Nutella pot")).toMatchObject({ base: "Nutella", packaging: "jar" });
+    expect(parseName("walnoten")).toEqual({ name: "Walnoten", base: "Walnoten" });
+  });
+
+  it("labels sizes the way packs do", () => {
+    expect(sizeLabel({ unit: "ml", amount: 1000 })).toBe("1 l");
+    expect(sizeLabel({ unit: "ml", amount: 1500 })).toBe("1,5 l");
+    expect(sizeLabel({ unit: "ml", amount: 200, count: 6 })).toBe("6 x 200 ml");
+    expect(sizeLabel({ unit: "g", amount: 350 })).toBe("350 g");
   });
 });
 
