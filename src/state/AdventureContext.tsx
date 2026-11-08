@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { setSoundEnabled } from "../feedback/sound";
 import { trackEvent } from "../services/analytics";
+import { catalogSync } from "../services/catalog/sync";
 import { loadPersisted, savePersisted } from "../storage/db";
 import { preparePhotos } from "../storage/photos";
 import { offerQueries, offers } from "../storage/offers";
@@ -48,12 +49,14 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     void offers.hydrate();
     void storeImages.hydrate();
     void nameImages.hydrate();
+    void catalogSync.hydrate();
     Promise.all([loadPersisted(), references.hydrate()])
       .then(async ([data]) => {
         const minePhotos = data.mine.flatMap((entry) => [entry.photoId, entry.illustrationId].filter((id): id is string => Boolean(id)));
         const photos = preparePhotos(data.adventure, data.saved, [...references.photoIds(), ...minePhotos]).catch(() => undefined);
         await Promise.race([photos, new Promise((resolve) => window.setTimeout(resolve, 1500))]);
         if (!cancel) rawDispatch({ type: "hydrate", data });
+        if (!cancel) void catalogSync.sync();
       })
       .finally(() => {
         if (!cancel) setReady(true);

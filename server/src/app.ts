@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 import type { BarcodeLookup, LookupResult } from "./barcode.js";
 import { APPROVAL, CREATED_FROM, type Candidate, type CandidateStore } from "./candidates.js";
+import type { Catalog } from "./catalog/types.js";
 import { canonicalEan } from "./ean.js";
 import type { Illustrator } from "./illustration.js";
 import type { NormalizeResult } from "./normalize.js";
@@ -67,6 +68,8 @@ export type ProductDeps = {
   illustrations?: IllustrationDeps;
   /** Bearer token for the review routes; without one they do not exist. */
   adminToken?: string;
+  /** Request counts at or above this are labelled priority in the admin list. */
+  catalogPriorityCount?: number;
 };
 
 export type AppDeps = {
@@ -82,6 +85,7 @@ export type AppDeps = {
   storeImages?: StoreImageDeps;
   nameImages?: NameImageDeps;
   products?: ProductDeps;
+  catalog?: Catalog;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
 };
@@ -97,6 +101,8 @@ const ROUTES = [
   "/api/products/illustration",
 ];
 const ADMIN = "/api/admin/candidates";
+const ADMIN_CATALOG = "/api/admin/catalog";
+const CATALOG_CHANGES = "/api/catalog/changes";
 
 /** What the app gets back for a typed-in product; the same for a fresh answer and a known candidate. */
 function productOf(candidate: Candidate) {
@@ -235,10 +241,13 @@ export function createHandler(deps: AppDeps) {
                 : { enabled: false },
             }
           : undefined,
+        catalog: deps.catalog?.stats(),
       });
     }
 
+    if (url.pathname === CATALOG_CHANGES && req.method === "GET") return catalogChanges();
     if (url.pathname === ADMIN || url.pathname.startsWith(`${ADMIN}/`)) return admin();
+    if (url.pathname === ADMIN_CATALOG || url.pathname.startsWith(`${ADMIN_CATALOG}/`)) return adminCatalog();
     if (url.pathname === "/api/products/illustration" && !deps.products?.illustrations) return send(404, { status: "error", code: "not-found" });
     if (!ROUTES.includes(url.pathname)) return send(404, { status: "error", code: "not-found" });
     if (req.method !== "POST") return send(405, { status: "error", code: "method" });
@@ -538,10 +547,16 @@ export function createHandler(deps: AppDeps) {
       const given = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
       if (!token || !given || !sameToken(given, token)) return send(404, { status: "error", code: "not-found" });
       const candidates = deps.products!.candidates;
+      const priorityAt = deps.products!.catalogPriorityCount ?? 5;
       if (url.pathname === ADMIN && req.method === "GET") {
         const status = url.searchParams.get("status");
         if (status && !APPROVAL.includes(status as never)) return send(400, { status: "error", code: "bad-request" });
-        return send(200, { status: "ok", candidates: candidates.list((status as Candidate["approvalStatus"]) || undefined) });
+        const list = candidates.list((status as Candidate["approvalStatus"]) || undefined).map((candidate) => ({
+          ...candidate,
+          /** Request counts, not verified unique users. */
+          priority: candidate.usageCount >= priorityAt,
+        }));
+        return send(200, { status: "ok", candidates: list });
       }
       const id = url.pathname.slice(ADMIN.length + 1);
       if (!id || id.includes("/") || req.method !== "POST") return send(405, { status: "error", code: "method" });
@@ -554,7 +569,43 @@ export function createHandler(deps: AppDeps) {
         return send(400, { status: "error", code: "bad-request" });
       }
       const updated = candidates.review(id, review.approvalStatus);
-      return updated ? send(200, { status: "ok", candidate: updated }) : send(404, { status: "error", code: "unknown" });
+      if (!updated) return send(404, { status: "error", code: "unknown" });
+      let catalogProductId: string | undefined;
+      if (review.approvalStatus === "approved" && deps.catalog?.enabled) {
+        const linked = await deps.catalog.approveCandidate(updated);
+        catalogProductId = linked?.productId;
+      }
+      return send(200, { status: "ok", candidate: updated, ...(catalogProductId && { catalogProductId }) });
+    }
+
+    /** Promote, illustrate or deprecate a shared catalog product. Same bearer token as candidate review. */
+    async function adminCatalog() {
+      const token = deps.products?.adminToken;
+      const given = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      if (!token || !given || !sameToken(given, token) || !deps.catalog?.enabled) return send(404, { status: "error", code: "not-found" });
+      const id = url.pathname.slice(ADMIN_CATALOG.length + 1);
+      if (!id || id.includes("/") || req.method !== "POST") return send(405, { status: "error", code: "method" });
+      let body: z.infer<typeof CatalogAdminSchema>;
+      try {
+        const parsed = CatalogAdminSchema.safeParse(JSON.parse(await readBody(req)));
+        if (!parsed.success) return send(400, { status: "error", code: "bad-request" });
+        body = parsed.data;
+      } catch {
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      const ok = await deps.catalog.setDefault({ id, ...body });
+      return ok ? send(200, { status: "ok" }) : send(404, { status: "error", code: "unknown" });
+    }
+
+    /** Incremental shared-catalog sync for devices. Metadata only; no facts or personal data. */
+    async function catalogChanges() {
+      if (!deps.catalog?.enabled) return send(200, { status: "ok", products: [], next: null });
+      const since = url.searchParams.get("since");
+      if (since && Number.isNaN(Date.parse(since))) return send(400, { status: "error", code: "bad-request" });
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 200) || 200, 200);
+      const page = await deps.catalog.changesSince(since, limit);
+      res.setHeader("Cache-Control", "public, max-age=300");
+      return send(200, { status: "ok", products: page.products, next: page.next });
     }
   };
 }
@@ -574,6 +625,16 @@ function packagingLabel(parsed: ParsedName): string | undefined {
 }
 
 const ReviewSchema = z.object({ approvalStatus: z.enum(APPROVAL) }).strict();
+
+const CatalogAdminSchema = z
+  .object({
+    isDefaultCatalog: z.boolean().optional(),
+    illustrationKey: z.string().max(80).nullable().optional(),
+    category: z.enum(PRODUCT_CATEGORIES).optional(),
+    genericParentId: z.string().max(80).nullable().optional(),
+    deprecated: z.boolean().optional(),
+  })
+  .strict();
 
 const OfferText = z.string().trim().min(1).max(120);
 

@@ -121,7 +121,7 @@ export function createItem(product: Product, quantity = 1): AdventureItem {
     id: crypto.randomUUID(),
     productId: product.id,
     name: product.name,
-    icon: product.id,
+    icon: product.illustration ?? product.id,
     category: product.category,
     quantity: Math.max(1, Math.min(24, quantity)),
     status: "pending",

@@ -5,6 +5,11 @@ import { createHandler } from "./app.js";
 import { createBarcodeLookup } from "./barcode.js";
 import { createCandidateStore } from "./candidates.js";
 import { createPgPool, postgresStorage } from "./candidatesPg.js";
+import { startImageHealth } from "./catalog/imageHealth.js";
+import { createCatalogStore, disabledCatalog } from "./catalog/repo.js";
+import { seedCatalog } from "./catalog/seed.js";
+import type { Catalog } from "./catalog/types.js";
+import { migrate } from "./db/migrate.js";
 import { createIllustrator } from "./illustration.js";
 import { normalizeProduct } from "./normalize.js";
 import { createImageDiscovery } from "./images.js";
@@ -79,11 +84,6 @@ const barcodeLimits = createLimits({
   outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
 });
 
-const barcode = createBarcodeLookup({
-  userAgent: env.OFF_USER_AGENT || "Karrie/1.0 (https://karrie.eu)",
-  web: client && env.BARCODE_WEB_SEARCH !== "off" ? { client, model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model } : undefined,
-});
-
 const offerLimits = createLimits({
   perIpPerHour: number("OFFERS_LIMIT_PER_IP_HOUR", 300),
   perIpPerDay: number("OFFERS_LIMIT_PER_IP_DAY", 1500),
@@ -105,10 +105,6 @@ const prijsProfeet =
 const userAgent = env.OFF_USER_AGENT || "Karrie/1.0 (https://karrie.eu)";
 const offSearch = env.OFF_NAME_SEARCH !== "off" ? createOffSearch({ userAgent }) : null;
 const namePrijsProfeet = prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off" ? prijsProfeet : null;
-const nameImages =
-  namePrijsProfeet || offSearch
-    ? { lookup: createNameImageLookup({ prijsProfeet: namePrijsProfeet ?? undefined, off: offSearch ?? undefined }), limits: offerLimits, off: offSearch ?? undefined }
-    : undefined;
 
 const productLimits = createLimits({
   perIpPerHour: number("PRODUCTS_LIMIT_PER_IP_HOUR", 30),
@@ -120,9 +116,50 @@ const productLimits = createLimits({
   outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
 });
 
+/** One shared pool for candidates and the product catalog when CANDIDATES_DATABASE_URL is set. */
+const pgPool = env.CANDIDATES_DATABASE_URL ? createPgPool(env.CANDIDATES_DATABASE_URL) : null;
+let catalog: Catalog = disabledCatalog();
+let catalogMigrations: string[] = [];
+if (pgPool) {
+  try {
+    const migration = await migrate(pgPool);
+    catalogMigrations = [...migration.skipped, ...migration.applied].sort();
+    await seedCatalog(pgPool);
+    catalog = createCatalogStore(pgPool, {
+      refreshDays: number("CATALOG_REFRESH_DAYS", 90),
+      migrations: catalogMigrations,
+    });
+    if (env.CATALOG_IMAGE_HEALTH !== "off") startImageHealth(catalog);
+  } catch (error) {
+    console.log(JSON.stringify({ event: "catalog-init-failed", error: error instanceof Error ? error.message : "unknown" }));
+    catalog = disabledCatalog();
+  }
+}
+
+const catalogStore = catalog.enabled ? catalog : undefined;
+
+const barcode = createBarcodeLookup({
+  userAgent: env.OFF_USER_AGENT || "Karrie/1.0 (https://karrie.eu)",
+  web: client && env.BARCODE_WEB_SEARCH !== "off" ? { client, model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model } : undefined,
+  catalog: catalogStore,
+});
+
+const nameImages =
+  namePrijsProfeet || offSearch
+    ? {
+        lookup: createNameImageLookup(
+          { prijsProfeet: namePrijsProfeet ?? undefined, off: offSearch ?? undefined },
+          Date.now,
+          catalogStore,
+        ),
+        limits: offerLimits,
+        off: offSearch ?? undefined,
+      }
+    : undefined;
+
 /** Postgres when CANDIDATES_DATABASE_URL is set, else a JSON file (CANDIDATES_FILE), else memory only. */
 const candidates = createCandidateStore({
-  persistence: env.CANDIDATES_DATABASE_URL ? postgresStorage(createPgPool(env.CANDIDATES_DATABASE_URL)) : undefined,
+  persistence: pgPool ? postgresStorage(pgPool) : undefined,
   file: env.CANDIDATES_FILE || undefined,
   maxCandidates: number("CANDIDATES_MAX", 5000),
 });
@@ -163,7 +200,10 @@ const handler = createHandler({
     : undefined,
   barcode: { lookup: barcode, limits: barcodeLimits, searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01) },
   offers: prijsProfeet ? { lookup: createOfferLookup(prijsProfeet), provider: prijsProfeet, limits: offerLimits } : undefined,
-  storeImages: prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off" ? { lookup: createStoreImageLookup(prijsProfeet), limits: offerLimits } : undefined,
+  storeImages:
+    prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off"
+      ? { lookup: createStoreImageLookup(prijsProfeet, Date.now, catalogStore), limits: offerLimits }
+      : undefined,
   nameImages,
   products: {
     normalize: (name) => normalizeProduct(client!, { model: env.OPENAI_PRODUCT_MODEL || config.model, maxOutputTokens: number("PRODUCT_MAX_OUTPUT_TOKENS", 600) }, name),
@@ -171,7 +211,9 @@ const handler = createHandler({
     limits: productLimits,
     illustrations: illustrator ? { illustrator, limits: illustrationLimits } : undefined,
     adminToken: env.CANDIDATES_ADMIN_TOKEN || undefined,
+    catalogPriorityCount: number("CATALOG_PRIORITY_COUNT", 5),
   },
+  catalog,
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 
@@ -191,6 +233,7 @@ createServer((req, res) => {
       imageProvider: discovery?.provider,
       candidates: candidates.storage(),
       ...(candidates.stats().loadError && { candidatesLoadError: candidates.stats().loadError }),
+      catalog: catalog.stats(),
       nameSearch: { prijsprofeet: Boolean(namePrijsProfeet), off: Boolean(offSearch) },
       illustrations: Boolean(illustrator),
     }),

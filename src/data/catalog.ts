@@ -1,3 +1,4 @@
+import { isCategoryId } from "../domain/categories";
 import type { CategoryId, Product } from "../domain/types";
 
 function product(id: string, name: string, category: CategoryId, groupId: string, aliases: string[] = []): Product {
@@ -107,4 +108,42 @@ export const products: Product[] = [
 
 export function productById(id: string): Product | undefined {
   return products.find((product) => product.id === id);
+}
+
+/** Drawing id for a product: shared catalog rows may point at a bundled illustration. */
+export function artIdOf(product: Pick<Product, "id" | "illustration">): string {
+  return product.illustration ?? product.id;
+}
+
+const BUNDLED_IDS = new Set(products.map((entry) => entry.id));
+
+export type SharedCatalogProduct = {
+  id: string;
+  name: string;
+  category: string;
+  aliases: string[];
+  illustrationKey?: string;
+  deprecated?: boolean;
+  updatedAt?: string;
+};
+
+/**
+ * Merges approved shared products into the live catalog array in place.
+ * Bundled ids are never removed or renamed; deprecated shared ids are dropped.
+ */
+export function extendCatalog(list: SharedCatalogProduct[]): void {
+  for (let index = products.length - 1; index >= 0; index -= 1) {
+    if (!BUNDLED_IDS.has(products[index].id)) products.splice(index, 1);
+  }
+  for (const entry of list) {
+    if (entry.deprecated || BUNDLED_IDS.has(entry.id) || !isCategoryId(entry.category)) continue;
+    products.push({
+      id: entry.id,
+      name: entry.name,
+      category: entry.category,
+      groupId: entry.id,
+      aliases: entry.aliases.filter((alias) => typeof alias === "string"),
+      ...(entry.illustrationKey && { illustration: entry.illustrationKey }),
+    });
+  }
 }

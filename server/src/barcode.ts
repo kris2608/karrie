@@ -1,5 +1,6 @@
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
+import type { CatalogStore } from "./catalog/types.js";
 import { eanForms } from "./ean.js";
 import { cleanUrl, get, readLimited, stripHtml, usageOf, type Fetch, type RawResponse } from "./images.js";
 import type { Usage } from "./limits.js";
@@ -243,6 +244,8 @@ export type BarcodeConfig = {
   userAgent: string;
   /** OpenAI client and model for the web search; without them only Open Food Facts is asked. */
   web?: { client: ResponsesClient; model: string };
+  /** Shared Postgres catalog; checked after the memory cache and before Open Food Facts. */
+  catalog?: Pick<CatalogStore, "byGtin" | "upsertBarcodeRecord" | "cacheGet" | "cachePut" | "rememberSeen">;
 };
 
 class OffError extends Error {
@@ -324,14 +327,50 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     cache.set(ean, entry);
   }
 
-  async function lookupFresh(ean: string, allowWeb: boolean): Promise<LookupResult> {
+  function persist(answer: BarcodeAnswer) {
+    if (!config.catalog || answer.status === "none" || !answer.product || !answer.source) return;
+    void config.catalog.upsertBarcodeRecord({
+      ean: answer.ean,
+      status: answer.status,
+      product: answer.product,
+      source: answer.source,
+      at: answer.at,
+    });
+  }
+
+  function persistMiss(ean: string) {
+    if (!config.catalog) return;
+    void config.catalog.cachePut(`barcode:${ean}`, "barcode-miss", { status: "none" }, now() + BARCODE_RULES.missTtlMs);
+  }
+
+  async function fromCatalog(ean: string): Promise<LookupResult | null> {
+    if (!config.catalog) return null;
+    const hit = await config.catalog.byGtin(ean).catch(() => null);
+    if (hit) {
+      remember(ean, { answer: hit.answer, until: now() + BARCODE_RULES.foundTtlMs });
+      void config.catalog.rememberSeen(hit.productId);
+      if (hit.stale) {
+        void lookupFresh(ean, false, { refreshOnly: true }).catch(() => undefined);
+      }
+      return { ok: true, answer: hit.answer, cached: true, searchCalls: 0, failures: [] };
+    }
+    const miss = await config.catalog.cacheGet<{ status: "none" }>(`barcode:${ean}`).catch(() => null);
+    if (miss?.status === "none") {
+      const answer: BarcodeAnswer = { ean, status: "none", at: now() };
+      remember(ean, { answer, until: now() + BARCODE_RULES.missTtlMs });
+      return { ok: true, answer, cached: true, searchCalls: 0, failures: [] };
+    }
+    return null;
+  }
+
+  async function lookupFresh(ean: string, allowWeb: boolean, options: { refreshOnly?: boolean } = {}): Promise<LookupResult> {
     const failures: string[] = [];
     let raw: OffProduct | null;
     try {
       raw = await askOff(ean);
     } catch (error) {
       failures.push(error instanceof OffError ? `off:http-${error.status}` : "off:unreachable");
-      remember(ean, { error: true, until: now() + BARCODE_RULES.errorTtlMs });
+      if (!options.refreshOnly) remember(ean, { error: true, until: now() + BARCODE_RULES.errorTtlMs });
       return { ok: false, code: "unavailable", failures };
     }
     const off = raw ? fromOff(ean, raw) : null;
@@ -339,19 +378,24 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       const source: BarcodeSource = { kind: "off", name: "Open Food Facts", url: `${BARCODE_RULES.offOrigin}/product/${ean}`, dataLicense: "ODbL", ...(off.product.imageUrl && { imageLicense: "CC BY-SA" as const }) };
       const answer: BarcodeAnswer = { ean, status: off.status, product: off.product, source, at: now() };
       remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
+      persist(answer);
       return { ok: true, answer, cached: false, searchCalls: 0, failures };
     }
     failures.push(raw ? "off:not-credible" : "off:not-found");
+    if (options.refreshOnly) return { ok: true, answer: { ean, status: "none", at: now() }, cached: false, searchCalls: 0, failures };
     if (!allowWeb || !config.web) {
       // Without the web search the miss is not final, so it is kept briefly.
       const answer: BarcodeAnswer = { ean, status: "none", at: now() };
       remember(ean, { answer, until: now() + (config.web ? BARCODE_RULES.errorTtlMs : BARCODE_RULES.missTtlMs) });
+      if (!config.web) persistMiss(ean);
       if (config.web) failures.push("web:budget");
       return { ok: true, answer, cached: false, searchCalls: 0, failures };
     }
     const web = await askWeb(ean, failures);
     const answer = web.answer ?? { ean, status: "none" as const, at: now() };
     remember(ean, { answer, until: now() + (web.answer ? BARCODE_RULES.foundTtlMs : BARCODE_RULES.missTtlMs) });
+    if (web.answer) persist(answer);
+    else persistMiss(ean);
     return { ok: true, answer, cached: false, usage: web.usage, searchCalls: web.searchCalls, failures };
   }
 
@@ -370,7 +414,11 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       if (known) return Promise.resolve(known);
       const running = pending.get(ean);
       if (running) return running;
-      const promise = lookupFresh(ean, options.allowWeb).finally(() => pending.delete(ean));
+      const promise = (async () => {
+        const central = await fromCatalog(ean);
+        if (central) return central;
+        return lookupFresh(ean, options.allowWeb);
+      })().finally(() => pending.delete(ean));
       pending.set(ean, promise);
       return promise;
     },

@@ -1,3 +1,4 @@
+import type { CatalogStore } from "./catalog/types.js";
 import { matchName, words, type NameImage, type NameMatch, type NameRow } from "./nameMatch.js";
 import type { OffSearch } from "./offSearch.js";
 import type { OfferRow, PrijsProfeet } from "./offers/prijsprofeet.js";
@@ -70,7 +71,11 @@ function combine(first: NameMatch, second: NameMatch | null, searched: NameAnswe
 type Entry = { result: NameImageResult; until: number };
 type Rows = { rows: NameRow[]; failed?: "limit" | "unavailable" };
 
-export function createNameImageLookup(providers: { prijsProfeet?: Pick<PrijsProfeet, "searchName">; off?: Pick<OffSearch, "search"> }, now: () => number = Date.now) {
+export function createNameImageLookup(
+  providers: { prijsProfeet?: Pick<PrijsProfeet, "searchName">; off?: Pick<OffSearch, "search"> },
+  now: () => number = Date.now,
+  catalog?: Pick<CatalogStore, "byAlias" | "upsertNameImages" | "cacheGet" | "cachePut" | "rememberSeen">,
+) {
   const cache = new Map<string, Entry>();
   const pending = new Map<string, Promise<NameImageResult>>();
   const rows = new Map<string, { answer: Rows; until: number }>();
@@ -121,7 +126,30 @@ export function createNameImageLookup(providers: { prijsProfeet?: Pick<PrijsProf
     });
   }
 
+  async function fromCatalog(typed: string, key: string): Promise<NameImageResult | null> {
+    if (!catalog) return null;
+    const parsed = parseName(typed);
+    if (!parsed) return null;
+    const hit = await catalog.byAlias({ alias: parsed.base, packaging: parsed.packaging, size: parsed.size }).catch(() => null);
+    if (hit?.packMatched && hit.answer.match) {
+      const result: NameImageResult = { ok: true, answer: hit.answer, cached: true };
+      remember(key, result, NAME_IMAGE_RULES.foundTtlMs);
+      void catalog.rememberSeen(hit.productId);
+      return result;
+    }
+    if (hit && !hit.packMatched) return null;
+    const cachedAnswer = await catalog.cacheGet<NameAnswer>(`name:${key}`).catch(() => null);
+    if (cachedAnswer) {
+      const result: NameImageResult = { ok: true, answer: cachedAnswer, cached: true };
+      remember(key, result, cachedAnswer.match ? NAME_IMAGE_RULES.foundTtlMs : NAME_IMAGE_RULES.missTtlMs);
+      return result;
+    }
+    return null;
+  }
+
   async function fresh(typed: string, key: string): Promise<NameImageResult> {
+    const central = await fromCatalog(typed, key);
+    if (central) return central;
     const parsed = parseName(typed)!;
     const query = words(parsed.base).join(" ");
     const first = await prijsProfeetRows(query);
@@ -155,7 +183,12 @@ export function createNameImageLookup(providers: { prijsProfeet?: Pick<PrijsProf
       if (searched.prijsprofeet === "error" || !offPaused) remember(key, result, NAME_IMAGE_RULES.errorTtlMs);
       return result;
     }
-    remember(key, { ok: true, answer, cached: false }, answer.match ? NAME_IMAGE_RULES.foundTtlMs : NAME_IMAGE_RULES.missTtlMs);
+    const ttl = answer.match ? NAME_IMAGE_RULES.foundTtlMs : NAME_IMAGE_RULES.missTtlMs;
+    remember(key, { ok: true, answer, cached: false }, ttl);
+    if (catalog) {
+      void catalog.cachePut(`name:${key}`, "name", answer, now() + ttl);
+      if (answer.match) void catalog.upsertNameImages({ typed, answer });
+    }
     return { ok: true, answer, cached: false };
   }
 

@@ -6,7 +6,7 @@ import { customName, customProductId, nameTaken, suggestion } from "../../domain
 import { normalize } from "../../domain/matchProduct";
 import { matchesMine, mineKey } from "../../domain/mine";
 import type { AdventureItem, CategoryId, Product, SavedItem } from "../../domain/types";
-import { productById, products } from "../../data/catalog";
+import { artIdOf, productById, products } from "../../data/catalog";
 import { hasPhoto, ItemArt } from "../../components/ItemArt";
 import { ProductArt } from "../../components/ProductArt";
 import { TopBar } from "../../components/TopBar";
@@ -429,7 +429,7 @@ export function AddScreen() {
         key={product.id}
         name={product.name}
         category={product.category}
-        art={<ItemArt item={entry ? entry.item : { icon: product.id, name: product.name }} />}
+        art={<ItemArt item={entry ? entry.item : { icon: artIdOf(product), name: product.name }} />}
         quantity={entry?.quantity ?? 0}
         pop={burst?.id === product.id ? burst : null}
         onAdd={() => addProduct(product)}
@@ -590,7 +590,7 @@ export function AddScreen() {
             <li key={line.key}>
               {line.product ? (
                 <div className="paste-match">
-                  <ProductArt id={line.product.id} />
+                  <ProductArt id={artIdOf(line.product)} />
                   <span>
                     {line.quantity}× {line.product.name}
                   </span>

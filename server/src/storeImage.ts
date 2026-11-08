@@ -1,3 +1,4 @@
+import type { CatalogStore } from "./catalog/types.js";
 import { eanForms } from "./ean.js";
 import type { PrijsProfeet, RetailerId } from "./offers/prijsprofeet.js";
 
@@ -20,7 +21,11 @@ export const STORE_IMAGE_RULES = {
 
 type Entry = { result: StoreImageResult; until: number };
 
-export function createStoreImageLookup(provider: Pick<PrijsProfeet, "searchImage">, now: () => number = Date.now) {
+export function createStoreImageLookup(
+  provider: Pick<PrijsProfeet, "searchImage">,
+  now: () => number = Date.now,
+  catalog?: Pick<CatalogStore, "storeImageByGtin" | "upsertStoreImage">,
+) {
   const cache = new Map<string, Entry>();
   const pending = new Map<string, Promise<StoreImageResult>>();
   const stats = { hits: 0, misses: 0 };
@@ -32,6 +37,19 @@ export function createStoreImageLookup(provider: Pick<PrijsProfeet, "searchImage
   }
 
   async function fresh(ean: string): Promise<StoreImageResult> {
+    if (catalog) {
+      const stored = await catalog.storeImageByGtin(ean).catch(() => null);
+      if (stored) {
+        const image: StoreImage = {
+          ean,
+          imageUrl: stored.imageUrl,
+          retailer: stored.retailer as RetailerId,
+          ...(stored.sourceUrl && { sourceUrl: stored.sourceUrl }),
+        };
+        remember(ean, { ok: true, image, cached: true }, STORE_IMAGE_RULES.foundTtlMs);
+        return { ok: true, image, cached: true };
+      }
+    }
     const answer = await provider.searchImage(ean);
     if (!answer.ok) {
       const result: StoreImageResult = { ok: false, code: answer.code === "unavailable" ? "unavailable" : "limit" };
@@ -41,6 +59,9 @@ export function createStoreImageLookup(provider: Pick<PrijsProfeet, "searchImage
     const forms = eanForms(ean);
     const row = answer.rows.find((candidate) => candidate.ean && forms.includes(candidate.ean.replace(/^0+(?=\d{13})/, "")) && candidate.imageUrl);
     const image: StoreImage | null = row ? { ean, imageUrl: row.imageUrl!, retailer: row.retailer, ...(row.sourceUrl && { sourceUrl: row.sourceUrl }) } : null;
+    if (image && catalog) {
+      void catalog.upsertStoreImage({ ean, imageUrl: image.imageUrl, retailer: image.retailer, sourceUrl: image.sourceUrl });
+    }
     remember(ean, { ok: true, image, cached: false }, image ? STORE_IMAGE_RULES.foundTtlMs : STORE_IMAGE_RULES.missTtlMs);
     return { ok: true, image, cached: false };
   }

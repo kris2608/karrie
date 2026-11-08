@@ -336,14 +336,37 @@ Staat een gewoon product niet in de catalogus (walnoten, komijn, rozijnen), dan 
 - **Bewaren.** Er zijn drie standen; `/api/health` toont onder `products.candidates.storage` welke er echt draait:
   - **Geheugen** (standaard, zo staat het nu op Render): weg na een herstart of slaapstand.
   - **Bestand** met `CANDIDATES_FILE=/var/data/candidates.json` (atomair geschreven). Op het gratis Render-plan is er geen blijvende schijf; daarvoor zijn een betaalde instance (Starter, $7 per maand) en een Persistent Disk ($0,25 per GB per maand) nodig.
-  - **Postgres** met `CANDIDATES_DATABASE_URL` (heeft voorrang op het bestand). De server maakt bij het starten zelf de tabel (`server/migrations/001_candidates.sql`, `CREATE TABLE IF NOT EXISTS`), leest alle kandidaten voor hij luistert en schrijft daarna alleen gewijzigde rijen. Is de database niet bereikbaar, dan draait hij in het geheugen en toont `/api/health` `storage: "memory"` met `loadError`. Een mislukte schrijfactie wordt bij de volgende wijziging opnieuw geprobeerd.
+  - **Postgres** met `CANDIDATES_DATABASE_URL` (heeft voorrang op het bestand). De server draait bij het starten de migraties in `server/migrations/` (`001_candidates.sql`, `002_catalog.sql`) via `schema_migrations`, leest alle kandidaten voor hij luistert en schrijft daarna alleen gewijzigde rijen. Is de database niet bereikbaar, dan draait hij in het geheugen en toont `/api/health` `storage: "memory"` met `loadError`. Een mislukte schrijfactie wordt bij de volgende wijziging opnieuw geprobeerd.
 - **Postgres kiezen** (er is **niets aangemaakt**; dat is jouw keuze):
   - **Neon**, gratis plan: geen einddatum, ongeveer 0,5 GB opslag, genoeg voor vele duizenden kandidaten. Maak op neon.tech een project in regio Frankfurt, kopieer de connection string (met `?sslmode=require`) en zet die op `karrie-api` als `CANDIDATES_DATABASE_URL` (geheim; staat al in `render.yaml` met `sync: false`).
   - **Render Postgres**: het gratis plan verloopt na 30 dagen (daarna worden de gegevens verwijderd); betaalde plannen kosten per maand, kijk voor de actuele prijs op render.com/pricing. Gebruik dan de *Internal Database URL*.
-  - Duurzaam bewaren werkt pas als `CANDIDATES_DATABASE_URL` gezet is én `/api/health` `"storage": "postgres"` toont. Getest is het alleen met een Postgres in het geheugen (`pg-mem`, herstart-test), nog niet met een echte database.
-- **Beoordelen.** Zet `CANDIDATES_ADMIN_TOKEN` (geheim, lang en willekeurig) op `karrie-api`. Dan werken `GET /api/admin/candidates?status=pending` en `POST /api/admin/candidates/<candidateId>` met `{"approvalStatus":"approved"}` of `"rejected"`, met de kop `Authorization: Bearer <token>`. Zonder token of met een fout token antwoorden ze `404`. Een afgewezen kandidaat wordt voor iedereen weer "niet herkend"; het product blijft dan zoals getypt.
-- **Exporteren.** `npm run candidates:export -- --status=pending --format=csv` in `server/` leest `CANDIDATES_FILE`, of met `KARRIE_API_URL` en `CANDIDATES_ADMIN_TOKEN` de draaiende server. Goedgekeurde kandidaten neem je met de hand over in `src/data/catalog.ts` (met een tekening) of `server/src/schema.ts`.
+  - Duurzaam bewaren werkt pas als `CANDIDATES_DATABASE_URL` gezet is én `/api/health` `"storage": "postgres"` toont.
+- **Gedeelde productcatalogus.** Dezelfde Postgres bevat ook producten, verpakkingen, GTINs, feiten (Nutri-Score alleen van Open Food Facts), afbeeldingslinks en een lookup-cache. Bij het starten zaait de server de gebundelde catalogus (`origin=bundled`). Streepjescode-lookups lezen eerst deze database, daarna Open Food Facts; gevonden antwoorden worden gedeeld tussen gezinnen. Retailerfoto's van PrijsProfeet worden alleen als URL bewaard (`usage_status=link_only`), nooit gedownload. `/api/health` toont onder `catalog` `{ enabled, degraded, migrations, products, identifiers, centralHits, writes, writeErrors }`.
+- **Beoordelen.** Zet `CANDIDATES_ADMIN_TOKEN` (geheim, lang en willekeurig) op `karrie-api`. Dan werken:
+  - `GET /api/admin/candidates?status=pending` — kandidaten; `priority: true` als `usageCount >= CATALOG_PRIORITY_COUNT` (standaard 5; dat zijn aanvraag-tellingen, geen geverifieerde gebruikers).
+  - `POST /api/admin/candidates/<candidateId>` met `{"approvalStatus":"approved"}` of `"rejected"` — goedkeuren koppelt automatisch een `catalog_products`-rij (`approved`, nog niet default).
+  - `POST /api/admin/catalog/<productId>` met bijvoorbeeld `{"isDefaultCatalog":true}`, `{"illustrationKey":"melk"}`, `{"deprecated":true}` — alleen met hetzelfde Bearer-token.
+  - Zonder token of met een fout token antwoorden ze `404`. Er is geen publieke schrijfroute.
+- **Sync naar toestellen.** `GET /api/catalog/changes?since=<iso>` is openbaar en alleen-lezen (pagina van 200, `Cache-Control: max-age=300`). Alleen default of deprecated shared metadata; geen feiten of lijstjes. De app bewaart de sync in IndexedDB (`catalogSync`) en mengt hem in de gebundelde catalogus; lokale overrides winnen altijd.
+- **Exporteren.** `npm run candidates:export -- --status=pending --format=csv` in `server/` leest `CANDIDATES_FILE`, of met `KARRIE_API_URL` en `CANDIDATES_ADMIN_TOKEN` de draaiende server.
 - `/api/health` toont onder `products` de aantallen kandidaten per status en soort, waar ze bewaard worden (`storage`) en de uitkomsten (`normalized`, `known`, `brand`, `refused-input`, fouten).
+
+**Voorbeelden (admin).**
+
+```bash
+curl -s -H "Authorization: Bearer $CANDIDATES_ADMIN_TOKEN" \
+  "https://karrie-api.onrender.com/api/admin/candidates?status=pending"
+
+curl -s -X POST -H "Authorization: Bearer $CANDIDATES_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"approvalStatus":"approved"}' \
+  "https://karrie-api.onrender.com/api/admin/candidates/<candidateId>"
+
+curl -s -X POST -H "Authorization: Bearer $CANDIDATES_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"isDefaultCatalog":true,"illustrationKey":"drinkpakje"}' \
+  "https://karrie-api.onrender.com/api/admin/catalog/<productId>"
+```
 
 **Tekening (uit, kost geld per tekening).** Een nieuw product krijgt de catalogustekening die er het meest op lijkt (anders het doosje van de afdeling). Met `ILLUSTRATIONS_ENABLED=true` maakt de server ook een eigen tekening in Karrie-stijl (`POST /api/products/illustration`): `gpt-image-1`, 1024×1024, kwaliteit `low`, transparante achtergrond, WebP, met een vaste stijlopdracht (platte tekening, dikke ronde lijnen, geen tekst, merk, mensen of foto-realisme). Alleen voor een bekende kandidaat, nooit met vrije tekst; één tekening per kandidaat, daarna uit het geheugen van de server voor iedereen gratis. De app verkleint hem tot 256×256 en bewaart hem op het toestel. Tot hij er is, staat de catalogustekening er; een foto van de ouder wint altijd. Zonder de vlag antwoordt de route `404` en vraagt de app niets.
 
@@ -357,10 +380,13 @@ Staat een gewoon product niet in de catalogus (walnoten, komijn, rozijnen), dan 
 | `OPENAI_PRODUCT_MODEL` | het herkenningsmodel | Model voor het ordenen van een getypt product |
 | `PRODUCTS_LIMIT_PER_IP_HOUR`, `PRODUCTS_LIMIT_PER_IP_DAY` | 30, 100 | Nieuwe producten per IP (bekende kandidaten tellen niet) |
 | `PRODUCTS_LIMIT_DAILY_REQUESTS`, `PRODUCTS_DAILY_BUDGET_USD` | 1000, 0,5 | Hele server per dag |
-| `CANDIDATES_DATABASE_URL` | leeg | Postgres voor kandidaten (geheim); wint van `CANDIDATES_FILE` |
+| `CANDIDATES_DATABASE_URL` | leeg | Postgres voor kandidaten én gedeelde catalogus (geheim); wint van `CANDIDATES_FILE` |
 | `CANDIDATES_FILE` | leeg (geheugen) | JSON-bestand voor kandidaten |
 | `CANDIDATES_MAX` | 5000 | Daarboven komen er geen nieuwe kandidaten bij |
-| `CANDIDATES_ADMIN_TOKEN` | leeg (routes bestaan niet) | Token voor beoordelen en exporteren |
+| `CANDIDATES_ADMIN_TOKEN` | leeg (routes bestaan niet) | Token voor beoordelen, catalogus en exporteren |
+| `CATALOG_REFRESH_DAYS` | 90 | Na zoveel dagen wordt een bewaard barcode-record op de achtergrond ververst |
+| `CATALOG_PRIORITY_COUNT` | 5 | Aanvraag-telling vanaf waar een kandidaat `priority` krijgt |
+| `CATALOG_IMAGE_HEALTH` | aan | `off` zet de periodieke HEAD-check van afbeeldingslinks uit |
 | `ILLUSTRATIONS_ENABLED` | uit | `true` zet eigen tekeningen aan (kost geld) |
 | `ILLUSTRATION_MODEL`, `PRICE_ILLUSTRATION` | `gpt-image-1`, 0,011 | Model en prijs per tekening |
 | `ILLUSTRATION_DAILY_BUDGET_USD` | 1 | Dagbudget voor tekeningen |

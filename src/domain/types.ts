@@ -21,6 +21,8 @@ export type Product = {
   aliases: string[];
   category: CategoryId;
   groupId: string;
+  /** Drawing id when different from the product id (shared catalog additions). */
+  illustration?: string;
 };
 
 export type ImageKind = "generic" | "photo";
