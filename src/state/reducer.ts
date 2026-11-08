@@ -13,6 +13,7 @@ import {
 } from "../domain/shopQueue";
 import { declineKey, pickMissions } from "../domain/discovery";
 import { SCORING } from "../domain/scoring";
+import { rememberCompleted } from "../domain/feedback";
 import { nextSticker } from "../domain/stickers";
 import { MINE_LIMIT, mineKey, remember as rememberMine } from "../domain/mine";
 import { categoryIcon } from "../domain/categoryIcon";
@@ -71,6 +72,10 @@ export type AppState = {
   declined: string[];
   /** Mijn producten, newest first. */
   mine: SavedItem[];
+  /** Distinct adventure ids that reached the finish at least once on this device. */
+  completedAdventures: string[];
+  /** The automatic feedback invite was dismissed or opened. */
+  feedbackAsked: boolean;
 };
 
 export const initialState: AppState = {
@@ -81,6 +86,8 @@ export const initialState: AppState = {
   settings: { ...defaultSettings },
   declined: [],
   mine: [],
+  completedAdventures: [],
+  feedbackAsked: false,
 };
 
 export type Action =
@@ -144,7 +151,8 @@ export type Action =
   | { type: "open-saved"; id: string }
   | { type: "forget-saved"; id: string }
   | { type: "restore-saved"; list: SavedList; index: number }
-  | { type: "clear-saved" };
+  | { type: "clear-saved" }
+  | { type: "feedback-asked" };
 
 function touch(adventure: Adventure, patch: Partial<Adventure>): Adventure {
   return { ...adventure, ...patch, updatedAt: Date.now() };
@@ -314,7 +322,8 @@ function collected(state: AppState, items: AdventureItem[]): AppState {
     const stickerId = state.adventure.stickerId ?? nextSticker(state.stickers);
     const stickers = state.stickers.includes(stickerId) ? state.stickers : [...state.stickers, stickerId];
     const adventure = touch(state.adventure, { items, history, phase: "done", stickerId });
-    return { ...state, stickers, adventure, saved: upsertSaved(state.saved, adventure) };
+    const completedAdventures = rememberCompleted(state.completedAdventures, state.adventure.id);
+    return { ...state, stickers, adventure, saved: upsertSaved(state.saved, adventure), completedAdventures };
   }
   return { ...state, adventure: touch(state.adventure, { items, history, phase: "shopping" }) };
 }
@@ -366,6 +375,10 @@ export function reducer(state: AppState, action: Action): AppState {
         settings,
         declined: Array.isArray(action.data.declined) ? action.data.declined : [],
         mine: Array.isArray(action.data.mine) ? action.data.mine : [],
+        completedAdventures: Array.isArray(action.data.completedAdventures)
+          ? action.data.completedAdventures.filter((id): id is string => typeof id === "string")
+          : [],
+        feedbackAsked: action.data.feedbackAsked === true,
       };
     }
     case "add-mine": {
@@ -676,6 +689,8 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "clear-saved":
       return { ...state, saved: [], adventure: forget(state.adventure, state.saved.map((list) => list.id)) };
+    case "feedback-asked":
+      return state.feedbackAsked ? state : { ...state, feedbackAsked: true };
     default:
       return state;
   }

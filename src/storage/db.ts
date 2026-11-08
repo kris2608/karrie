@@ -14,6 +14,8 @@ export type Persisted = {
   settings: Settings;
   declined: string[];
   mine: SavedItem[];
+  completedAdventures: string[];
+  feedbackAsked: boolean;
 };
 
 export const emptyPersisted = (): Persisted => ({
@@ -24,6 +26,8 @@ export const emptyPersisted = (): Persisted => ({
   settings: { ...defaultSettings },
   declined: [],
   mine: [],
+  completedAdventures: [],
+  feedbackAsked: false,
 });
 
 let connection: ReturnType<typeof openDB> | null = null;
@@ -119,6 +123,7 @@ export async function loadPersisted(): Promise<Persisted> {
     const settings = (await db.get("kv", "settings")) as Partial<Settings> | undefined;
     const discovery = (await db.get("kv", "discovery")) as { declined?: string[] } | undefined;
     const mine = (await db.get("kv", "mine")) as SavedItem[] | undefined;
+    const feedback = (await db.get("kv", "feedback")) as { completed?: string[]; asked?: boolean } | undefined;
     return {
       adventure: adventure ?? null,
       saved: saved ?? [],
@@ -127,6 +132,8 @@ export async function loadPersisted(): Promise<Persisted> {
       settings: { ...defaultSettings, ...settings },
       declined: Array.isArray(discovery?.declined) ? discovery.declined : [],
       mine: Array.isArray(mine) ? mine : [],
+      completedAdventures: Array.isArray(feedback?.completed) ? feedback.completed.filter((id) => typeof id === "string") : [],
+      feedbackAsked: feedback?.asked === true,
     };
   } catch {
     return emptyPersisted();
@@ -144,6 +151,7 @@ export async function savePersisted(data: Persisted): Promise<void> {
     tx.store.put(data.settings, "settings"),
     tx.store.put({ declined: data.declined }, "discovery"),
     tx.store.put(data.mine, "mine"),
+    tx.store.put({ completed: data.completedAdventures, asked: data.feedbackAsked }, "feedback"),
     tx.done,
   ]);
 }

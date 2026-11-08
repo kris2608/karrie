@@ -468,6 +468,7 @@ h1, h2, p { margin: 0; }
   cursor: pointer;
 }
 .settings-link + .settings-link { border-top: 1px solid rgba(43, 54, 64, 0.08); }
+a.settings-link { text-decoration: none; color: inherit; }
 .settings-link svg { flex: none; width: 18px; height: 18px; color: var(--ink-mute); }
 .sheet-back {
   display: inline-flex;
@@ -1383,6 +1384,21 @@ h1, h2, p { margin: 0; }
 }
 .sticker-big { width: 72px; height: 72px; }
 .complete-actions { display: grid; gap: var(--space-3); width: min(100%, 340px); margin-top: var(--space-2); }
+.feedback-invite {
+  display: grid;
+  gap: var(--space-2);
+  width: min(100%, 340px);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+.feedback-invite strong { font-size: 1.05rem; font-weight: 900; }
+.feedback-invite p { color: var(--ink-soft); font-weight: 700; }
+.feedback-invite-actions { display: grid; gap: var(--space-2); margin-top: var(--space-1); }
+.feedback-invite-actions a.pbtn { text-decoration: none; box-sizing: border-box; justify-content: center; }
 
 /* Packaging photos */
 

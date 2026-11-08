@@ -163,3 +163,37 @@ it("maakt van een geplakte lijst een avontuur en bewaart een favoriet", () => {
   state = reducer(state, { type: "save-favorite" });
   expect(state.saved[0]?.favorite).toBe(true);
 });
+
+function finish(state: ReturnType<typeof shop>) {
+  const open = state.adventure!.items.filter((item) => item.status !== "found").length;
+  let next = state;
+  for (let step = 0; step < open; step += 1) next = reducer(next, { type: "found" });
+  return next;
+}
+
+it("telt elk afgerond avontuur één keer voor de feedback-uitnodiging", () => {
+  let state = finish(shop());
+  const first = state.adventure!.id;
+  expect(state.completedAdventures).toEqual([first]);
+  expect(state.feedbackAsked).toBe(false);
+
+  state = finish(reducer(state, { type: "undo" }));
+  expect(state.completedAdventures).toEqual([first]);
+
+  state = finish(reducer(state, { type: "start-sample" }));
+  const second = state.adventure!.id;
+  expect(second).not.toBe(first);
+  expect(state.completedAdventures).toEqual([first, second]);
+
+  state = reducer(state, { type: "feedback-asked" });
+  expect(state.feedbackAsked).toBe(true);
+  expect(reducer(state, { type: "feedback-asked" })).toBe(state);
+
+  const restored = reducer(initialState, {
+    type: "hydrate",
+    data: { completedAdventures: [first, second], feedbackAsked: true, saved: [{ id: "saved-only", name: "Zaterdag", items: [], favorite: true, updatedAt: 1 }] },
+  });
+  expect(restored.completedAdventures).toEqual([first, second]);
+  expect(restored.feedbackAsked).toBe(true);
+  expect(restored.completedAdventures).not.toContain("saved-only");
+});

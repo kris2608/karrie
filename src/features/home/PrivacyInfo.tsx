@@ -1,4 +1,5 @@
 import type { Ref } from "react";
+import { FEEDBACK_PRIVACY, feedbackUrl } from "../../domain/feedback";
 
 export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement> }) {
   return (
@@ -24,6 +25,15 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
         <p>
           Met Umami tellen we anoniem hoe de app wordt gebruikt, bijvoorbeeld welk scherm opent en hoe een product is toegevoegd. Umami zet geen
           cookies. We sturen geen namen, productfoto's of de inhoud van je boodschappenlijstjes naar Umami.
+        </p>
+        <p>
+          Via <a href={feedbackUrl("settings")} target="_blank" rel="noopener noreferrer">Geef feedback</a> kun je vrijwillig iets doorgeven. Wat je
+          invult, gaat naar <a href="https://tally.so" rel="noopener noreferrer">Tally</a>; Karrie stuurt geen boodschappenlijst, producten of
+          kindgegevens mee. Zie ook de{" "}
+          <a href={FEEDBACK_PRIVACY} target="_blank" rel="noopener noreferrer">
+            privacy-informatie van Tally
+          </a>
+          .
         </p>
       </section>
       <section>

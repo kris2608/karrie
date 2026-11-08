@@ -20,6 +20,7 @@ import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { listName } from "../../state/reducer";
 import { needsIntro } from "../../domain/intro";
+import { feedbackUrl } from "../../domain/feedback";
 import { AboutKarrie } from "./AboutKarrie";
 import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
@@ -317,7 +318,7 @@ export function HomeScreen() {
                 </button>
               ))}
             <nav className="settings-links" aria-label="Meer over Karrie">
-              {(["howto", "about", "privacy"] as const).map((target) => (
+              {(["howto", "about"] as const).map((target) => (
                 <button
                   key={target}
                   ref={(node) => {
@@ -334,6 +335,26 @@ export function HomeScreen() {
                   </svg>
                 </button>
               ))}
+              <a className="settings-link" href={feedbackUrl("settings")} target="_blank" rel="noopener noreferrer" data-testid="open-feedback">
+                💬 Geef feedback
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 5h5v5M19 5l-9 9M10 5H5v14h14v-5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+              <button
+                ref={(node) => {
+                  rowRefs.current.privacy = node;
+                }}
+                type="button"
+                className="settings-link"
+                data-testid="open-privacy"
+                onClick={() => setView("privacy")}
+              >
+                {linkLabels.privacy}
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
             </nav>
             <p className="sheet-note">Zet Karrie op je beginscherm: deel-knop in Safari, of het menu in Chrome. Lang drukken op een lijstje wist het.</p>
             <PressButton variant="secondary" wide onClick={closeParent}>

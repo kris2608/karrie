@@ -7,6 +7,7 @@ import { celebrate } from "../../components/rewards/confetti";
 import { StickerBadge } from "../../components/StickerBadge";
 import { PressButton } from "../../components/ui/PressButton";
 import { StarIcon } from "../../components/ui/StarIcon";
+import { feedbackUrl, wantsFeedbackInvite } from "../../domain/feedback";
 import { foundCount } from "../../domain/shopQueue";
 import { starTotal } from "../../domain/scoring";
 import { stickerLabel } from "../../domain/stickers";
@@ -17,16 +18,20 @@ import { useAdventure } from "../../state/AdventureContext";
 import { SaveListSheet } from "../review/SaveListSheet";
 
 const CHEST_AT = 0.5;
+/** After the sticker has appeared, so the child's celebration is never interrupted. */
+const FEEDBACK_AT = CHEST_AT + 1.7;
 
 export function CompleteScreen() {
-  const { adventure, saved, dispatch } = useAdventure();
+  const { adventure, saved, completedAdventures, feedbackAsked, dispatch } = useAdventure();
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const stars = adventure ? starTotal(adventure.items) : 0;
   const bonus = adventure ? stars - foundCount(adventure.items) : 0;
   const [shown, setShown] = useState(reduced ? stars : 0);
   const [saving, setSaving] = useState(false);
+  const [inviteReady, setInviteReady] = useState(reduced);
   const fired = useRef(false);
+  const invite = wantsFeedbackInvite(completedAdventures, feedbackAsked);
 
   useEffect(() => {
     if (!adventure || adventure.phase !== "done" || fired.current) return;
@@ -50,11 +55,24 @@ export function CompleteScreen() {
     return () => controls.stop();
   }, [reduced, stars]);
 
+  useEffect(() => {
+    if (!invite || reduced) {
+      setInviteReady(Boolean(invite));
+      return;
+    }
+    const timer = window.setTimeout(() => setInviteReady(true), FEEDBACK_AT * 1000);
+    return () => window.clearTimeout(timer);
+  }, [invite, reduced]);
+
   if (!adventure || adventure.phase !== "done") return <Navigate to="/" replace />;
 
   const favorite = saved.some((list) => list.id === adventure.id && list.favorite);
   const sticker = adventure.stickerId ?? "ster";
   const flyers = reduced ? 0 : Math.min(stars, 5);
+
+  function askFeedback() {
+    dispatch({ type: "feedback-asked" });
+  }
 
   return (
     <main className="screen complete">
@@ -100,6 +118,27 @@ export function CompleteScreen() {
           Nieuwe sticker: <strong>{stickerLabel(sticker)}</strong>
         </p>
       </motion.div>
+
+      {invite && inviteReady && (
+        <motion.aside
+          className="feedback-invite"
+          data-testid="feedback-invite"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: "easeOut" }}
+        >
+          <strong>Wat vonden jullie van Karrie? 💛</strong>
+          <p>Met jouw feedback maken we boodschappen doen nóg leuker!</p>
+          <div className="feedback-invite-actions">
+            <a className="pbtn pbtn-secondary pbtn-m pbtn-wide" href={feedbackUrl("completed")} target="_blank" rel="noopener noreferrer" data-testid="feedback-open" onClick={askFeedback}>
+              Geef feedback
+            </a>
+            <PressButton variant="quiet" wide data-testid="feedback-later" onClick={askFeedback}>
+              Niet nu
+            </PressButton>
+          </div>
+        </motion.aside>
+      )}
 
       <div className="complete-actions">
         <PressButton
