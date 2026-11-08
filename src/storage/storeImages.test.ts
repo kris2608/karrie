@@ -28,10 +28,10 @@ describe("picture order", () => {
   const all: ArtCandidates = { off: "off", prijsprofeet: "pp", reference: "ref", parent: "mine" };
   const drop = (...sources: (keyof ArtCandidates)[]) => Object.fromEntries(Object.entries(all).filter(([key]) => !sources.includes(key as keyof ArtCandidates)));
 
-  it("uses Open Food Facts, then PrijsProfeet, then a reference, then the parent's photo, then the drawing", () => {
-    expect(AUTOMATIC_ORDER).toEqual(["off", "prijsprofeet", "name", "reference", "parent"]);
-    expect(pickArt(undefined, all)).toEqual({ source: "off", url: "off" });
-    expect(pickArt(undefined, drop("off"))).toEqual({ source: "prijsprofeet", url: "pp" });
+  it("uses PrijsProfeet, then Open Food Facts, then a reference, then the parent's photo, then the drawing", () => {
+    expect(AUTOMATIC_ORDER).toEqual(["prijsprofeet", "off", "name", "reference", "parent"]);
+    expect(pickArt(undefined, all)).toEqual({ source: "prijsprofeet", url: "pp" });
+    expect(pickArt(undefined, drop("prijsprofeet"))).toEqual({ source: "off", url: "off" });
     expect(pickArt(undefined, drop("off", "prijsprofeet"))).toEqual({ source: "reference", url: "ref" });
     expect(pickArt(undefined, { parent: "mine" })).toEqual({ source: "parent", url: "mine" });
     expect(pickArt(undefined, {})).toBeNull();
@@ -52,14 +52,17 @@ describe("picture order", () => {
 });
 
 describe("which products look for a retailer photo", () => {
-  it("only scanned packs without an Open Food Facts photo; generic products keep their drawing", () => {
+  it("looks up a retailer photo for every scanned EAN, including packs that already have an Open Food Facts photo", () => {
     expect(wantsStoreImage(scanned())).toBe(true);
-    expect(wantsStoreImage(scanned(OFF))).toBe(false);
+    expect(wantsStoreImage(scanned(OFF))).toBe(true);
     expect(wantsStoreImage(item({}))).toBe(false);
     expect(wantsStoreImage(item({ ean: EAN, kind: "custom_generic" }))).toBe(false);
     expect(wantsStoreImage(scanned({ photoId: "p1", imageKind: "photo", imageSource: "parent" }))).toBe(true);
-    const adventure = { phase: "draft", items: [scanned(), scanned({ id: "2" }), scanned({ id: "3", ean: "8718166011021", ...OFF }), item({ id: "4" })] } as unknown as Adventure;
-    expect(wantedStoreImages(adventure)).toEqual([EAN]);
+    const adventure = {
+      phase: "draft",
+      items: [scanned(), scanned({ id: "2" }), scanned({ id: "3", ean: "8718166011021", ...OFF }), item({ id: "4" })],
+    } as unknown as Adventure;
+    expect(wantedStoreImages(adventure)).toEqual([EAN, "8718166011021"]);
     expect(wantedStoreImages({ ...adventure, phase: "done" })).toEqual([]);
   });
 

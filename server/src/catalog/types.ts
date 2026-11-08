@@ -2,6 +2,7 @@ import type { BarcodeAnswer, BarcodeProduct, BarcodeStatus } from "../barcode.js
 import type { Candidate } from "../candidates.js";
 import type { NameAnswer } from "../nameImage.js";
 import type { Packaging, Size } from "../productName.js";
+import type { PackEvidence, PackSummary } from "./pack.js";
 
 export type CatalogConfidence = "off-exact" | "off-partial" | "web-page";
 export type CatalogUsageStatus = "cc_by_sa" | "link_only" | "unavailable";
@@ -14,6 +15,8 @@ export type StoredBarcodeHit = {
   stale: boolean;
   variantId: string;
   productId: string;
+  pack: PackSummary;
+  storeImage?: StoreImageInput;
 };
 
 export type StoredNameHit = {
@@ -61,6 +64,14 @@ export type StoreImageInput = {
   imageUrl: string;
   retailer: string;
   sourceUrl?: string;
+  quantity?: string;
+  productName?: string;
+  brand?: string;
+};
+
+export type ParentPackInput = {
+  ean: string;
+  quantity: string;
 };
 
 export type ApproveCandidateInput = Candidate;
@@ -90,6 +101,9 @@ export type CatalogStore = {
   upsertNameImages: (input: UpsertNameImagesInput) => Promise<void>;
   upsertStoreImage: (input: StoreImageInput) => Promise<void>;
   storeImageByGtin: (ean: string) => Promise<StoreImageInput | null>;
+  recordParentPack: (input: ParentPackInput) => Promise<PackSummary | null>;
+  packForGtin: (ean: string) => Promise<PackSummary>;
+  repairPackConflicts: () => Promise<number>;
   cacheGet: <T>(key: string) => Promise<T | null>;
   cachePut: (key: string, kind: string, payload: unknown, expiresAt: number) => Promise<void>;
   changesSince: (since: string | null, limit: number) => Promise<{ products: CatalogChange[]; next: string | null }>;
@@ -103,3 +117,5 @@ export type CatalogStore = {
 
 export type DisabledCatalog = { enabled: false; stats: () => CatalogStats };
 export type Catalog = CatalogStore | DisabledCatalog;
+
+export type { PackEvidence, PackSummary };

@@ -79,6 +79,34 @@ describe("barcode lookup on the device", () => {
     expect(down.cache.size).toBe(0);
   });
 
+  it("soft-revalidates a cached found answer after six hours when online", async () => {
+    const { lookup, requests, advance } = setup(ok(OFF_ANSWER));
+    await lookup(CALVE, []);
+    expect(requests).toHaveLength(1);
+    advance(BARCODE_CLIENT_RULES.revalidateAfterMs + 1);
+    expect(await lookup(CALVE, [])).toMatchObject({ status: "found", cached: true });
+    await Promise.resolve();
+    expect(requests).toHaveLength(2);
+  });
+
+  it("expires a conflicted pack answer after the short TTL", async () => {
+    const conflicted = {
+      ...OFF_ANSWER,
+      pack: {
+        conflict: true,
+        sources: [
+          { source: "openfoodfacts", quantityRaw: "220 ml", quantityMl: 220 },
+          { source: "prijsprofeet", quantityRaw: "1 l", quantityMl: 1000 },
+        ],
+      },
+    };
+    const { lookup, requests, advance } = setup(ok(conflicted));
+    await lookup(CALVE, []);
+    advance(BARCODE_CLIENT_RULES.conflictTtlMs + 1);
+    await lookup(CALVE, []);
+    expect(requests).toHaveLength(2);
+  });
+
   it("reports limits and offline, keeps an old answer when the server cannot be reached and rejects invalid codes", async () => {
     const limited = setup(() => new Response(JSON.stringify({ status: "error", code: "rate-limited" }), { status: 429 }));
     expect(await limited.lookup(CALVE, [])).toMatchObject({ status: "limit", code: "rate-limited" });

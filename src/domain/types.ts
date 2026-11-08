@@ -27,8 +27,8 @@ export type Product = {
 
 export type ImageKind = "generic" | "photo";
 
-/** The parent's choice of picture; undefined lets a found reference picture win over the photo, then the drawing. */
-export type ImageChoice = "reference" | "photo" | "drawing";
+/** The parent's choice of picture; undefined lets automatic order pick. "off" is the Open Food Facts front photo. */
+export type ImageChoice = "reference" | "photo" | "drawing" | "off";
 
 /** How the product itself was identified. "off": Open Food Facts by barcode; "barcode": a web page that prints the barcode. */
 export type ItemSource = "catalog" | "manual" | "off" | "barcode" | "vision" | "user_created";
@@ -116,6 +116,8 @@ export type PackInfo = {
   nutrition?: Nutrition;
   offAttribution?: boolean;
   barcode?: BarcodeInfo;
+  /** Unresolved pack-size disagreement between sources; cleared when the parent confirms. */
+  packConflict?: { choices: string[]; raw: string[] };
   fieldSources?: FieldSources;
   recognition?: Recognition;
   alternative?: AlternativeAssessment;

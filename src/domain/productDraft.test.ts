@@ -46,6 +46,26 @@ const PHOTO: RecognizedProduct = {
 };
 
 describe("merging barcode, photo and my products", () => {
+  it("surfaces a pack-size conflict without blocking Nutri-Score", () => {
+    const draft = mergeDraft({
+      ean: CALVE,
+      barcode: {
+        ...OFF,
+        pack: {
+          conflict: true,
+          sources: [
+            { source: "openfoodfacts", quantityRaw: "220 ml", quantityMl: 220 },
+            { source: "prijsprofeet", quantityRaw: "1 l", quantityMl: 1000 },
+          ],
+        },
+      },
+    });
+    expect(draft.packConflict).toEqual({ raw: ["220 ml", "1 l"], choices: ["220 ml", "1 liter"] });
+    expect(draft.pack.packConflict).toEqual(draft.packConflict);
+    expect(draft.pack.nutrition?.nutriscore).toBe("c");
+    expect(draft.unsure).toBe(true);
+  });
+
   it("a complete Open Food Facts record needs no photo and keeps each field's source", () => {
     const draft = mergeDraft({ ean: CALVE, barcode: OFF });
     expect(draft).toMatchObject({ name: "Pindakaas", ean: CALVE, recognized: true, unsure: false, keepPhoto: true, imageUrl: OFF.product.imageUrl, match: { id: "pindakaas" } });

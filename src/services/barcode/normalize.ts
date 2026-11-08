@@ -17,7 +17,41 @@ export type BarcodeSource =
 
 export type FoundStatus = "off-exact" | "off-partial" | "web-page";
 
-export type BarcodeAnswer = { ean: string; status: FoundStatus; product: BarcodeProduct; source: BarcodeSource; at: number } | { ean: string; status: "none"; at: number };
+export type PackEvidence = {
+  source: "openfoodfacts" | "prijsprofeet" | "parent_unverified";
+  quantityRaw?: string;
+  quantityMl?: number;
+  productName?: string;
+  brand?: string;
+};
+
+export type PackSummary = {
+  sources: PackEvidence[];
+  conflict: boolean;
+  displayQuantity?: string;
+};
+
+export type StoreImageHint = {
+  ean: string;
+  imageUrl: string;
+  retailer: string;
+  sourceUrl?: string;
+  quantity?: string;
+  productName?: string;
+  brand?: string;
+};
+
+export type BarcodeAnswer =
+  | {
+      ean: string;
+      status: FoundStatus;
+      product: BarcodeProduct;
+      source: BarcodeSource;
+      at: number;
+      pack?: PackSummary;
+      storeImage?: StoreImageHint;
+    }
+  | { ean: string; status: "none"; at: number };
 
 const PER100 = ["energyKcal", "fat", "saturatedFat", "sugars", "fibre", "protein", "salt"] as const;
 
@@ -82,5 +116,60 @@ export function cleanAnswer(value: unknown, ean: string): BarcodeAnswer | null {
   if (!from || (!found.name && !found.imageUrl)) return null;
   if ((raw.status === "web-page") !== (from.kind === "web")) return null;
   if (from.kind === "web") delete found.imageUrl;
-  return { ean, status: raw.status, product: found, source: from, at: raw.at };
+  const pack = cleanPack(raw.pack);
+  const storeImage = cleanStoreHint(raw.storeImage, ean);
+  if (pack?.displayQuantity) found.quantity = pack.displayQuantity;
+  else if (pack?.conflict) delete found.quantity;
+  return {
+    ean,
+    status: raw.status,
+    product: found,
+    source: from,
+    at: raw.at,
+    ...(pack && { pack }),
+    ...(storeImage && { storeImage }),
+  };
+}
+
+function cleanPack(value: unknown): PackSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const sources = Array.isArray(raw.sources)
+    ? raw.sources.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const row = entry as Record<string, unknown>;
+        if (row.source !== "openfoodfacts" && row.source !== "prijsprofeet" && row.source !== "parent_unverified") return [];
+        return [
+          {
+            source: row.source,
+            ...(text(row.quantityRaw, 24) && { quantityRaw: text(row.quantityRaw, 24) }),
+            ...(typeof row.quantityMl === "number" && Number.isFinite(row.quantityMl) && { quantityMl: row.quantityMl }),
+            ...(text(row.productName, 80) && { productName: text(row.productName, 80) }),
+            ...(text(row.brand, 40) && { brand: text(row.brand, 40) }),
+          } satisfies PackEvidence,
+        ];
+      })
+    : [];
+  return {
+    sources,
+    conflict: raw.conflict === true,
+    ...(text(raw.displayQuantity, 24) && { displayQuantity: text(raw.displayQuantity, 24) }),
+  };
+}
+
+function cleanStoreHint(value: unknown, ean: string): StoreImageHint | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const imageUrl = https(raw.imageUrl);
+  const retailer = text(raw.retailer, 40);
+  if (!imageUrl || !retailer) return undefined;
+  return {
+    ean,
+    imageUrl,
+    retailer,
+    ...(https(raw.sourceUrl) && { sourceUrl: https(raw.sourceUrl) }),
+    ...(text(raw.quantity, 24) && { quantity: text(raw.quantity, 24) }),
+    ...(text(raw.productName, 80) && { productName: text(raw.productName, 80) }),
+    ...(text(raw.brand, 40) && { brand: text(raw.brand, 40) }),
+  };
 }

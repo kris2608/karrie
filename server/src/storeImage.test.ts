@@ -36,7 +36,14 @@ describe("store image lookup", () => {
     expect(await createStoreImageLookup(exact, () => NOW).find(EAN)).toEqual({
       ok: true,
       cached: false,
-      image: { ean: EAN, imageUrl: IMAGE, retailer: "albert_heijn", sourceUrl: row().sourceUrl },
+      image: {
+        ean: EAN,
+        imageUrl: IMAGE,
+        retailer: "albert_heijn",
+        sourceUrl: row().sourceUrl,
+        productName: "De Ruijter Kleintjes hagelslag",
+        brand: "De Ruijter",
+      },
     });
   });
 
@@ -124,7 +131,17 @@ describe("POST /api/images/ean", () => {
     const { post, base } = await start(() => ({ ok: true, rows: [row()] }));
     const response = await post({ ean: EAN });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "ok", image: { ean: EAN, imageUrl: IMAGE, retailer: "albert_heijn", sourceUrl: row().sourceUrl } });
+    expect(await response.json()).toEqual({
+      status: "ok",
+      image: {
+        ean: EAN,
+        imageUrl: IMAGE,
+        retailer: "albert_heijn",
+        sourceUrl: row().sourceUrl,
+        productName: "De Ruijter Kleintjes hagelslag",
+        brand: "De Ruijter",
+      },
+    });
     const health = await (await fetch(`${base}/api/health`)).json();
     expect(health.storeImages.outcomes).toEqual({ "found-albert_heijn": 1 });
     expect(JSON.stringify(logs)).not.toContain("static.ah.nl");
