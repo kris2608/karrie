@@ -1,4 +1,5 @@
 import { DEFAULT_CATEGORY_ORDER } from "../domain/categories";
+import { houseBrandRetailer } from "../domain/retailers";
 import { sortByCategory } from "../domain/shopQueue";
 import type {
   Adventure,
@@ -44,6 +45,7 @@ const PACK_KEYS = [
   "illustrationId",
   "illustration",
   "namePhoto",
+  "privateLabelRetailer",
 ] as const;
 const IMAGE_KEYS = ["imageUrl", "photoId", "imageKind", "imageSource", "imageChoice"] as const;
 
@@ -90,6 +92,7 @@ export type VisionPack = {
 
 export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
   const offImage = photoId ? undefined : vision.imageUrl;
+  const privateLabelRetailer = houseBrandRetailer(vision.brand, vision.recognition?.genericName);
   return packOf({
     ean: vision.ean,
     brand: vision.brand,
@@ -106,6 +109,7 @@ export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
     recognition: vision.recognition,
     alternative: vision.alternative,
     packConflict: vision.packConflict,
+    ...(privateLabelRetailer && { privateLabelRetailer }),
   });
 }
 

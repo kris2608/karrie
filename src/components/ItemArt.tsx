@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
-import { hasOffPhoto, identityOf, nameImageKey, wantsNameImage, wantsReference, wantsStoreImage } from "../domain/imageIdentity";
+import { hasOffPhoto, identityOf, nameImageLookupKey, wantsNameImage, wantsReference, wantsStoreImage } from "../domain/imageIdentity";
 import type { ImageSource, NamePhoto, PackInfo } from "../domain/types";
 import type { StoreImage } from "../services/images/storeImage";
+import { useAdventure } from "../state/AdventureContext";
 import { useNameAnswer } from "../storage/nameImages";
 import { usePhotoUrl } from "../storage/photos";
 import { useReferenceUrl } from "../storage/references";
@@ -77,7 +78,9 @@ export function useBroken(): (url: string | null | undefined) => string | null {
 
 /** The photo for a typed product: the one the parent picked, else the reliable match from its name lookup. */
 export function useNamePhoto(item: Pick<PackInfo, "ean" | "kind" | "namePhoto"> & { name: string }): NamePhoto | null {
-  const answer = useNameAnswer(wantsNameImage(item) ? nameImageKey(item.name) : undefined);
+  const { adventure } = useAdventure();
+  const key = wantsNameImage(item) ? nameImageLookupKey(item.name, adventure?.retailer) : undefined;
+  const answer = useNameAnswer(key);
   if (!wantsNameImage(item)) return null;
   return item.namePhoto ?? (answer?.classification === "branded" ? answer.match : null);
 }

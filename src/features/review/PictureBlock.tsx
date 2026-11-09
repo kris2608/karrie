@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { markBroken, useArt, useNamePhoto } from "../../components/ItemArt";
-import { hasOffPhoto, identityKey, identityOf, nameImageKey, wantsNameImage, wantsReference, wantsStoreImage } from "../../domain/imageIdentity";
+import { hasOffPhoto, identityKey, identityOf, nameImageLookupKey, wantsNameImage, wantsReference, wantsStoreImage } from "../../domain/imageIdentity";
 import { namePhotoCredit } from "../../services/images/nameImage";
 import { storeCredit } from "../../services/images/storeImage";
-import { useNameAnswer } from "../../storage/nameImages";
+import { nameImages, useNameAnswer } from "../../storage/nameImages";
 import { useStoreImage } from "../../storage/storeImages";
 import type { AdventureItem, ImageChoice, NamePhoto } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
@@ -20,14 +20,16 @@ const STATUS: Record<string, string> = {
 
 /** Parent-only picture controls: which picture the child sees, and where a reference picture came from. */
 export function PictureBlock({ item }: { item: AdventureItem }) {
-  const { settings, dispatch } = useAdventure();
+  const { settings, dispatch, adventure } = useAdventure();
   const identity = identityOf(item);
   const offPhoto = hasOffPhoto(item);
   const store = useStoreImage(wantsStoreImage(item) ? item.ean : undefined);
   const { pick: art, name: namePhoto } = useArt(item);
   const named = useNamePhoto(item);
-  const answer = useNameAnswer(wantsNameImage(item) ? nameImageKey(item.name) : undefined);
+  const nameKey = wantsNameImage(item) ? nameImageLookupKey(item.name, adventure?.retailer) : undefined;
+  const answer = useNameAnswer(nameKey);
   const others = answer?.classification === "branded" ? [answer.match, ...answer.alternatives].filter((photo): photo is NamePhoto => Boolean(photo)) : [];
+  const privateLabels = answer?.privateLabelAlternatives ?? [];
   const wanted = wantsReference(identity, item.imageChoice, offPhoto, Boolean(store || named));
   const entry = useReference(identity);
   const shown = wanted ? shownImage(entry) : null;
@@ -37,6 +39,9 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   useEffect(() => {
     if (settings.referenceImages && wanted) references.request(identity);
   }, [key, wanted, settings.referenceImages]);
+  useEffect(() => {
+    if (nameKey) nameImages.request(nameKey);
+  }, [nameKey]);
   const candidates = wanted ? (entry?.discovery?.candidates ?? []) : [];
   const active: ImageChoice =
     item.imageChoice ??
@@ -63,7 +68,7 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
     { id: "drawing", label: "Tekening", show: true },
   ];
 
-  if (!identity || (!settings.referenceImages && !entry && !store && !named && !others.length)) return null;
+  if (!identity || (!settings.referenceImages && !entry && !store && !named && !others.length && !privateLabels.length)) return null;
   const chosenName = named?.imageUrl;
 
   return (
@@ -111,25 +116,77 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
         </div>
       )}
 
-      {others.length > 1 && (
-        <div className="picture-candidates" role="group" aria-label="Andere foto's van dit merk" data-testid="name-photos">
-          {others.map((photo) => (
-            <button
-              key={photo.imageUrl}
-              type="button"
-              className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
-              aria-pressed={photo.imageUrl === chosenName}
-              aria-label={photo.productName}
-              title={photo.productName}
-              data-testid="name-photo"
-              onClick={() => {
-                dispatch({ type: "choose-name-photo", productId: item.productId, photo });
-                choose("reference");
-              }}
-            >
-              <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
-            </button>
-          ))}
+      {(others.length > 1 || privateLabels.length > 0) && (
+        <div className="picture-variants" data-testid="picture-variants">
+          <p className="sheet-note">Andere productfoto of variant</p>
+          {others.length > 1 && (
+            <div className="picture-candidates" role="group" aria-label="Andere foto's van dit merk" data-testid="name-photos">
+              {others.map((photo) => (
+                <button
+                  key={photo.imageUrl}
+                  type="button"
+                  className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
+                  aria-pressed={photo.imageUrl === chosenName}
+                  aria-label={photo.productName}
+                  title={photo.productName}
+                  data-testid="name-photo"
+                  onClick={() => {
+                    dispatch({ type: "choose-name-photo", productId: item.productId, photo });
+                    choose("reference");
+                  }}
+                >
+                  <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
+                </button>
+              ))}
+            </div>
+          )}
+          {privateLabels.length > 0 && (
+            <div className="picture-candidates" role="group" aria-label="Huismerk van deze winkel" data-testid="private-label-photos">
+              {privateLabels.map((photo) => (
+                <button
+                  key={photo.imageUrl}
+                  type="button"
+                  className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
+                  aria-pressed={photo.imageUrl === chosenName}
+                  aria-label={photo.productName}
+                  title={photo.productName}
+                  data-testid="private-label-photo"
+                  onClick={() => {
+                    dispatch({ type: "choose-name-photo", productId: item.productId, photo });
+                    choose("reference");
+                  }}
+                >
+                  <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
+                </button>
+              ))}
+            </div>
+          )}
+          {privateLabels.length > 0 && (
+            <div className="picture-actions">
+              {privateLabels.slice(0, 1).map((photo) => (
+                <button
+                  key={`adopt-${photo.imageUrl}`}
+                  type="button"
+                  className="text-button"
+                  data-testid="adopt-private-label"
+                  onClick={() => {
+                    if (!adventure?.retailer) return;
+                    dispatch({
+                      type: "adopt-commercial",
+                      itemId: item.id,
+                      name: photo.productName.slice(0, 40),
+                      brand: photo.productName.split(" ")[0],
+                      privateLabelRetailer: adventure.retailer,
+                      photo,
+                    });
+                    choose("reference");
+                  }}
+                >
+                  Gebruik dit huismerkproduct
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

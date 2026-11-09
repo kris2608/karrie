@@ -1,3 +1,4 @@
+import { isRetailer, type RetailerId } from "./retailers";
 import { parseName, sizeLabel } from "./typedName";
 import type { PackInfo } from "./types";
 
@@ -58,6 +59,21 @@ export function wantsNameImage(item: Pick<PackInfo, "ean" | "kind">): boolean {
 /** One lookup per typed name, whatever its capitals or spacing; packaging and sizes stay part of it. */
 export function nameImageKey(name: string): string {
   return name.replace(/\s+/g, " ").trim().toLocaleLowerCase("nl");
+}
+
+const RETAILER_MARK = "|r|";
+
+/** Device cache key: brand/generic answers stay reusable; with a retailer, private-label suggestions stay isolated. */
+export function nameImageLookupKey(name: string, retailer?: RetailerId): string {
+  const base = nameImageKey(name);
+  return retailer ? `${base}${RETAILER_MARK}${retailer}` : base;
+}
+
+export function parseNameImageLookupKey(key: string): { name: string; retailer?: RetailerId } {
+  const at = key.lastIndexOf(RETAILER_MARK);
+  if (at < 0) return { name: key };
+  const retailer = key.slice(at + RETAILER_MARK.length);
+  return isRetailer(retailer) ? { name: key.slice(0, at), retailer } : { name: key };
 }
 
 /**

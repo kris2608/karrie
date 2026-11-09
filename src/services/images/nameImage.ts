@@ -1,4 +1,5 @@
 import { CATEGORIES } from "../../domain/categories";
+import { parseNameImageLookupKey } from "../../domain/imageIdentity";
 import { isRetailer, retailerName, type RetailerId } from "../../domain/retailers";
 import type { CategoryId, NamePhoto } from "../../domain/types";
 import type { LookupOutcome } from "../../storage/lookupStore";
@@ -16,6 +17,8 @@ export type NameAnswer = {
   variant?: string;
   match: NamePhoto | null;
   alternatives: NamePhoto[];
+  /** Private-label examples for the shopping supermarket only; never other chains. */
+  privateLabelAlternatives?: NamePhoto[];
   category?: CategoryId;
 };
 
@@ -74,6 +77,10 @@ export function cleanNameAnswer(value: unknown): NameAnswer | null {
     .slice(0, NAME_IMAGE_CLIENT_RULES.alternatives)
     .map(cleanNamePhoto)
     .filter((photo): photo is NamePhoto => Boolean(photo));
+  const privateLabelAlternatives = (Array.isArray(raw.privateLabelAlternatives) ? raw.privateLabelAlternatives : [])
+    .slice(0, NAME_IMAGE_CLIENT_RULES.alternatives)
+    .map(cleanNamePhoto)
+    .filter((photo): photo is NamePhoto => Boolean(photo));
   const category = typeof raw.category === "string" && CATEGORY_IDS.has(raw.category) ? (raw.category as CategoryId) : undefined;
   const branded = raw.classification === "branded" && Boolean(brand);
   return {
@@ -82,6 +89,7 @@ export function cleanNameAnswer(value: unknown): NameAnswer | null {
     ...(branded && variant && { variant }),
     match: branded ? match : null,
     alternatives: branded ? alternatives : [],
+    ...(privateLabelAlternatives.length > 0 && { privateLabelAlternatives }),
     ...(category && { category }),
   };
 }
@@ -98,16 +106,17 @@ const UNKNOWN: NameAnswer = { classification: "unknown", match: null, alternativ
 
 export function createNameImageClient(deps: NameImageClientDeps) {
   return {
-    /** Only the typed product name is sent. */
-    async find(name: string): Promise<NameImageOutcome> {
+    /** Lookup key may include `|r|{retailer}` for private-label scoping (see nameImageLookupKey). */
+    async find(key: string): Promise<NameImageOutcome> {
       if (!deps.online()) return { status: "offline" };
+      const { name, retailer } = parseNameImageLookupKey(key);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), NAME_IMAGE_CLIENT_RULES.timeoutMs);
       try {
         const response = await deps.fetch(`${deps.origin.replace(/\/$/, "")}/api/images/name`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name }),
+          body: JSON.stringify({ name, ...(retailer && { retailer }) }),
           credentials: "omit",
           referrerPolicy: "no-referrer",
           signal: controller.signal,

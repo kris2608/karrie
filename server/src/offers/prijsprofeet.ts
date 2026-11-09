@@ -8,19 +8,30 @@ import type { Fetch } from "../images.js";
 export const PRIJSPROFEET_RULES = {
   origin: "https://www.prijsprofeet.nl",
   pageSize: 20,
+  /** Extra pages for name/image search when page 1 has no adequate match. */
+  maxNamePages: 3,
   timeoutMs: 8_000,
   perMinute: 60,
   eanPerDay: 400,
   maxPauseMs: 10 * 60_000,
 } as const;
 
+/** Supermarkets the parent can pick for shopping lists and offers. */
 export const RETAILERS = ["jumbo", "albert_heijn", "lidl"] as const;
 export type RetailerId = (typeof RETAILERS)[number];
+
+/**
+ * Retailers whose product photos may be used as image sources. Kept separate from the shopping
+ * picker; expand only with validated image hosts (never invent hosts).
+ */
+export const IMAGE_SOURCE_RETAILERS = ["jumbo", "albert_heijn", "lidl"] as const;
+export type ImageSourceRetailerId = (typeof IMAGE_SOURCE_RETAILERS)[number];
 
 /** One promoted product as the app shows it; prices in euros. */
 export type OfferRow = {
   retailer: RetailerId;
   sourceProductId: string;
+  baseProductId?: string;
   productName: string;
   brand?: string;
   ean?: string;
@@ -28,6 +39,8 @@ export type OfferRow = {
   category?: string;
   quantity?: string;
   promotionStatus: string;
+  approximate?: boolean;
+  brandHub?: string;
   promotionalPrice?: number;
   originalPrice?: number;
   unitPrice?: number;
@@ -70,6 +83,7 @@ const day = z.string().regex(/^\d{4}-\d{2}-\d{2}/).nullish().catch(undefined);
 
 const RowSchema = z.object({
   product_id: z.string().min(1).max(200),
+  base_product_id: text,
   name: z.string().trim().min(1).max(300),
   brand: text,
   ean: z.string().regex(/^\d{8,14}$/).nullish().catch(undefined),
@@ -80,7 +94,7 @@ const RowSchema = z.object({
   original_price: amount,
   unit_price: amount,
   unit: text,
-  retailer: z.enum(RETAILERS),
+  retailer: z.enum(IMAGE_SOURCE_RETAILERS),
   promotion_status: z.string().max(40).nullish().catch(undefined),
   promotion_type: text,
   promotional_keywords: z.array(z.string().max(200)).max(20).nullish().catch(undefined),
@@ -94,11 +108,17 @@ const RowSchema = z.object({
   valid_from: day,
   valid_until: day,
   valid_until_estimated: flag,
+  approximate: flag,
+  brand_hub: text,
   product_url: text,
   image_url: z.string().trim().min(1).max(600).nullish().catch(undefined),
 });
 
-const SearchSchema = z.object({ results: z.array(z.unknown()).max(200) });
+const SearchSchema = z.object({
+  results: z.array(z.unknown()).max(200),
+  approximate: flag,
+  brand_hub: text,
+});
 
 type Row = z.infer<typeof RowSchema>;
 
@@ -116,14 +136,14 @@ function httpsUrl(value: string | null | undefined): string | undefined {
   }
 }
 
-/** Where each retailer serves its product photos; anything else in `image_url` is ignored. */
-export const RETAILER_IMAGE_HOSTS: Record<RetailerId, { host: string; path: string }> = {
+/** Where each image-source retailer serves its product photos; anything else in `image_url` is ignored. */
+export const RETAILER_IMAGE_HOSTS: Record<ImageSourceRetailerId, { host: string; path: string }> = {
   albert_heijn: { host: "static.ah.nl", path: "/dam/product/" },
   jumbo: { host: "www.jumbo.com", path: "/dam-images/" },
   lidl: { host: "www.lidl.nl", path: "/assets/" },
 };
 
-export function retailerImage(retailer: RetailerId, value: string | null | undefined): string | undefined {
+export function retailerImage(retailer: ImageSourceRetailerId, value: string | null | undefined): string | undefined {
   const href = httpsUrl(value);
   if (!href) return undefined;
   const url = new URL(href);
@@ -135,6 +155,7 @@ export function toOfferRow(row: Row): OfferRow {
   return defined({
     retailer: row.retailer,
     sourceProductId: row.product_id,
+    baseProductId: row.base_product_id ?? undefined,
     productName: row.name,
     brand: row.brand ?? undefined,
     ean: row.ean ?? undefined,
@@ -142,6 +163,8 @@ export function toOfferRow(row: Row): OfferRow {
     category: row.unified_category ?? undefined,
     quantity: row.quantity ?? undefined,
     promotionStatus: row.promotion_status ?? "unknown",
+    approximate: row.approximate ?? undefined,
+    brandHub: row.brand_hub ?? undefined,
     promotionalPrice: row.price ?? undefined,
     originalPrice: row.original_price ?? undefined,
     unitPrice: row.unit_price ?? undefined,
@@ -183,15 +206,36 @@ export function searchUrl(q: string, retailer: RetailerId): string {
   return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
 }
 
-/** A product photo by barcode: every promotion status and every supported retailer in one call. */
-export function imageSearchUrl(ean: string): string {
-  const params = new URLSearchParams({ q: ean, retailer: RETAILERS.join(","), page_size: String(PRIJSPROFEET_RULES.pageSize) });
+/** A product photo by barcode: every promotion status and every image-source retailer in one call. */
+export function imageSearchUrl(ean: string, page = 1): string {
+  const params = new URLSearchParams({
+    q: ean,
+    retailer: IMAGE_SOURCE_RETAILERS.join(","),
+    page_size: String(PRIJSPROFEET_RULES.pageSize),
+    page: String(page),
+  });
   return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
 }
 
-/** A product photo by typed name: every promotion status and every supported retailer in one call. */
-export function nameSearchUrl(name: string): string {
-  const params = new URLSearchParams({ q: name, retailer: RETAILERS.join(","), page_size: String(PRIJSPROFEET_RULES.pageSize) });
+/** A product photo by typed name: every promotion status and every image-source retailer. */
+export function nameSearchUrl(name: string, page = 1): string {
+  const params = new URLSearchParams({
+    q: name,
+    retailer: IMAGE_SOURCE_RETAILERS.join(","),
+    page_size: String(PRIJSPROFEET_RULES.pageSize),
+    page: String(page),
+  });
+  return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
+}
+
+/** Private-label candidates for one shopping supermarket only. */
+export function privateLabelSearchUrl(name: string, retailer: RetailerId, page = 1): string {
+  const params = new URLSearchParams({
+    q: name,
+    retailer,
+    page_size: String(PRIJSPROFEET_RULES.pageSize),
+    page: String(page),
+  });
   return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
 }
 
@@ -279,10 +323,26 @@ export function createPrijsProfeet(config: PrijsProfeetConfig, fetchImpl: Fetch 
     }
   }
 
+  /** Fetch up to `maxNamePages`, stopping early when `enough` says the rows are adequate. */
+  async function paginated(buildUrl: (page: number) => string, bareEan: boolean, enough?: (rows: OfferRow[]) => boolean): Promise<SearchResult> {
+    const rows: OfferRow[] = [];
+    for (let page = 1; page <= PRIJSPROFEET_RULES.maxNamePages; page += 1) {
+      const answer = await call(buildUrl(page), bareEan && page === 1);
+      if (!answer.ok) return rows.length ? { ok: true, rows } : answer;
+      rows.push(...answer.rows);
+      if (answer.rows.length < PRIJSPROFEET_RULES.pageSize) break;
+      if (enough?.(rows)) break;
+    }
+    return { ok: true, rows };
+  }
+
   return {
     search: (q: string, retailer: RetailerId) => call(searchUrl(q, retailer), isBareEan(q)),
-    searchImage: (ean: string) => call(imageSearchUrl(ean), true),
-    searchName: (name: string) => call(nameSearchUrl(name), isBareEan(name)),
+    searchImage: (ean: string) => paginated((page) => imageSearchUrl(ean, page), true, (rows) => rows.some((row) => row.imageUrl && row.ean)),
+    searchName: (name: string, enough?: (rows: OfferRow[]) => boolean) =>
+      paginated((page) => nameSearchUrl(name, page), isBareEan(name), enough),
+    searchPrivateLabel: (name: string, retailer: RetailerId, enough?: (rows: OfferRow[]) => boolean) =>
+      paginated((page) => privateLabelSearchUrl(name, retailer, page), isBareEan(name), enough),
     stats(): ProviderStats {
       return {
         ...stats,

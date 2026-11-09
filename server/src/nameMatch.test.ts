@@ -240,6 +240,16 @@ describe("name image lookup", () => {
   });
 
   it("maps offer rows without inventing fields", () => {
-    expect(fromOffer({ retailer: "lidl", sourceProductId: "1", productName: "Melk", promotionStatus: "active" })).toEqual({ source: "prijsprofeet", retailer: "lidl", name: "Melk", brands: [] });
+    expect(fromOffer({ retailer: "lidl", sourceProductId: "1", productName: "Melk", promotionStatus: "active" })).toEqual({
+      source: "prijsprofeet",
+      retailer: "lidl",
+      name: "Melk",
+      brands: [],
+      promotionStatus: "active",
+    });
+    expect(fromOffer({ retailer: "albert_heijn", sourceProductId: "2", productName: "AH Hagelslag", brand: "AH", promotionStatus: "unknown", privateLabel: true })).toMatchObject({
+      privateLabel: true,
+      retailer: "albert_heijn",
+    });
   });
 });

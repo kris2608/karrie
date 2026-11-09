@@ -20,3 +20,21 @@ export function retailerName(id: RetailerId): string {
 export function analyticsRetailer(id: RetailerId): "jumbo" | "ah" | "lidl" {
   return id === "albert_heijn" ? "ah" : id;
 }
+
+const HOUSE_BRAND_MARKERS: { match: RegExp; retailer: RetailerId }[] = [
+  { match: /^(ah|albert\s*heijn)\b/i, retailer: "albert_heijn" },
+  { match: /^jumbo\b/i, retailer: "jumbo" },
+  { match: /^lidl\b/i, retailer: "lidl" },
+];
+
+/** Detect an observed private-label chain from a brand or product name; unknown brands return undefined. */
+export function houseBrandRetailer(...parts: (string | undefined)[]): RetailerId | undefined {
+  for (const part of parts) {
+    const text = part?.trim();
+    if (!text) continue;
+    for (const entry of HOUSE_BRAND_MARKERS) {
+      if (entry.match.test(text)) return entry.retailer;
+    }
+  }
+  return undefined;
+}

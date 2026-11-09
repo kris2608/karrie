@@ -11,21 +11,27 @@ function withDraft(): AppState {
 }
 
 describe("supermarket per list", () => {
-  it("sets the supermarket on the list and remembers it as the last one used", () => {
+  it("sets the supermarket on the list without changing the default for new lists", () => {
     const state = reducer(withDraft(), { type: "set-retailer", retailer: "jumbo" });
     expect(state.adventure?.retailer).toBe("jumbo");
-    expect(state.settings.retailer).toBe("jumbo");
+    expect(state.settings).not.toHaveProperty("retailer");
     const cleared = reducer(state, { type: "set-retailer", retailer: null });
     expect(cleared.adventure).not.toHaveProperty("retailer");
     expect(cleared.settings).not.toHaveProperty("retailer");
   });
 
-  it("starts new lists with the last supermarket", () => {
-    let state = reducer(initialState, { type: "set-retailer", retailer: "lidl" });
+  it("starts new lists with the default supermarket from settings", () => {
+    let state = reducer(initialState, { type: "set-default-retailer", retailer: "lidl" });
     expect(state.adventure).toBeNull();
     state = reducer(state, { type: "add-product", product: banaan });
     expect(state.adventure?.retailer).toBe("lidl");
     expect(reducer(state, { type: "new-draft" }).adventure?.retailer).toBe("lidl");
+  });
+
+  it("picking a supermarket before the first product still only touches the list", () => {
+    const state = reducer(initialState, { type: "set-retailer", retailer: "jumbo" });
+    expect(state.adventure?.retailer).toBe("jumbo");
+    expect(state.settings).not.toHaveProperty("retailer");
   });
 
   it("a default chosen in the parent settings starts new lists, without changing the current one", () => {
@@ -36,6 +42,16 @@ describe("supermarket per list", () => {
     const none = reducer(state, { type: "set-default-retailer", retailer: null });
     expect(none.settings).not.toHaveProperty("retailer");
     expect(reducer(none, { type: "new-draft" }).adventure).not.toHaveProperty("retailer");
+  });
+
+  it("reopening a saved list does not overwrite the default supermarket", () => {
+    let state = reducer(withDraft(), { type: "set-default-retailer", retailer: "lidl" });
+    state = reducer(state, { type: "set-retailer", retailer: "jumbo" });
+    state = reducer(state, { type: "save-favorite", name: "Zaterdag", store: "" });
+    const id = state.saved[0].id;
+    state = reducer(state, { type: "open-saved", id });
+    expect(state.adventure?.retailer).toBe("jumbo");
+    expect(state.settings.retailer).toBe("lidl");
   });
 
   it("8. switching supermarket changes every question to the new one", () => {
@@ -58,12 +74,13 @@ describe("supermarket per list", () => {
     expect(state.adventure?.retailer).toBe("jumbo");
   });
 
-  it("9. an older saved list without a supermarket gets the last one used", () => {
+  it("9. an older saved list without a supermarket gets the default from settings", () => {
     let state = reducer(withDraft(), { type: "save-favorite", name: "Oud", store: "" });
     const id = state.saved[0].id;
-    state = reducer(state, { type: "set-retailer", retailer: "albert_heijn" });
+    state = reducer(state, { type: "set-default-retailer", retailer: "albert_heijn" });
     state = reducer(state, { type: "open-saved", id });
     expect(state.adventure?.retailer).toBe("albert_heijn");
+    expect(state.settings.retailer).toBe("albert_heijn");
   });
 
   it("ignores stored supermarkets it does not know", () => {

@@ -135,6 +135,11 @@ export type PackInfo = {
   illustration?: "pending" | "ready" | "none";
   /** A photo of this typed product the parent picked from a name search; only the link and where it came from. */
   namePhoto?: NamePhoto;
+  /**
+   * Set only when the parent explicitly adopted a private-label commercial product, or a scan/vision confirmed
+   * that chain's house brand. An image pick alone never sets this.
+   */
+  privateLabelRetailer?: RetailerId;
 };
 
 /** A link to a photo of a typed product: a retailer's (via PrijsProfeet) or Open Food Facts'. Never a barcode match. */

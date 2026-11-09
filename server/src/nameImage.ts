@@ -1,8 +1,10 @@
 import type { CatalogStore } from "./catalog/types.js";
-import { matchName, words, type NameImage, type NameMatch, type NameRow } from "./nameMatch.js";
+import { matchName, privateLabelImages, words, type NameImage, type NameMatch, type NameRow } from "./nameMatch.js";
 import type { OffSearch } from "./offSearch.js";
-import type { OfferRow, PrijsProfeet } from "./offers/prijsprofeet.js";
+import type { OfferRow, PrijsProfeet, RetailerId } from "./offers/prijsprofeet.js";
 import { parseName } from "./productName.js";
+
+export type NameLookupOptions = { retailer?: RetailerId };
 
 /**
  * A picture for a product a parent typed: PrijsProfeet first, then Open Food Facts, with the same rules for both.
@@ -36,7 +38,15 @@ export function fromOffer(row: OfferRow): NameRow {
     ...(row.sourceUrl && { sourceUrl: row.sourceUrl }),
     ...(row.ean && { ean: row.ean }),
     ...(row.category && { category: row.category }),
+    ...(row.privateLabel === true && { privateLabel: true }),
+    ...(row.promotionStatus && { promotionStatus: row.promotionStatus }),
   };
+}
+
+/** Cache key for retailer-scoped private-label suggestions. */
+export function privateLabelKey(retailer: string, typed: string): string | null {
+  const key = nameKey(typed);
+  return key ? `private-label|${retailer}|${key}` : null;
 }
 
 /** One cache entry for "Chocomel", "chocomel" and "Chocomél"; packaging and size are part of what was asked. */
@@ -48,11 +58,12 @@ export function nameKey(typed: string): string | null {
 
 const outcomeOf = (match: NameMatch): Outcome => (match.match ? "match" : match.classification === "branded" ? "brand" : "none");
 
-function combine(first: NameMatch, second: NameMatch | null, searched: NameAnswer["searched"]): NameAnswer {
+function combine(first: NameMatch, second: NameMatch | null, searched: NameAnswer["searched"], privateLabels?: NameImage[]): NameAnswer {
   const branded = first.classification === "branded" ? first : second?.classification === "branded" ? second : null;
   const seen = new Set<string>();
   const alternatives: NameImage[] = [];
   for (const image of [...first.alternatives, ...(second?.alternatives ?? [])]) {
+    if (image.privateLabel) continue;
     if (seen.has(image.imageUrl) || image.imageUrl === (first.match ?? second?.match)?.imageUrl) continue;
     seen.add(image.imageUrl);
     alternatives.push(image);
@@ -63,6 +74,7 @@ function combine(first: NameMatch, second: NameMatch | null, searched: NameAnswe
     ...(branded?.variant && { variant: branded.variant }),
     match: first.match ?? second?.match ?? null,
     alternatives: alternatives.slice(0, NAME_IMAGE_RULES.alternatives),
+    ...(privateLabels && privateLabels.length > 0 && { privateLabelAlternatives: privateLabels }),
     ...((first.category ?? second?.category) && { category: first.category ?? second?.category }),
     searched,
   };
@@ -72,12 +84,13 @@ type Entry = { result: NameImageResult; until: number };
 type Rows = { rows: NameRow[]; failed?: "limit" | "unavailable" };
 
 export function createNameImageLookup(
-  providers: { prijsProfeet?: Pick<PrijsProfeet, "searchName">; off?: Pick<OffSearch, "search"> },
+  providers: { prijsProfeet?: Pick<PrijsProfeet, "searchName" | "searchPrivateLabel">; off?: Pick<OffSearch, "search"> },
   now: () => number = Date.now,
   catalog?: Pick<CatalogStore, "byAlias" | "upsertNameImages" | "cacheGet" | "cachePut" | "rememberSeen">,
 ) {
   const cache = new Map<string, Entry>();
   const pending = new Map<string, Promise<NameImageResult>>();
+  const plCache = new Map<string, { images: NameImage[]; until: number }>();
   const rows = new Map<string, { answer: Rows; until: number }>();
   const loading = new Map<string, Promise<Rows>>();
   const stats = { hits: 0, misses: 0 };
@@ -108,14 +121,32 @@ export function createNameImageLookup(
     return promise;
   }
 
-  function prijsProfeetRows(query: string): Promise<Rows> {
+  function prijsProfeetRows(query: string, typed: string): Promise<Rows> {
     const provider = providers.prijsProfeet;
     if (!provider) return Promise.resolve({ rows: [] });
     return rowsOnce(`pp|${query}`, async () => {
-      const answer = await provider.searchName(query);
+      const answer = await provider.searchName(query, (collected) => Boolean(matchName(typed, collected.map(fromOffer)).match));
       if (!answer.ok) return { rows: [], failed: answer.code === "unavailable" ? "unavailable" : "limit" };
       return { rows: answer.rows.map(fromOffer) };
     });
+  }
+
+  async function loadPrivateLabels(typed: string, retailer: RetailerId, seed: NameRow[]): Promise<NameImage[]> {
+    const key = privateLabelKey(retailer, typed);
+    if (!key) return [];
+    const hit = plCache.get(key);
+    if (hit && hit.until > now()) return hit.images;
+    let images = privateLabelImages(typed, seed, retailer);
+    if (images.length === 0 && providers.prijsProfeet?.searchPrivateLabel) {
+      const answer = await providers.prijsProfeet.searchPrivateLabel(words(parseName(typed)!.base).join(" "), retailer, (collected) =>
+        privateLabelImages(typed, collected.map(fromOffer), retailer).length > 0,
+      );
+      if (answer.ok) images = privateLabelImages(typed, answer.rows.map(fromOffer), retailer);
+    }
+    plCache.delete(key);
+    if (plCache.size >= NAME_IMAGE_RULES.cacheEntries) plCache.delete(plCache.keys().next().value as string);
+    plCache.set(key, { images, until: now() + (images.length ? NAME_IMAGE_RULES.foundTtlMs : NAME_IMAGE_RULES.missTtlMs) });
+    return images;
   }
 
   function offRows(query: string): Promise<Rows> {
@@ -147,18 +178,22 @@ export function createNameImageLookup(
     return null;
   }
 
-  async function fresh(typed: string, key: string): Promise<NameImageResult> {
+  async function fresh(typed: string, key: string, retailer?: RetailerId): Promise<NameImageResult> {
     const central = await fromCatalog(typed, key);
-    if (central) return central;
+    if (central) {
+      if (!retailer || !central.ok) return central;
+      const labels = await loadPrivateLabels(typed, retailer, []);
+      return { ...central, answer: { ...central.answer, ...(labels.length > 0 && { privateLabelAlternatives: labels }) } };
+    }
     const parsed = parseName(typed)!;
     const query = words(parsed.base).join(" ");
-    const first = await prijsProfeetRows(query);
+    const first = await prijsProfeetRows(query, typed);
     if (first.failed === "limit") return { ok: false, code: "limit" };
     let found = first.rows;
     let matched = matchName(typed, found);
     const brandWord = query.split(" ")[0];
     if (!first.failed && matched.classification === "unknown" && query.includes(" ")) {
-      const again = await prijsProfeetRows(brandWord);
+      const again = await prijsProfeetRows(brandWord, typed);
       if (again.failed === "limit") return { ok: false, code: "limit" };
       found = [...found, ...again.rows];
       matched = matchName(typed, found);
@@ -176,18 +211,21 @@ export function createNameImageLookup(
         offPaused = off.failed === "limit";
       }
     }
-    const answer = combine(matched, second, searched);
-    if (!answer.match && (searched.prijsprofeet === "error" || searched.off === "error")) {
+    const labels = retailer ? await loadPrivateLabels(typed, retailer, found) : undefined;
+    const answer = combine(matched, second, searched, labels);
+    if (!answer.match && (searched.prijsprofeet === "error" || searched.off === "error") && !(labels && labels.length)) {
       const result: NameImageResult = { ok: false, code: "unavailable" };
       /** Our own pause on Open Food Facts asked nothing; the next request may try again. */
       if (searched.prijsprofeet === "error" || !offPaused) remember(key, result, NAME_IMAGE_RULES.errorTtlMs);
       return result;
     }
+    const storeable: NameAnswer = { ...answer };
+    delete storeable.privateLabelAlternatives;
     const ttl = answer.match ? NAME_IMAGE_RULES.foundTtlMs : NAME_IMAGE_RULES.missTtlMs;
-    remember(key, { ok: true, answer, cached: false }, ttl);
+    remember(key, { ok: true, answer: storeable, cached: false }, ttl);
     if (catalog) {
-      void catalog.cachePut(`name:${key}`, "name", answer, now() + ttl);
-      if (answer.match) void catalog.upsertNameImages({ typed, answer });
+      void catalog.cachePut(`name:${key}`, "name", storeable, now() + ttl);
+      if (storeable.match) void catalog.upsertNameImages({ typed, answer: storeable });
     }
     return { ok: true, answer, cached: false };
   }
@@ -200,20 +238,33 @@ export function createNameImageLookup(
     return entry.result.ok ? { ...entry.result, cached: true } : entry.result;
   }
 
+  async function withPrivateLabels(typed: string, result: NameImageResult, retailer?: RetailerId): Promise<NameImageResult> {
+    if (!retailer || !result.ok) return result;
+    const labels = await loadPrivateLabels(typed, retailer, []);
+    if (!labels.length) return result;
+    return { ...result, answer: { ...result.answer, privateLabelAlternatives: labels } };
+  }
+
   return {
     cached,
-    find(typed: string): Promise<NameImageResult> {
+    find(typed: string, options: NameLookupOptions = {}): Promise<NameImageResult> {
       const key = nameKey(typed);
-      if (!key) return Promise.resolve({ ok: true, answer: { classification: "unknown", match: null, alternatives: [], searched: { prijsprofeet: "skipped", off: "skipped" } }, cached: false });
+      if (!key) {
+        return Promise.resolve({
+          ok: true,
+          answer: { classification: "unknown", match: null, alternatives: [], searched: { prijsprofeet: "skipped", off: "skipped" } },
+          cached: false,
+        });
+      }
       const known = cached(typed);
       if (known) {
         stats.hits += 1;
-        return Promise.resolve(known);
+        return withPrivateLabels(typed, known, options.retailer);
       }
       const running = pending.get(key);
-      if (running) return running;
+      if (running) return running.then((result) => withPrivateLabels(typed, result, options.retailer));
       stats.misses += 1;
-      const promise = fresh(typed, key).finally(() => pending.delete(key));
+      const promise = fresh(typed, key, options.retailer).finally(() => pending.delete(key));
       pending.set(key, promise);
       return promise;
     },

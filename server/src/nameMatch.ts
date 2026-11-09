@@ -21,6 +21,9 @@ export type NameRow = {
   sourceUrl?: string;
   ean?: string;
   category?: string;
+  /** Only true when the source marked it; missing/false is never treated as a house brand here. */
+  privateLabel?: boolean;
+  promotionStatus?: string;
 };
 
 export type NameImage = {
@@ -34,6 +37,7 @@ export type NameImage = {
   retailer?: RetailerId;
   sourceUrl?: string;
   confidence: "high" | "medium";
+  privateLabel?: boolean;
 };
 
 export type NameMatch = {
@@ -43,6 +47,8 @@ export type NameMatch = {
   variant?: string;
   match: NameImage | null;
   alternatives: NameImage[];
+  /** Private-label alternatives for the shopping supermarket, when requested. */
+  privateLabelAlternatives?: NameImage[];
   category?: ProductCategory;
 };
 
@@ -395,8 +401,10 @@ function judge(row: NameRow, brand: string[], requested: string[], parsed: Parse
 }
 
 function order(a: Judged, b: Judged): number {
+  const promo = (row: NameRow) => (row.promotionStatus === "active" ? 1 : 0);
   return (
     b.score - a.score ||
+    promo(a.row) - promo(b.row) ||
     (RETAILER_RANK[a.row.retailer ?? ""] ?? 3) - (RETAILER_RANK[b.row.retailer ?? ""] ?? 3) ||
     a.row.name.length - b.row.name.length ||
     a.row.name.localeCompare(b.row.name)
@@ -412,8 +420,35 @@ function imageOf(row: NameRow, confidence: NameImage["confidence"], brand: strin
     imageUrl: row.imageUrl!,
     ...(row.retailer && { retailer: row.retailer }),
     ...(row.sourceUrl && { sourceUrl: row.sourceUrl }),
+    ...(row.privateLabel === true && { privateLabel: true }),
     confidence,
   };
+}
+
+/** Strict private-label rows for one supermarket: only `private_label === true` for that retailer. */
+export function privateLabelImages(typed: string, rows: NameRow[], retailer: RetailerId, limit = NAME_RULES.alternatives): NameImage[] {
+  const parsed = parseName(typed);
+  if (!parsed) return [];
+  const query = words(parsed.base);
+  const core = query.filter((word) => !NEUTRAL.has(word));
+  const candidates = rows
+    .filter((row) => row.privateLabel === true && row.retailer === retailer && row.imageUrl)
+    .map((row) => {
+      const nameWords = words(row.name);
+      const hasAll = core.every((word) => nameWords.includes(word) || words(row.brands.join(" ")).includes(word));
+      return { row, hasAll, score: hasAll ? 10 : 0 };
+    })
+    .filter((entry) => entry.hasAll)
+    .sort((a, b) => b.score - a.score || a.row.name.length - b.row.name.length);
+  const seen = new Set<string>();
+  const out: NameImage[] = [];
+  for (const entry of candidates) {
+    if (out.length >= limit) break;
+    if (seen.has(entry.row.imageUrl!)) continue;
+    seen.add(entry.row.imageUrl!);
+    out.push(imageOf(entry.row, "medium", entry.row.brands[0]));
+  }
+  return out;
 }
 
 /** Where each PrijsProfeet category sits in the shop; categories without one clear department are left out. */
@@ -465,11 +500,14 @@ export function matchName(typed: string, rows: NameRow[]): NameMatch {
   const requested = query.slice(brand.length);
   const branded = rows.map((row) => judge(row, brand, requested, parsed)).filter((entry) => entry.brandHit);
   const brandName = typedWords(parsed.base, 0, brand.length);
-  const best = branded.filter((entry) => entry.eligible).sort(order)[0];
+  /** Prefer manufacturer rows for the automatic photo; private labels stay in dedicated alternatives. */
+  const byPreference = (a: Judged, b: Judged) =>
+    (a.row.privateLabel === true ? 1 : 0) - (b.row.privateLabel === true ? 1 : 0) || order(a, b);
+  const best = branded.filter((entry) => entry.eligible).sort(byPreference)[0];
   const match = best ? imageOf(best.row, "high", brandName) : null;
   const seen = new Set(match ? [match.imageUrl] : []);
   const alternatives: NameImage[] = [];
-  for (const entry of branded.filter((item) => item.row.imageUrl && item.hasAll).sort(order)) {
+  for (const entry of branded.filter((item) => item.row.imageUrl && item.hasAll && item.row.privateLabel !== true).sort(order)) {
     if (alternatives.length >= NAME_RULES.alternatives) break;
     if (seen.has(entry.row.imageUrl!)) continue;
     seen.add(entry.row.imageUrl!);

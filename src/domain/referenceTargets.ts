@@ -1,4 +1,4 @@
-import { hasOffPhoto, identityKey, identityOf, nameImageKey, wantsNameImage, wantsReference, wantsStoreImage, type ImageIdentity } from "./imageIdentity";
+import { hasOffPhoto, identityKey, identityOf, nameImageLookupKey, wantsNameImage, wantsReference, wantsStoreImage, type ImageIdentity } from "./imageIdentity";
 import type { Adventure } from "./types";
 
 /** Whether a retailer photo is known for a barcode: found, none, or still being looked up. */
@@ -22,7 +22,7 @@ export function wantedReferences(adventure: Adventure | null, storeStatus: Store
     const offPhoto = hasOffPhoto(item);
     const store = wantsStoreImage(item) ? storeStatus(item.ean!) : "none";
     if (store === "pending") continue;
-    const name = wantsNameImage(item) && !identity.generic ? nameStatus(nameImageKey(item.name)) : "none";
+    const name = wantsNameImage(item) && !identity.generic ? nameStatus(nameImageLookupKey(item.name, adventure.retailer)) : "none";
     if (name === "pending") continue;
     const storePhoto = store === "found" || name === "found" || Boolean(item.namePhoto);
     if ((!identity.generic && !offPhoto && !storePhoto) || wantsReference(identity, item.imageChoice, offPhoto, storePhoto)) wanted.set(identityKey(identity), identity);

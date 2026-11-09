@@ -143,6 +143,15 @@ export type Action =
   /** A name search found this typed product as a brand; no OpenAI tidy-up is needed for it. */
   | { type: "brand-custom"; productId: string; brand: string; category?: CategoryId }
   | { type: "choose-name-photo"; productId: string; photo: NamePhoto | null }
+  /** Explicit commercial private-label identity; never from an image pick alone. */
+  | {
+      type: "adopt-commercial";
+      itemId: string;
+      name: string;
+      brand?: string;
+      privateLabelRetailer: RetailerId;
+      photo?: NamePhoto;
+    }
   | { type: "insert-item"; item: AdventureItem; index: number }
   | { type: "start-shopping" }
   | { type: "found" }
@@ -409,11 +418,10 @@ export function reducer(state: AppState, action: Action): AppState {
     case "set-reference-images":
       return { ...state, settings: { ...state.settings, referenceImages: action.enabled } };
     case "set-retailer": {
+      /** List supermarket only; the default for new lists is `set-default-retailer`. */
       const retailer = action.retailer ?? undefined;
-      const { retailer: _previous, ...rest } = state.settings;
-      const settings: Settings = retailer ? { ...rest, retailer } : rest;
-      if (!state.adventure || state.adventure.phase === "done") return { ...state, settings };
-      return { ...state, settings, adventure: touch(withRetailer(state.adventure, retailer), {}) };
+      const base = !state.adventure || state.adventure.phase === "done" ? ensureDraft(state) : state.adventure;
+      return { ...state, adventure: touch(withRetailer(base, retailer), {}) };
     }
     case "set-default-retailer": {
       const { retailer: _previous, ...rest } = state.settings;
@@ -621,6 +629,14 @@ export function reducer(state: AppState, action: Action): AppState {
         const { namePhoto: _photo, ...rest } = item;
         return rest as typeof item;
       });
+    case "adopt-commercial":
+      return updateItem(state, action.itemId, (item) => ({
+        ...item,
+        name: action.name.slice(0, 40),
+        ...(action.brand && { brand: action.brand.slice(0, 40) }),
+        privateLabelRetailer: action.privateLabelRetailer,
+        ...(action.photo && { namePhoto: action.photo, imageChoice: "reference" as const }),
+      }));
     case "set-illustration":
       return updateCustom(state, action.productId, (item) => {
         if (item.illustration === "none") return item;

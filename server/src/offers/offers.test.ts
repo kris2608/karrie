@@ -135,7 +135,7 @@ describe("PrijsProfeet adapter", () => {
     const provider = createPrijsProfeet({ userAgent: "Karrie", eanPerDay: 2, perMinute: 3 }, async (url) => (urls.push(url), json({ results: [] })), () => NOW);
     expect(await provider.searchImage("8718166011021")).toMatchObject({ ok: true });
     const params = Object.fromEntries(new URL(urls[0]).searchParams);
-    expect(params).toEqual({ q: "8718166011021", retailer: "jumbo,albert_heijn,lidl", page_size: "20" });
+    expect(params).toEqual({ q: "8718166011021", retailer: "jumbo,albert_heijn,lidl", page_size: "20", page: "1" });
     expect(imageSearchUrl("8718166011021")).not.toContain("promotion_status");
     expect(searchUrl("8718166011021", "jumbo")).toContain("promotion_status=active");
     await provider.search("8718166011021", "jumbo");

@@ -447,15 +447,17 @@ export function createHandler(deps: AppDeps) {
         );
         return send(200, { status: "ok", result: answer });
       };
+      const retailer = request.data.retailer;
       const hit = images.lookup.cached(parsed.name);
-      if (hit) {
+      if (hit && !retailer) {
         entry.cached = true;
         return reply(hit);
       }
       const denial = images.limits.admit(ip);
       if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
       const callStarted = now();
-      const result = await images.lookup.find(parsed.name);
+      const result = await images.lookup.find(parsed.name, { retailer });
+      if (result.ok && result.cached) entry.cached = true;
       images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
       entry.lookupMs = now() - callStarted;
       return reply(result);
@@ -630,7 +632,13 @@ const NormalizeRequestSchema = z.object({ name: z.string().max(40), createdFrom:
 
 const IllustrationRequestSchema = z.object({ name: z.string().max(40) }).strict();
 
-const NameRequestSchema = z.object({ name: z.string().max(40) }).strict();
+const NameRequestSchema = z
+  .object({
+    name: z.string().max(40),
+    /** Shopping-list supermarket: scopes private-label alternatives only. */
+    retailer: z.enum(RETAILERS).optional(),
+  })
+  .strict();
 
 /** "blik", "1 l", "6 x 200 ml": how a requested pack is kept on a candidate. */
 function packagingLabel(parsed: ParsedName): string | undefined {

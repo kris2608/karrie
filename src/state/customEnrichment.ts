@@ -5,7 +5,7 @@ import { savePhoto } from "../storage/photos";
 import type { LookupStatus } from "../storage/lookupStore";
 import { nameImages, useNameImagesVersion } from "../storage/nameImages";
 import type { NameAnswer } from "../services/images/nameImage";
-import { nameImageKey, wantsNameImage } from "../domain/imageIdentity";
+import { nameImageLookupKey, wantsNameImage } from "../domain/imageIdentity";
 import { parseName } from "../domain/typedName";
 import type { AdventureItem, CategoryId, SavedItem } from "../domain/types";
 import type { Action, AppState } from "./reducer";
@@ -32,7 +32,7 @@ export function customWork(
   const brand = new Map<string, BrandWork>();
   const visit = (item: SavedItem | AdventureItem, onList: boolean) => {
     if (item.kind !== "custom_generic") return;
-    const key = wantsNameImage(item) ? nameImageKey(item.name) : null;
+    const key = wantsNameImage(item) ? nameImageLookupKey(item.name, state.adventure?.retailer) : null;
     const pending = item.enrichment?.status === "pending";
     if (key && (pending || onList)) lookup.add(key);
     const answer = key && names.status(key) !== "pending" ? names.value(key) : null;

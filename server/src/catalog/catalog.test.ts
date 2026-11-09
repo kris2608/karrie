@@ -55,10 +55,10 @@ describe("catalog migrations and seed", () => {
     const { pool } = memoryPg();
     const client = pool();
     const first = await migrate(client, MIGRATIONS);
-    expect(first.applied).toEqual(["001", "002", "003"]);
+    expect(first.applied).toEqual(["001", "002", "003", "004"]);
     const second = await migrate(client, MIGRATIONS);
     expect(second.applied).toEqual([]);
-    expect(second.skipped).toEqual(["001", "002", "003"]);
+    expect(second.skipped).toEqual(["001", "002", "003", "004"]);
     const seeded = await seedCatalog(client);
     expect(seeded.products).toBe(BOOTSTRAP_PRODUCTS.length);
     await seedCatalog(client);

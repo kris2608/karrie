@@ -532,8 +532,8 @@ export function createCatalogStore(
             await db.query(
               `INSERT INTO catalog_products (
                  id, normalized_key, name, product_type, brand, formulation, category_id,
-                 aliases, approval_status, is_default_catalog, origin, updated_at, last_seen_at
-               ) VALUES ($1, $2, $3, 'branded', $4, $5, $6, $7::jsonb, 'approved', false, 'shared', now(), now())
+                 aliases, approval_status, is_default_catalog, origin, private_label, retailer, updated_at, last_seen_at
+               ) VALUES ($1, $2, $3, 'branded', $4, $5, $6, $7::jsonb, 'approved', false, 'shared', false, NULL, now(), now())
                ON CONFLICT (normalized_key) DO UPDATE SET
                  brand = COALESCE(EXCLUDED.brand, catalog_products.brand),
                  formulation = COALESCE(EXCLUDED.formulation, catalog_products.formulation),
@@ -545,11 +545,40 @@ export function createCatalogStore(
             const resolvedId = String(rows[0]?.id ?? productId);
             await replaceAliases(db, resolvedId, aliases);
 
-            const images = [answer.match, ...answer.alternatives].filter((image): image is NameImage => Boolean(image));
+            const images = [answer.match, ...answer.alternatives, ...(answer.privateLabelAlternatives ?? [])].filter(
+              (image): image is NameImage => Boolean(image),
+            );
             let preferred = true;
             for (const image of images) {
               const id = imageIdOf(resolvedId, image.imageUrl);
               const fromOff = image.source === "off";
+              const isPrivate = image.privateLabel === true;
+              if (isPrivate && image.retailer) {
+                const plKey = normalizedKey([image.productName, image.retailer].join(" "), image.brand ?? image.productName);
+                const plId = productIdFromKey(plKey, "pl");
+                await db.query(
+                  `INSERT INTO catalog_products (
+                     id, normalized_key, name, product_type, brand, formulation, category_id, generic_parent_id,
+                     aliases, approval_status, is_default_catalog, origin, private_label, retailer, updated_at, last_seen_at
+                   ) VALUES ($1, $2, $3, 'branded', $4, NULL, $5, $6, $7::jsonb, 'approved', false, 'shared', true, $8, now(), now())
+                   ON CONFLICT (normalized_key) DO UPDATE SET
+                     private_label = true,
+                     retailer = COALESCE(EXCLUDED.retailer, catalog_products.retailer),
+                     generic_parent_id = COALESCE(catalog_products.generic_parent_id, EXCLUDED.generic_parent_id),
+                     updated_at = now(),
+                     last_seen_at = now()`,
+                  [
+                    plId,
+                    plKey,
+                    image.productName.slice(0, 120),
+                    image.brand ?? image.productName.slice(0, 40),
+                    category,
+                    resolvedId,
+                    JSON.stringify([image.productName]),
+                    image.retailer,
+                  ],
+                );
+              }
               await db.query(
                 `INSERT INTO product_images (
                    id, product_id, variant_id, url, source, retailer, source_url, license, usage_status, preferred, last_checked_at
@@ -566,7 +595,7 @@ export function createCatalogStore(
                   image.sourceUrl ?? null,
                   fromOff ? "CC BY-SA" : null,
                   fromOff ? "cc_by_sa" : "link_only",
-                  preferred,
+                  preferred && !isPrivate,
                 ],
               );
               preferred = false;

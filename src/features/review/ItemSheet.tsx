@@ -8,10 +8,13 @@ import { StarIcon } from "../../components/ui/StarIcon";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { brandLabel } from "../../domain/customProduct";
 import { hasSuggestion, missionOn } from "../../domain/discovery";
+import { nameImageLookupKey } from "../../domain/imageIdentity";
+import { retailerName } from "../../domain/retailers";
 import type { AdventureItem } from "../../domain/types";
 import { productById } from "../../data/catalog";
 import { confirmPackSize } from "../../services/barcode/pack";
 import { useAdventure } from "../../state/AdventureContext";
+import { useNameAnswer } from "../../storage/nameImages";
 import { PackConflict } from "../photo/PackConflict";
 import { DrawingPicker } from "./DrawingPicker";
 import { PictureBlock } from "./PictureBlock";
@@ -69,13 +72,18 @@ function MissionBlock({ item }: { item: AdventureItem }) {
 }
 
 function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetProps & { item: AdventureItem }) {
-  const { dispatch } = useAdventure();
+  const { dispatch, adventure } = useAdventure();
   const [name, setName] = useState(item.name);
   const [editing, setEditing] = useState(false);
   const parentPhoto = item.imageSource === "parent" && Boolean(item.photoId);
   const shown = useArt(item).pick;
   const variant = item.recognition?.variant;
   const detail = [brandLabel(item), variant, item.packageSize].filter(Boolean).join(" · ");
+  const listRetailer = adventure?.retailer;
+  const crossRetailer =
+    item.privateLabelRetailer && listRetailer && item.privateLabelRetailer !== listRetailer ? item.privateLabelRetailer : undefined;
+  const altAnswer = useNameAnswer(crossRetailer && listRetailer ? nameImageLookupKey(item.name, listRetailer) : undefined);
+  const jumboAlt = altAnswer?.privateLabelAlternatives?.[0];
 
   function saveName() {
     const next = name.trim();
@@ -111,6 +119,33 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
             if (item.ean) void confirmPackSize(item.ean, quantity);
           }}
         />
+      )}
+      {crossRetailer && listRetailer && (
+        <p className="sheet-note" data-testid="cross-retailer-note">
+          Dit is een {retailerName(crossRetailer)}-product. Je hebt nu {retailerName(listRetailer)} geselecteerd.
+          {jumboAlt && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="text-button"
+                data-testid="view-retailer-alternative"
+                onClick={() =>
+                  dispatch({
+                    type: "adopt-commercial",
+                    itemId: item.id,
+                    name: jumboAlt.productName.slice(0, 40),
+                    brand: jumboAlt.productName.split(" ")[0],
+                    privateLabelRetailer: listRetailer,
+                    photo: jumboAlt,
+                  })
+                }
+              >
+                Bekijk een {retailerName(listRetailer)}-alternatief
+              </button>
+            </>
+          )}
+        </p>
       )}
       <PictureBlock item={item} />
       <ProductInfo item={item} />

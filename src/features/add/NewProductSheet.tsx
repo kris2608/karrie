@@ -7,7 +7,7 @@ import { productById } from "../../data/catalog";
 import { categoryLabel } from "../../domain/categories";
 import { categoryIcon } from "../../domain/categoryIcon";
 import { brandLabel } from "../../domain/customProduct";
-import { nameImageKey } from "../../domain/imageIdentity";
+import { nameImageLookupKey } from "../../domain/imageIdentity";
 import { customProducts } from "../../services/customProducts/client";
 import { namePhotoCredit, type NameAnswer } from "../../services/images/nameImage";
 import { useAdventure } from "../../state/AdventureContext";
@@ -40,8 +40,8 @@ function useOnline(): boolean {
 
 /** The new-product counterpart of the barcode result: Karrie looks the name up first, then the parent adds it. */
 export function NewProductSheet({ name, onAdd, onCancel }: NewProductSheetProps) {
-  const { settings } = useAdventure();
-  const key = nameImageKey(name);
+  const { settings, adventure } = useAdventure();
+  const key = nameImageLookupKey(name, adventure?.retailer);
   const status = useNameImageStatus(key);
   const answer = useNameAnswer(key);
   const online = useOnline();
