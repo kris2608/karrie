@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
-import { whatsAppShareUrl } from "../../domain/share";
+import { LIST_SHARE_TEXT, LIST_SHARE_TITLE, shareLink } from "../../domain/share";
 import { toSharedList, type ShareListSource } from "../../domain/shareList";
 import { trackEvent } from "../../services/analytics";
 import { shareListClient } from "../../services/shareList/client";
@@ -59,10 +59,29 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
     };
   }, [open, source]);
 
-  function shareWhatsApp() {
+  async function share() {
     if (encoded.status !== "ready" || busy) return;
-    trackEvent({ name: "shopping_list_shared", data: { method: "whatsapp" } });
-    window.open(whatsAppShareUrl(encoded.url), "_blank", "noopener,noreferrer");
+    setBusy(true);
+    try {
+      const outcome = await shareLink(
+        {
+          share: navigator.share?.bind(navigator),
+          canShare: navigator.canShare?.bind(navigator),
+          copy: (text) => navigator.clipboard.writeText(text),
+        },
+        { title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT, url: encoded.url },
+      );
+      if (outcome === "cancelled") return;
+      trackEvent({ name: "shopping_list_shared", data: { method: outcome === "shared" ? "native" : "copied" } });
+      if (outcome === "copied") flashCopied();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function flashCopied() {
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
   }
 
   async function copyLink() {
@@ -71,8 +90,7 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
     try {
       await navigator.clipboard.writeText(encoded.url);
       trackEvent({ name: "shopping_list_shared", data: { method: "copied" } });
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      flashCopied();
     } finally {
       setBusy(false);
     }
@@ -95,8 +113,8 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
 
         {encoded.status === "ready" && (
           <div className="share-list-actions">
-            <PressButton type="button" variant="primary" wide data-testid="share-list-whatsapp" disabled={busy} onClick={shareWhatsApp}>
-              Deel via WhatsApp
+            <PressButton type="button" variant="primary" wide data-testid="share-list-share" disabled={busy} onClick={() => void share()}>
+              Delen
             </PressButton>
             <PressButton type="button" variant="secondary" wide data-testid="share-list-copy" disabled={busy} onClick={() => void copyLink()}>
               {copied ? "Link gekopieerd!" : "Kopieer link"}

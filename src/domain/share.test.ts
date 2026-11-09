@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { SHARE_TEXT, SHARE_TITLE, SHARE_URL, shareKarrie, whatsAppShareUrl } from "./share";
+import { LIST_SHARE_TEXT, LIST_SHARE_TITLE, SHARE_TEXT, SHARE_TITLE, SHARE_URL, shareKarrie, shareLink } from "./share";
 
 describe("shareKarrie", () => {
   it("opens the system share sheet with only the public site", async () => {
@@ -31,13 +31,15 @@ describe("shareKarrie", () => {
   });
 });
 
-describe("whatsAppShareUrl", () => {
-  it("encodes the Dutch share text with the short list URL", () => {
+describe("shareLink", () => {
+  it("shares or copies the given short list URL", async () => {
     const listUrl = "https://www.karrie.eu/l/abcdefghijklmnop";
-    const url = whatsAppShareUrl(listUrl);
-    expect(url.startsWith("https://wa.me/?text=")).toBe(true);
-    const text = decodeURIComponent(url.slice("https://wa.me/?text=".length));
-    expect(text).toContain("🛒 Ik heb een boodschappenlijstje met Karrie gedeeld!");
-    expect(text).toContain(listUrl);
+    const data = { title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT, url: listUrl };
+    const share = vi.fn().mockResolvedValue(undefined);
+    const copy = vi.fn().mockResolvedValue(undefined);
+    await expect(shareLink({ share, copy }, data)).resolves.toBe("shared");
+    expect(share).toHaveBeenCalledWith(data);
+    await expect(shareLink({ copy }, data)).resolves.toBe("copied");
+    expect(copy).toHaveBeenCalledWith(listUrl);
   });
 });

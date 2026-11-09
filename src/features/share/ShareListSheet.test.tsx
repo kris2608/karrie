@@ -49,28 +49,28 @@ describe("ShareListSheet", () => {
     Object.assign(navigator, {
       clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
-    vi.spyOn(window, "open").mockImplementation(() => null);
   });
 
-  it("shows WhatsApp and copy actions for a short link (no QR)", async () => {
+  it("opens the system share sheet and offers copy for a short link (no QR)", async () => {
     create.mockResolvedValue({
       status: "ok",
       id: "abcdefghijklmnop",
       url: "https://www.karrie.eu/l/abcdefghijklmnop",
       expiresAt: "2099-01-01T00:00:00.000Z",
     });
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { share });
     render(<ShareListSheet open source={adventure} onClose={() => undefined} />);
-    await waitFor(() => expect(screen.getByTestId("share-list-whatsapp")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("share-list-share")).toBeTruthy());
     expect(screen.getByTestId("share-list-copy")).toBeTruthy();
     expect(screen.queryByTestId("share-list-qr")).toBeNull();
     expect(document.querySelector(".share-qr")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("share-list-whatsapp"));
-    expect(window.open).toHaveBeenCalledWith(
-      expect.stringContaining("https://wa.me/?text="),
-      "_blank",
-      "noopener,noreferrer",
+    fireEvent.click(screen.getByTestId("share-list-share"));
+    await waitFor(() =>
+      expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://www.karrie.eu/l/abcdefghijklmnop" })),
     );
+    await waitFor(() => expect((screen.getByTestId("share-list-copy") as HTMLButtonElement).disabled).toBe(false));
 
     fireEvent.click(screen.getByTestId("share-list-copy"));
     await waitFor(() => expect(screen.getByText("Link gekopieerd!")).toBeTruthy());

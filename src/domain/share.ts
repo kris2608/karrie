@@ -2,6 +2,8 @@
 export const SHARE_URL = "https://www.karrie.eu";
 export const SHARE_TITLE = "Karrie";
 export const SHARE_TEXT = "Speur, vind en vink af! Boodschappen doen als een avontuur.";
+export const LIST_SHARE_TITLE = "Boodschappenlijstje";
+export const LIST_SHARE_TEXT = "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld!";
 
 export type ShareOutcome = "shared" | "copied" | "cancelled";
 
@@ -16,8 +18,7 @@ function isAbort(error: unknown): boolean {
 }
 
 /** Opens the system share sheet when the device has one; otherwise copies the link. */
-export async function shareKarrie(deps: ShareDeps): Promise<ShareOutcome> {
-  const data: ShareData = { title: SHARE_TITLE, text: SHARE_TEXT, url: SHARE_URL };
+export async function shareLink(deps: ShareDeps, data: ShareData & { url: string }): Promise<ShareOutcome> {
   const can = deps.share && (!deps.canShare || deps.canShare(data));
   if (can && deps.share) {
     try {
@@ -27,11 +28,10 @@ export async function shareKarrie(deps: ShareDeps): Promise<ShareOutcome> {
       if (isAbort(error)) return "cancelled";
     }
   }
-  await deps.copy(SHARE_URL);
+  await deps.copy(data.url);
   return "copied";
 }
 
-export function whatsAppShareUrl(listUrl: string): string {
-  const text = `🛒 Ik heb een boodschappenlijstje met Karrie gedeeld!\n\nBekijk het hier: ${listUrl}`;
-  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+export function shareKarrie(deps: ShareDeps): Promise<ShareOutcome> {
+  return shareLink(deps, { title: SHARE_TITLE, text: SHARE_TEXT, url: SHARE_URL });
 }

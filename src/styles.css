@@ -479,7 +479,7 @@ h1, h2, p { margin: 0; }
   padding:
     0
     calc(var(--safe-right) + var(--space-5))
-    calc(var(--space-5) + var(--safe-bottom))
+    var(--space-3)
     calc(var(--safe-left) + var(--space-5));
   border-radius: 28px;
   background: var(--paper);
@@ -525,6 +525,8 @@ h1, h2, p { margin: 0; }
   min-height: 0;
   overflow-x: clip;
   overflow-y: auto;
+  /* Room for the drop shadow under the last button, which the scroller would clip. */
+  padding-bottom: var(--space-3);
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -1045,9 +1047,9 @@ a.settings-link { text-decoration: none; color: inherit; }
   z-index: 10;
   width: min(480px, 100%);
   padding:
-    var(--space-5)
+    var(--space-4)
     calc(var(--safe-right) + var(--space-3))
-    calc(var(--safe-bottom) + var(--space-4))
+    calc(var(--safe-bottom) + var(--space-3))
     calc(var(--safe-left) + var(--space-3));
   background: linear-gradient(rgba(255, 246, 232, 0), var(--paper) 34%);
   transform: translateX(-50%);
@@ -2143,6 +2145,9 @@ a.settings-link { text-decoration: none; color: inherit; }
   gap: var(--space-2);
   min-width: 0;
   overflow-x: auto;
+  /* A horizontal scroller also clips vertically; leave room for the chip shadows. */
+  margin: -4px -4px -8px;
+  padding: 4px 4px 8px;
   scrollbar-width: none;
 }
 .retailer-picker::-webkit-scrollbar { display: none; }
