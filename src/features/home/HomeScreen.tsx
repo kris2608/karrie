@@ -14,6 +14,7 @@ import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { softSpring } from "../../motion/variants";
 import { appVersionLabel } from "../../domain/appVersion";
+import { homeShelf } from "../../domain/homeShelf";
 import { retailerName } from "../../domain/retailers";
 import { stickerPreview } from "../../domain/stickers";
 import { RetailerPicker } from "../offers/RetailerPicker";
@@ -172,9 +173,7 @@ export function HomeScreen() {
 
   const shopping = adventure?.phase === "shopping";
   const draft = adventure?.phase === "draft" && adventure.items.length > 0;
-  const previous = adventure?.phase === "done" ? saved[0] : saved.find((list) => list.id !== adventure?.id);
-  const favorites = saved.filter((list) => list.favorite && list.id !== previous?.id).slice(0, 6);
-  const shelf = [...(previous ? [{ list: previous, label: "Vorig lijstje" }] : []), ...favorites.map((list) => ({ list, label: "Bewaard" }))];
+  const shelf = homeShelf(saved, adventure);
 
   function openList(list: SavedList) {
     dispatch({ type: "open-saved", id: list.id });
