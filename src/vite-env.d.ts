@@ -4,6 +4,8 @@
 interface ImportMetaEnv {
   /** Public origin of karrie-api, e.g. https://karrie-api.onrender.com. Empty means same origin (dev proxy). */
   readonly VITE_API_ORIGIN?: string;
+  /** Official Nutri-Score logos are on by default; set to "off" to show the text/pill fallback instead. */
+  readonly VITE_NUTRISCORE_LOGOS?: string;
 }
 
 interface Window {

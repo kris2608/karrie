@@ -1,3 +1,4 @@
+import { NutriScoreLogo, nutriScoreGrade, nutriScoreLogosEnabled } from "../../components/NutriScoreLogo";
 import type { ProductFacts } from "../../domain/productFacts";
 import type { AdventureItem } from "../../domain/types";
 import { useFacts } from "../../storage/references";
@@ -17,14 +18,17 @@ export function ProductInfo({ item }: { item: AdventureItem }) {
   const facts = useFacts(item);
   if (!facts) return null;
   const rows = VALUES.filter((row) => facts.per100?.[row.key] !== undefined);
+  const grade = nutriScoreGrade(facts.nutriScore);
+  const logo = grade && nutriScoreLogosEnabled() ? <NutriScoreLogo grade={grade} /> : null;
 
   return (
     <section className="product-info" data-testid="product-info">
       <header>
         <strong>Productinformatie</strong>
-        {facts.nutriScore && (
-          <span className={`nutri-score nutri-${facts.nutriScore.toLowerCase()}`} aria-label={`Nutri-Score ${facts.nutriScore}`} data-testid="nutri-score">
-            Nutri-Score {facts.nutriScore}
+        {logo}
+        {!logo && grade && (
+          <span className={`nutri-score nutri-${grade.toLowerCase()}`} aria-label={`Nutri-Score ${grade}`} data-testid="nutri-score">
+            Nutri-Score {grade}
           </span>
         )}
       </header>

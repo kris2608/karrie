@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ItemArt, markBroken, useBroken } from "../../components/ItemArt";
+import { NutriScoreMark } from "../../components/NutriScoreLogo";
 import { ProductArt } from "../../components/ProductArt";
 import { PressButton } from "../../components/ui/PressButton";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { categoryIcon } from "../../domain/categoryIcon";
 import { declineKey, missionOn } from "../../domain/discovery";
-import { newItemFor, type DraftField, type ProductDraft } from "../../domain/productDraft";
+import { newItemFor, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem, AlternativeAssessment, CategoryId } from "../../domain/types";
 import { confirmPackSize } from "../../services/barcode/pack";
 import { storeCredit } from "../../services/images/storeImage";
@@ -42,15 +43,6 @@ function MissionNote({ assessment, state }: { assessment?: AlternativeAssessment
       <small>{MISSION_STATE[state]}</small>
     </div>
   );
-}
-
-export function sourceLabel(field: DraftField | undefined, draft: ProductDraft): string | null {
-  if (!field) return null;
-  if (field.source === "parent") return "uit Mijn producten";
-  if (field.source === "off") return "Open Food Facts";
-  if (field.source === "web") return `gevonden op ${draft.from.barcode?.source.name ?? "internet"}`;
-  if (field.source === "photo") return "gelezen op de verpakking";
-  return "geschat";
 }
 
 /** Each source says what it is and under which licence; Open Food Facts data and its photos are listed apart. */
@@ -152,7 +144,6 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
     );
   }
 
-  const brandField = draft?.fields.brand ?? draft?.fields.variant;
   const brandLine = draft && [draft.fields.brand?.value, draft.fields.variant?.value].filter(Boolean).join(" · ");
   const card = (
     <div className="scan-card photo-card" data-testid="photo-card">
@@ -167,24 +158,13 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
       )}
       <div className="scan-card-text">
         <strong>{draft ? draft.name || "Onbekend product" : "Jouw foto"}</strong>
-        {brandLine && draft && (
-          <span>
-            {brandLine} <em className="photo-source">{sourceLabel(brandField, draft)}</em>
-          </span>
-        )}
+        {brandLine && <span>{brandLine}</span>}
         {packSize && <span>{packSize}</span>}
-        {nutriScore && /^[A-E]$/i.test(nutriScore) && (
-          <small data-testid="nutri-score">Nutri-Score {nutriScore.toUpperCase()}</small>
-        )}
+        <NutriScoreMark grade={nutriScore} />
         {drawing ? (
           <small data-testid="photo-drawing">Karrie gebruikt de tekening van {drawing.name.toLowerCase()}</small>
         ) : (
           draft?.from.photo?.genericName && <small>{draft.from.photo.genericName}</small>
-        )}
-        {draft?.ean && (
-          <small className="photo-ean" data-testid="photo-ean">
-            Streepjescode {draft.ean}
-          </small>
         )}
       </div>
     </div>
