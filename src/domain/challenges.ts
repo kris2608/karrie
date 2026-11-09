@@ -11,8 +11,8 @@ export const CHALLENGES: Challenge[] = [
     text: "Zoek iets voor het ontbijt!",
     ids: [
       "brood",
-      "volkorenbrood",
       "bolletjes",
+      "krentenbollen",
       "croissant",
       "beschuit",
       "crackers",
@@ -52,7 +52,8 @@ export const CHALLENGES: Challenge[] = [
       "prei",
       "verse-spinazie",
       "spinazie",
-      "doperwten",
+      "wokgroenten",
+      "pastagroenten",
     ],
   },
   {

@@ -70,7 +70,7 @@ describe("visionMapping", () => {
 
   it("prefers the catalog type the model picked, else matches only exact names or aliases", () => {
     expect(catalogMatch({ ...PEANUT, catalogType: "brood", productName: "Wit casinobrood", subcategory: "casinobrood", genericName: "brood" })?.id).toBe("brood");
-    expect(catalogMatch({ ...PEANUT, catalogType: "brood", productName: "Volkoren casino", subcategory: "volkorenbrood", genericName: null })?.id).toBe("volkorenbrood");
+    expect(catalogMatch({ ...PEANUT, catalogType: "brood", productName: "Volkoren casino", subcategory: "volkorenbrood", genericName: null })?.id).toBe("brood");
     expect(catalogMatch({ ...PEANUT, catalogType: "jam", productName: "Mister Choc Choco Pasta", subcategory: "chocopasta", genericName: "chocopasta" })).toBeNull();
     expect(catalogMatch({ ...PEANUT, catalogType: "bestaat-niet", subcategory: null, genericName: "Melk" })?.id).toBe("melk");
     expect(catalogMatch({ ...PEANUT, catalogType: null, subcategory: "pindakaas met stukjes", genericName: "notenpasta" })).toBeNull();

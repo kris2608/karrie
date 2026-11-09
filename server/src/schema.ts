@@ -17,15 +17,15 @@ export const INFERABLE_FIELDS = ["productName", "genericName", "brand", "variant
 export const FOOD_TYPES = [
   "appel", "banaan", "peer", "sinaasappel", "aardbei", "druiven", "mandarijn", "citroen", "kiwi", "tomaat", "komkommer", "paprika",
   "wortel", "broccoli", "sla", "avocado", "aardappel", "aardappeltjes", "ui", "knoflook", "champignons", "courgette", "aubergine",
-  "sperziebonen", "prei", "verse-spinazie",
-  "brood", "volkorenbrood", "bolletjes", "croissant", "stokbrood",
+  "sperziebonen", "prei", "verse-spinazie", "wokgroenten", "pastagroenten",
+  "brood", "bolletjes", "krentenbollen", "croissant", "stokbrood",
   "kipfilet", "gehakt", "zalm", "vegaburger",
   "beschuit", "crackers", "havermout", "pindakaas", "jam", "hagelslag", "muesli", "honing", "appelstroop",
   "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "bloem", "suiker", "koekjes", "chips", "pastasaus", "mais",
-  "augurk", "olijven", "walnoten", "babyvoeding",
-  "melk", "yoghurt", "kwark", "kaas", "mozzarella", "feta", "boter", "eieren", "slagroom", "vla", "karnemelk", "roomkaas",
+  "augurk", "olijven", "babyvoeding",
+  "melk", "yoghurt", "kwark", "kaas", "mozzarella", "feta", "boter", "eieren", "vla", "karnemelk", "roomkaas",
   "koffie", "thee", "sinaasappelsap", "water", "drinkpakje", "frisdrank", "siroop",
-  "doperwten", "ijs", "pizza", "vissticks", "spinazie", "bessen", "wokgroenten", "pastagroenten", "kant-en-klaar",
+  "ijs", "pizza", "vissticks", "spinazie", "bessen", "kant-en-klaar",
 ] as const;
 export const HOUSEHOLD_TYPES = [
   "toiletpapier", "keukenpapier", "afwasmiddel", "wasmiddel", "vuilniszakken", "handzeep", "tandpasta", "shampoo", "schoonmaakmiddel", "vaatwastabletten", "luiers",

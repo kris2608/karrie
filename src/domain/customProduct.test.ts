@@ -91,7 +91,8 @@ describe("suggestion", () => {
   it("finds catalog products first, also by singular or plural", () => {
     expect(suggestion("prei", [])).toMatchObject({ kind: "catalog", product: { id: "prei" }, close: false });
     expect(suggestion("Courgettes", [])).toMatchObject({ kind: "catalog", product: { id: "courgette" }, close: false });
-    expect(suggestion("walnoten", [])).toMatchObject({ kind: "catalog", product: { id: "walnoten" }, close: false });
+    expect(suggestion("tomaten", [])).toMatchObject({ kind: "catalog", product: { id: "tomaat" }, close: false });
+    expect(suggestion("walnoten", [])).toBeNull();
   });
 
   it("offers a typo match only as a close suggestion", () => {

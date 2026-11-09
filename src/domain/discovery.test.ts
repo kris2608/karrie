@@ -33,9 +33,9 @@ const possible = (evidence: "label" | "inferred"): AlternativeAssessment => ({
 describe("same purpose", () => {
   it("allows the same type and a short allowlist, nothing else", () => {
     expect(samePurpose("pindakaas", "pindakaas")).toBe(true);
-    expect(samePurpose("brood", "volkorenbrood")).toBe(true);
+    expect(samePurpose("brood", "brood")).toBe(true);
     expect(samePurpose("ontbijtgranen", "muesli")).toBe(true);
-    expect(samePurpose("volkorenbrood", "brood")).toBe(false);
+    expect(samePurpose("brood", "bolletjes")).toBe(false);
     expect(samePurpose("koekjes", "wortel")).toBe(false);
     expect(samePurpose("melk", "water")).toBe(false);
   });
@@ -84,13 +84,13 @@ describe("resolveAssessment", () => {
     expect(resolveAssessment(undefined, "pindakaas")).toBeUndefined();
   });
 
-  it("allows white bread to wholegrain bread", () => {
+  it("allows wholegrain as a same-type mission on brood", () => {
     const result = resolveAssessment(
-      { ...SWEET_PEANUT, criteria: ["wholegrain"], alternativeType: "volkorenbrood", targetType: "volkorenbrood", childPrompt: null },
+      { ...SWEET_PEANUT, criteria: ["wholegrain"], alternativeType: "volkorenbrood", targetType: "brood", childPrompt: null },
       "brood",
       "Tarwebloem, water, gist, zout",
     );
-    expect(result).toMatchObject({ status: "possible", evidence: "label", targetType: "volkorenbrood", childPrompt: "Kun jij volkorenbrood vinden?" });
+    expect(result).toMatchObject({ status: "possible", evidence: "label", targetType: "brood", childPrompt: "Kun jij volkorenbrood vinden?" });
   });
 });
 

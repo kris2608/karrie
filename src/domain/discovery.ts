@@ -11,8 +11,6 @@ export const MAX_MISSIONS = 3;
  * else must stay the same type (peanut butter -> 100% peanut butter).
  */
 const SAME_PURPOSE: Record<string, readonly string[]> = {
-  brood: ["volkorenbrood"],
-  bolletjes: ["volkorenbrood"],
   ontbijtgranen: ["muesli", "havermout"],
 };
 
