@@ -421,13 +421,13 @@ h1, h2, p { margin: 0; }
 }
 .sheet-card {
   display: grid;
-  gap: var(--space-4);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
   width: min(480px, 100%);
   max-height: 88dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   padding:
-    var(--space-3)
+    0
     calc(var(--safe-right) + var(--space-5))
     calc(var(--safe-bottom) + var(--space-5))
     calc(var(--safe-left) + var(--space-5));
@@ -435,13 +435,33 @@ h1, h2, p { margin: 0; }
   background: var(--paper);
   box-shadow: var(--shadow-float);
   text-align: left;
+  touch-action: pan-y;
 }
+.sheet-handle {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 36px;
+  margin: 0 calc((var(--safe-right) + var(--space-5)) * -1) 0 calc((var(--safe-left) + var(--space-5)) * -1);
+  padding: var(--space-3) var(--space-5) var(--space-2);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sheet-handle:active { cursor: grabbing; }
 .sheet-grip {
-  justify-self: center;
   width: 44px;
   height: 5px;
   border-radius: var(--radius-pill);
   background: rgba(43, 54, 64, 0.18);
+}
+.sheet-body {
+  display: grid;
+  gap: var(--space-4);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .sheet-card h2 { font-size: var(--text-title); font-weight: 900; }
 .sheet-note { color: var(--ink-soft); font-size: 0.95rem; }

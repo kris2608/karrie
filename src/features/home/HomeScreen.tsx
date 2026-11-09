@@ -101,7 +101,7 @@ export function HomeScreen() {
     const from = lastView.current;
     lastView.current = parentOpen ? view : "settings";
     if (!parentOpen || from === view) return;
-    headingRef.current?.closest(".sheet-card")?.scrollTo({ top: 0 });
+    headingRef.current?.closest(".sheet-body")?.scrollTo({ top: 0 });
     if (view === "settings") rowRefs.current[from]?.focus();
     else headingRef.current?.focus();
   }, [view, parentOpen]);
