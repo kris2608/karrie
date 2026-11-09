@@ -18,31 +18,43 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function createShareListClient(deps: Deps) {
   const base = deps.origin.replace(/\/$/, "");
 
-  return {
-    async create(list: SharedListV1): Promise<ShareCreateResult> {
-      if (!base) return { status: "error", code: "unavailable" };
-      try {
-        const response = await deps.fetch(`${base}/api/lists/share`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "omit",
-          referrerPolicy: "no-referrer",
-          body: JSON.stringify(list),
-        });
-        const body = (await readJson(response)) as { status?: string; code?: string; id?: string; url?: string; expiresAt?: string } | null;
-        if (response.status === 429) return { status: "error", code: "rate-limited" };
-        if (response.status === 422 && body?.code === "empty") return { status: "error", code: "empty" };
-        if (response.status === 422) return { status: "error", code: "invalid" };
-        if (!response.ok || body?.status !== "ok" || !body.id || !body.url || !body.expiresAt) {
-          return { status: "error", code: "unavailable" };
-        }
-        return { status: "ok", id: body.id, url: body.url, expiresAt: body.expiresAt };
-      } catch {
-        return { status: "error", code: "network" };
+  async function createOnce(list: SharedListV1): Promise<ShareCreateResult> {
+    if (!base) return { status: "error", code: "unavailable" };
+    try {
+      const response = await deps.fetch(`${base}/api/lists/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        body: JSON.stringify(list),
+      });
+      const body = (await readJson(response)) as { status?: string; code?: string; id?: string; url?: string; expiresAt?: string } | null;
+      if (response.status === 429) return { status: "error", code: "rate-limited" };
+      if (response.status === 422 && body?.code === "empty") return { status: "error", code: "empty" };
+      if (response.status === 422) return { status: "error", code: "invalid" };
+      if (!response.ok || body?.status !== "ok" || !body.id || !body.url || !body.expiresAt) {
+        return { status: "error", code: "unavailable" };
       }
+      return { status: "ok", id: body.id, url: body.url, expiresAt: body.expiresAt };
+    } catch {
+      return { status: "error", code: "network" };
+    }
+  }
+
+  return {
+    /** Cold API starts can fail once; retry briefly on network/unavailable. */
+    async create(list: SharedListV1): Promise<ShareCreateResult> {
+      const first = await createOnce(list);
+      if (first.status === "ok" || (first.code !== "unavailable" && first.code !== "network")) return first;
+      await sleep(1200);
+      return createOnce(list);
     },
 
     async fetch(id: string): Promise<ShareFetchResult> {

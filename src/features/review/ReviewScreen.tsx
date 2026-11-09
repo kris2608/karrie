@@ -142,17 +142,7 @@ export function ReviewScreen() {
 
   return (
     <main className="screen screen-review">
-      <TopBar
-        title={named ?? "Klopt het lijstje?"}
-        to="/toevoegen"
-        action={
-          <Link to="/toevoegen" className="round-button" aria-label="Producten toevoegen" data-testid="add-products">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 6v12M6 12h12" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-            </svg>
-          </Link>
-        }
-      />
+      <TopBar title={named ?? "Klopt het lijstje?"} to="/toevoegen" />
       {adventure.store && (
         <p className="list-name" data-testid="list-store">
           {adventure.store}
@@ -231,13 +221,16 @@ export function ReviewScreen() {
           Lijstje leegmaken
         </button>
       )}
-      <div className="dock dock-fixed">
+      <div className="dock dock-fixed dock-review">
+        <PressButton variant="quiet" size="l" data-testid="add-products" onClick={() => navigate("/toevoegen")}>
+          Toevoegen
+        </PressButton>
         {adventure.phase === "draft" && (
           <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={() => setSaving(true)}>
-            {editingFavorite ? "Bewaar wijzigingen" : "Bewaren"}
+            Bewaar
           </PressButton>
         )}
-        <PressButton variant="primary" size="l" wide data-testid="start" disabled={!hasOpen} onClick={start}>
+        <PressButton variant="primary" size="l" data-testid="start" disabled={!hasOpen} onClick={start}>
           {adventure.phase === "shopping" ? "Verder winkelen" : "Start avontuur"}
         </PressButton>
       </div>

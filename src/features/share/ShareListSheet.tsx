@@ -46,7 +46,9 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
             ? "Je hebt te vaak gedeeld. Probeer het zo weer."
             : result.code === "empty"
               ? "Dit lijstje is leeg of kan niet worden gedeeld."
-              : "Deellink maken lukt nu niet. Probeer het zo opnieuw.";
+              : result.code === "invalid"
+                ? "Dit lijstje kan zo niet worden gedeeld. Verwijder vreemde producten en probeer opnieuw."
+                : "Deellink maken lukt nu niet. Controleer je internet en probeer het zo opnieuw.";
         setEncoded({ status: "error", message });
         return;
       }

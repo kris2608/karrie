@@ -14,9 +14,10 @@ export function RetailerPicker({ value, onChange }: { value: RetailerId | undefi
             aria-checked={active}
             className={active ? "chip retailer-chip is-active" : "chip retailer-chip"}
             data-testid={`retailer-${retailer.id}`}
+            aria-label={retailer.name}
             onClick={() => onChange(active ? null : retailer.id)}
           >
-            {retailer.name}
+            {retailer.short}
           </button>
         );
       })}

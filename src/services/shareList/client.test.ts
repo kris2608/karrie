@@ -50,11 +50,14 @@ describe("shareListClient", () => {
     });
     await expect(empty.create(list)).resolves.toEqual({ status: "error", code: "empty" });
 
-    const network = createShareListClient({
-      origin: "https://api.example",
-      fetch: vi.fn().mockRejectedValue(new Error("offline")) as typeof fetch,
-    });
-    await expect(network.create(list)).resolves.toEqual({ status: "error", code: "network" });
+    vi.useFakeTimers();
+    const fetchFn = vi.fn().mockRejectedValue(new Error("offline"));
+    const network = createShareListClient({ origin: "https://api.example", fetch: fetchFn as typeof fetch });
+    const pending = network.create(list);
+    await vi.advanceTimersByTimeAsync(1300);
+    await expect(pending).resolves.toEqual({ status: "error", code: "network" });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 
   it("fetches a list and maps expired / missing", async () => {
