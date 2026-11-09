@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assignBonuses, pickMissions } from "./discovery";
-import { colorFor, pickDistractor, pickPlayOffers, seededRandom } from "./bonusPlay";
+import { ART } from "../components/art";
+import { colorFor, distractorScore, pickDistractor, pickPlayOffers, seededRandom } from "./bonusPlay";
 import type { AdventureItem, AlternativeAssessment } from "./types";
 
 function item(id: string, productId: string, category: AdventureItem["category"], extra: Partial<AdventureItem> = {}): AdventureItem {
@@ -58,12 +59,15 @@ describe("bonus play picker", () => {
     expect(pickPlayOffers([], [], true, "s")).toEqual({});
   });
 
-  it("only maps unambiguous colours and finds same-category distractors", () => {
+  it("only maps unambiguous colours and finds visually distinct distractors", () => {
     expect(colorFor("banaan")).toBe("geel");
     expect(colorFor("broccoli")).toBe("groen");
     expect(colorFor("paprika")).toBeUndefined();
     const rand = seededRandom("x");
-    expect(pickDistractor("banaan", "produce", rand)).toBeTruthy();
-    expect(pickDistractor("banaan", "produce", rand)).not.toBe("banaan");
+    const distractor = pickDistractor("boter", "dairy", rand);
+    expect(distractor).toBeTruthy();
+    expect(distractor).not.toBe("boter");
+    expect(distractorScore("boter", distractor!)).toBeGreaterThanOrEqual(60);
+    expect(ART[distractor!]?.kind).not.toBe(ART.boter.kind);
   });
 });

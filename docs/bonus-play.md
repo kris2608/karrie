@@ -6,9 +6,9 @@ Offline shopping mini-games under the existing **Bonusmissies** (`settings.smart
 
 | Kind | Dutch cue | Behaviour |
 |------|-----------|-----------|
-| `guess` | Raad het product! | Overlay with two drawings (item vs same-category distractor). Correct → celebrate, keep searching (not found). Wrong → gentle retry. Skip → `skipped`. |
+| `guess` | Raad het product! | Overlay names the list item and shows two unlabeled drawings. Distractor prefers a different silhouette/colour (widens beyond the shelf if needed). Child taps the matching picture. Correct → celebrate, keep searching (not found). Wrong → gentle retry. Skip → `skipped`. |
 | `color` | Zoek iets [kleur]! | Curated `COLOR_HUNT` from unambiguous `ART` colours only. Gevonden! still finds the product. |
-| `drag` | In Karrie's karretje! | Free-drag art onto Karrie's basket (`useFoundSequence.collect`). Swipe-to-skip disabled; Later stays. Enter/Space collects when focused. Reduced motion → instant collect (no flight). |
+| `drag` | Sleep naar Karrie! | Free-drag art onto Karrie (`useFoundSequence.collect`). Swipe-to-skip disabled so left flicks are not “later”; Later button stays. Enter/Space collects when focused. Reduced motion → instant collect (no flight). |
 
 `PlayOffer` lives on `AdventureItem.play` and does **not** overload healthier `MissionState`.
 

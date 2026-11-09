@@ -2041,10 +2041,11 @@ a.settings-link { text-decoration: none; color: inherit; }
   gap: var(--space-3);
   width: 100%;
 }
+.guess-card .mission-prompt strong { font-weight: 900; color: var(--teal-shade); }
 .guess-choice {
   display: grid;
   place-items: center;
-  min-height: 140px;
+  min-height: 148px;
   padding: var(--space-3);
   border: 0;
   border-radius: var(--radius-m);
@@ -2052,9 +2053,11 @@ a.settings-link { text-decoration: none; color: inherit; }
   box-shadow: var(--shadow-card);
   cursor: pointer;
   color: inherit;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+.guess-choice:active { transform: scale(0.96); }
 .guess-choice:focus-visible { outline: 3px solid var(--teal-shade); outline-offset: 3px; }
-.guess-choice .product-art { width: min(100%, 120px); }
+.guess-choice .product-art { width: min(100%, 120px); pointer-events: none; }
 .guess-retry { margin: 0; font-weight: 800; color: var(--teal-shade); }
 .stage-product.is-drag-play { touch-action: none; cursor: grab; }
 .stage-product.is-drag-play:active { cursor: grabbing; }

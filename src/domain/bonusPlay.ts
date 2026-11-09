@@ -1,3 +1,4 @@
+import { ART } from "../components/art";
 import { products } from "../data/catalog";
 import type { AdventureItem, CategoryId, PlayKind, PlayOffer } from "./types";
 
@@ -55,9 +56,48 @@ export function colorFor(productId: string): string | undefined {
   return COLOR_HUNT[productId];
 }
 
-/** Same-category catalog sibling for the guess game; undefined when none. */
+function artKey(productId: string): string {
+  return products.find((product) => product.id === productId)?.illustration ?? productId;
+}
+
+function hexDistance(a: string, b: string): number {
+  const parse = (hex: string) => {
+    const h = hex.replace("#", "");
+    if (h.length < 6) return [0, 0, 0] as const;
+    return [Number.parseInt(h.slice(0, 2), 16), Number.parseInt(h.slice(2, 4), 16), Number.parseInt(h.slice(4, 6), 16)] as const;
+  };
+  const [r1, g1, b1] = parse(a);
+  const [r2, g2, b2] = parse(b);
+  return Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+}
+
+/** How clearly two drawings differ for a toddler: kind first, then colour. */
+export function distractorScore(productId: string, otherId: string): number {
+  const own = ART[artKey(productId)];
+  const other = ART[artKey(otherId)];
+  if (!own || !other) return 0;
+  let score = 0;
+  if (own.kind !== other.kind) score += 100;
+  score += Math.min(hexDistance(own.color, other.color), 240) / 2;
+  return score;
+}
+
+/**
+ * Pick a distractor that looks clearly different (silhouette + colour).
+ * Prefer same category when possible; widen the pool when same-shelf art is too similar.
+ */
 export function pickDistractor(productId: string, category: CategoryId, rand: () => number): string | undefined {
-  const pool = products.filter((product) => product.category === category && product.id !== productId);
+  const others = products.filter((product) => product.id !== productId);
+  if (!others.length) return undefined;
+
+  const sameCategory = others.filter((product) => product.category === category);
+  const clear = (pool: typeof others) => pool.filter((product) => distractorScore(productId, product.id) >= 100);
+  // Different art kind is the bar; fall back to strong colour contrast if every sibling shares a silhouette.
+  const vivid = (pool: typeof others) => pool.filter((product) => distractorScore(productId, product.id) >= 60);
+
+  const preferred = clear(sameCategory);
+  const widened = preferred.length ? preferred : clear(others);
+  const pool = widened.length ? widened : vivid(sameCategory).length ? vivid(sameCategory) : vivid(others);
   if (!pool.length) return undefined;
   return pool[Math.floor(rand() * pool.length)]?.id;
 }

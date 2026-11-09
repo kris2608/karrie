@@ -112,7 +112,9 @@ export function ShopScreen() {
   const openItems = adventure.items.filter((item) => item.status !== "found");
   const dragPlay = play?.kind === "drag" && (play.status === "offered" || play.status === "active");
   const colorPlay = play?.kind === "color" && (play.status === "offered" || play.status === "active");
-  const canSkip = openItems.length > 1 && !sequence.locked && !dragPlay;
+  const canLater = openItems.length > 1 && !sequence.locked;
+  /** Swipe-to-skip stays off during drag-play so kids do not confuse a left flick with “later”. */
+  const canSwipe = canLater && !dragPlay;
   const searching = current?.mission?.status === "active" ? current : null;
   const missionTarget = searching?.alternative?.targetType ? productById(searching.alternative.targetType) : undefined;
   const showMission = Boolean(current && offered === current.id && missionShown === current.id && !showGuess);
@@ -224,11 +226,11 @@ export function ShopScreen() {
                 : searching
                   ? "Zoek de bonus!"
                   : showGuess
-                    ? "Raad het product!"
+                    ? "Tik op het goede plaatje!"
                     : colorPlay
                       ? `Zoek iets ${play?.colorLabel ?? "kleurigs"}!`
                       : dragPlay
-                        ? "Sleep het in mijn karretje!"
+                        ? "Sleep naar Karrie!"
                         : "Zoek dit product!"}
           </motion.p>
         </AnimatePresence>
@@ -242,7 +244,7 @@ export function ShopScreen() {
               type="button"
               className={`stage-product${dragPlay ? " is-drag-play" : ""}`}
               data-testid="product-stage"
-              aria-label={dragPlay ? `Sleep ${current.name} naar het karretje` : `Gevonden: ${current.name}`}
+              aria-label={dragPlay ? `Sleep ${current.name} naar Karrie` : `Gevonden: ${current.name}`}
               disabled={sequence.locked}
               custom={sequence.enterDelay}
               variants={{ ...productEnter, ...productExit }}
@@ -250,7 +252,7 @@ export function ShopScreen() {
               animate="shown"
               exit={sequence.exitKind}
               whileTap={sequence.locked || dragPlay ? undefined : { scale: 0.93 }}
-              drag={dragPlay ? true : canSkip ? "x" : false}
+              drag={dragPlay ? true : canSwipe ? "x" : false}
               dragConstraints={dragPlay ? undefined : { left: 0, right: 0 }}
               dragElastic={dragPlay ? 0.35 : { left: 0.9, right: 0.12 }}
               dragSnapToOrigin={dragPlay}
@@ -372,7 +374,7 @@ export function ShopScreen() {
               animate={{ scale: 1, opacity: 1, transition: spring }}
               exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
             >
-              <span>In Karrie's karretje!</span>
+              <span>Sleep naar Karrie!</span>
               <button type="button" className="mission-stop" aria-label="Stop sleepmissie" data-testid="drag-skip" onClick={() => dispatch({ type: "play-skip" })}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
@@ -399,7 +401,7 @@ export function ShopScreen() {
           </svg>
           Gevonden!
         </PressButton>
-        <button type="button" className="side-action" data-testid="skip" onClick={sequence.skip} disabled={!canSkip}>
+        <button type="button" className="side-action" data-testid="skip" onClick={sequence.skip} disabled={!canLater}>
           <span className="round-button round-quiet" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="M6 6l7 6-7 6M13 6l7 6-7 6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />

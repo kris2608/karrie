@@ -45,8 +45,10 @@ export function GuessProductCard({ item, reduced, onCorrect, onSkip }: GuessProd
         exit="gone"
       >
         <h2 id="guess-title">Raad het product!</h2>
-        <p className="mission-prompt">Welke hoort bij jullie boodschappenlijst?</p>
-        <div className="guess-choices" role="group" aria-label="Kies het juiste product">
+        <p className="mission-prompt">
+          Waar is de <strong>{item.name}</strong>? Tik op het goede plaatje.
+        </p>
+        <div className="guess-choices" role="group" aria-label={`Tik op ${item.name}`}>
           {choices.map((choice) => {
             const label = productById(choice.id)?.name ?? choice.id;
             return (
@@ -72,7 +74,7 @@ export function GuessProductCard({ item, reduced, onCorrect, onSkip }: GuessProd
         </div>
         {wrong && (
           <p className="guess-retry" data-testid="guess-retry" role="status">
-            Bijna! Probeer de andere.
+            Bijna! Probeer het andere plaatje.
           </p>
         )}
         <div className="mission-actions">
