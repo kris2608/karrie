@@ -23,6 +23,8 @@ export type StoredNameHit = {
   answer: NameAnswer;
   productId: string;
   packMatched: boolean;
+  /** True only when a pack was requested and the top image is tied to the matching variant. */
+  exactPack?: boolean;
 };
 
 export type CatalogChange = {

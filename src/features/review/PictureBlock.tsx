@@ -1,13 +1,26 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { markBroken, useArt, useNamePhoto } from "../../components/ItemArt";
-import { hasOffPhoto, identityKey, identityOf, nameImageLookupKey, wantsNameImage, wantsReference, wantsStoreImage } from "../../domain/imageIdentity";
+import {
+  hasOffPhoto,
+  identityKey,
+  identityOf,
+  nameImageLookupKey,
+  privateLabelLookupKey,
+  privateLabelQuery,
+  wantsNameImage,
+  wantsPrivateLabels,
+  wantsReference,
+  wantsStoreImage,
+} from "../../domain/imageIdentity";
+import { retailerName } from "../../domain/retailers";
 import { namePhotoCredit } from "../../services/images/nameImage";
 import { storeCredit } from "../../services/images/storeImage";
-import { nameImages, useNameAnswer } from "../../storage/nameImages";
+import { nameImages, privateLabelImages, useNameAnswer, usePrivateLabelAnswer } from "../../storage/nameImages";
 import { useStoreImage } from "../../storage/storeImages";
 import type { AdventureItem, ImageChoice, NamePhoto } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
 import { references, shownImage, useReference, useSearching } from "../../storage/references";
+import { AlternativePreviewSheet } from "./AlternativePreviewSheet";
 
 const STATUS: Record<string, string> = {
   searching: "Karrie zoekt een voorbeeldfoto…",
@@ -29,7 +42,14 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   const nameKey = wantsNameImage(item) ? nameImageLookupKey(item.name, adventure?.retailer) : undefined;
   const answer = useNameAnswer(nameKey);
   const others = answer?.classification === "branded" ? [answer.match, ...answer.alternatives].filter((photo): photo is NamePhoto => Boolean(photo)) : [];
-  const privateLabels = answer?.privateLabelAlternatives ?? [];
+  const retailer = adventure?.retailer;
+  const plQuery = retailer && wantsPrivateLabels(item, retailer) ? privateLabelQuery(item) : null;
+  const plKey = plQuery && retailer && !wantsNameImage(item) ? privateLabelLookupKey(plQuery, retailer) : undefined;
+  const plAnswer = usePrivateLabelAnswer(plKey);
+  const privateLabels = wantsNameImage(item)
+    ? (answer?.privateLabelAlternatives ?? [])
+    : (plAnswer?.privateLabelAlternatives ?? []);
+  const [preview, setPreview] = useState<NamePhoto | null>(null);
   const wanted = wantsReference(identity, item.imageChoice, offPhoto, Boolean(store || named));
   const entry = useReference(identity);
   const shown = wanted ? shownImage(entry) : null;
@@ -42,6 +62,9 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   useEffect(() => {
     if (nameKey) nameImages.request(nameKey);
   }, [nameKey]);
+  useEffect(() => {
+    if (plKey) privateLabelImages.request(plKey);
+  }, [plKey]);
   const candidates = wanted ? (entry?.discovery?.candidates ?? []) : [];
   const active: ImageChoice =
     item.imageChoice ??
@@ -67,6 +90,20 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
     { id: "photo", label: "Eigen foto", show: Boolean(item.photoId) },
     { id: "drawing", label: "Tekening", show: true },
   ];
+
+  function adopt(photo: NamePhoto) {
+    if (!retailer) return;
+    dispatch({
+      type: "adopt-commercial",
+      itemId: item.id,
+      name: photo.productName.slice(0, 40),
+      ...(photo.brand && { brand: photo.brand.slice(0, 40) }),
+      privateLabelRetailer: retailer,
+      photo,
+    });
+    choose("reference");
+    setPreview(null);
+  }
 
   if (!identity || (!settings.referenceImages && !entry && !store && !named && !others.length && !privateLabels.length)) return null;
   const chosenName = named?.imageUrl;
@@ -118,74 +155,50 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
 
       {(others.length > 1 || privateLabels.length > 0) && (
         <div className="picture-variants" data-testid="picture-variants">
-          <p className="sheet-note">Andere productfoto of variant</p>
           {others.length > 1 && (
-            <div className="picture-candidates" role="group" aria-label="Andere foto's van dit merk" data-testid="name-photos">
-              {others.map((photo) => (
-                <button
-                  key={photo.imageUrl}
-                  type="button"
-                  className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
-                  aria-pressed={photo.imageUrl === chosenName}
-                  aria-label={photo.productName}
-                  title={photo.productName}
-                  data-testid="name-photo"
-                  onClick={() => {
-                    dispatch({ type: "choose-name-photo", productId: item.productId, photo });
-                    choose("reference");
-                  }}
-                >
-                  <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
-                </button>
-              ))}
-            </div>
+            <>
+              <p className="sheet-note">Andere productfoto of variant</p>
+              <div className="picture-candidates" role="group" aria-label="Andere foto's van dit merk" data-testid="name-photos">
+                {others.map((photo) => (
+                  <button
+                    key={photo.imageUrl}
+                    type="button"
+                    className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
+                    aria-pressed={photo.imageUrl === chosenName}
+                    aria-label={photo.productName}
+                    title={photo.productName}
+                    data-testid="name-photo"
+                    onClick={() => {
+                      dispatch({ type: "choose-name-photo", productId: item.productId, photo });
+                      choose("reference");
+                    }}
+                  >
+                    <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
+                  </button>
+                ))}
+              </div>
+            </>
           )}
-          {privateLabels.length > 0 && (
-            <div className="picture-candidates" role="group" aria-label="Huismerk van deze winkel" data-testid="private-label-photos">
-              {privateLabels.map((photo) => (
-                <button
-                  key={photo.imageUrl}
-                  type="button"
-                  className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
-                  aria-pressed={photo.imageUrl === chosenName}
-                  aria-label={photo.productName}
-                  title={photo.productName}
-                  data-testid="private-label-photo"
-                  onClick={() => {
-                    dispatch({ type: "choose-name-photo", productId: item.productId, photo });
-                    choose("reference");
-                  }}
-                >
-                  <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
-                </button>
-              ))}
-            </div>
-          )}
-          {privateLabels.length > 0 && (
-            <div className="picture-actions">
-              {privateLabels.slice(0, 1).map((photo) => (
-                <button
-                  key={`adopt-${photo.imageUrl}`}
-                  type="button"
-                  className="text-button"
-                  data-testid="adopt-private-label"
-                  onClick={() => {
-                    if (!adventure?.retailer) return;
-                    dispatch({
-                      type: "adopt-commercial",
-                      itemId: item.id,
-                      name: photo.productName.slice(0, 40),
-                      brand: photo.productName.split(" ")[0],
-                      privateLabelRetailer: adventure.retailer,
-                      photo,
-                    });
-                    choose("reference");
-                  }}
-                >
-                  Gebruik dit huismerkproduct
-                </button>
-              ))}
-            </div>
+          {privateLabels.length > 0 && retailer && (
+            <>
+              <p className="sheet-note">Huismerk van {retailerName(retailer)}</p>
+              <div className="picture-candidates" role="group" aria-label="Huismerk van deze winkel" data-testid="private-label-photos">
+                {privateLabels.map((photo) => (
+                  <button
+                    key={photo.imageUrl}
+                    type="button"
+                    className={photo.imageUrl === chosenName ? "picture-candidate is-active" : "picture-candidate"}
+                    aria-pressed={photo.imageUrl === chosenName}
+                    aria-label={photo.productName}
+                    title={photo.productName}
+                    data-testid="private-label-photo"
+                    onClick={() => setPreview(photo)}
+                  >
+                    <img src={photo.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => markBroken(photo.imageUrl)} />
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -249,6 +262,8 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
           </button>
         )}
       </div>
+
+      <AlternativePreviewSheet open={Boolean(preview)} photo={preview} retailer={retailer} onClose={() => setPreview(null)} onConfirm={adopt} />
     </section>
   );
 }

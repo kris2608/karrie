@@ -131,22 +131,41 @@ export function createNameImageLookup(
     });
   }
 
+  const plPending = new Map<string, Promise<NameImage[]>>();
+
+  function rememberPrivateLabels(key: string, images: NameImage[]) {
+    const ttl = images.length ? NAME_IMAGE_RULES.foundTtlMs : NAME_IMAGE_RULES.missTtlMs;
+    plCache.delete(key);
+    if (plCache.size >= NAME_IMAGE_RULES.cacheEntries) plCache.delete(plCache.keys().next().value as string);
+    plCache.set(key, { images, until: now() + ttl });
+    if (catalog) void catalog.cachePut(key, "name", { privateLabelAlternatives: images }, now() + ttl);
+  }
+
   async function loadPrivateLabels(typed: string, retailer: RetailerId, seed: NameRow[]): Promise<NameImage[]> {
     const key = privateLabelKey(retailer, typed);
     if (!key) return [];
     const hit = plCache.get(key);
     if (hit && hit.until > now()) return hit.images;
-    let images = privateLabelImages(typed, seed, retailer);
-    if (images.length === 0 && providers.prijsProfeet?.searchPrivateLabel) {
-      const answer = await providers.prijsProfeet.searchPrivateLabel(words(parseName(typed)!.base).join(" "), retailer, (collected) =>
-        privateLabelImages(typed, collected.map(fromOffer), retailer).length > 0,
-      );
-      if (answer.ok) images = privateLabelImages(typed, answer.rows.map(fromOffer), retailer);
-    }
-    plCache.delete(key);
-    if (plCache.size >= NAME_IMAGE_RULES.cacheEntries) plCache.delete(plCache.keys().next().value as string);
-    plCache.set(key, { images, until: now() + (images.length ? NAME_IMAGE_RULES.foundTtlMs : NAME_IMAGE_RULES.missTtlMs) });
-    return images;
+    const running = plPending.get(key);
+    if (running) return running;
+    const promise = (async () => {
+      const cached = await catalog?.cacheGet<{ privateLabelAlternatives?: NameImage[] }>(key).catch(() => null);
+      if (cached?.privateLabelAlternatives) {
+        rememberPrivateLabels(key, cached.privateLabelAlternatives);
+        return cached.privateLabelAlternatives;
+      }
+      let images = privateLabelImages(typed, seed, retailer);
+      if (images.length === 0 && providers.prijsProfeet?.searchPrivateLabel) {
+        const answer = await providers.prijsProfeet.searchPrivateLabel(words(parseName(typed)!.base).join(" "), retailer, (collected) =>
+          privateLabelImages(typed, collected.map(fromOffer), retailer).length > 0,
+        );
+        if (answer.ok) images = privateLabelImages(typed, answer.rows.map(fromOffer), retailer);
+      }
+      rememberPrivateLabels(key, images);
+      return images;
+    })().finally(() => plPending.delete(key));
+    plPending.set(key, promise);
+    return promise;
   }
 
   function offRows(query: string): Promise<Rows> {
@@ -161,14 +180,15 @@ export function createNameImageLookup(
     if (!catalog) return null;
     const parsed = parseName(typed);
     if (!parsed) return null;
+    const packRequested = Boolean(parsed.packaging || parsed.size);
     const hit = await catalog.byAlias({ alias: parsed.base, packaging: parsed.packaging, size: parsed.size }).catch(() => null);
-    if (hit?.packMatched && hit.answer.match) {
+    if (hit && !hit.packMatched) return null;
+    if (hit?.packMatched && hit.answer.match && (!packRequested || hit.exactPack)) {
       const result: NameImageResult = { ok: true, answer: hit.answer, cached: true };
       remember(key, result, NAME_IMAGE_RULES.foundTtlMs);
       void catalog.rememberSeen(hit.productId);
       return result;
     }
-    if (hit && !hit.packMatched) return null;
     const cachedAnswer = await catalog.cacheGet<NameAnswer>(`name:${key}`).catch(() => null);
     if (cachedAnswer) {
       const result: NameImageResult = { ok: true, answer: cachedAnswer, cached: true };
@@ -267,6 +287,34 @@ export function createNameImageLookup(
       const promise = fresh(typed, key, options.retailer).finally(() => pending.delete(key));
       pending.set(key, promise);
       return promise;
+    },
+    /**
+     * Private-label alternatives only: memory → PostgreSQL → PrijsProfeet. Never runs a branded name search
+     * or records a candidate. Concurrent lookups for the same key share one upstream call.
+     */
+    async privateLabels(typed: string, retailer: RetailerId): Promise<NameImageResult> {
+      const key = privateLabelKey(retailer, typed);
+      if (!key) {
+        return {
+          ok: true,
+          answer: { classification: "unknown", match: null, alternatives: [], searched: { prijsprofeet: "skipped", off: "skipped" } },
+          cached: false,
+        };
+      }
+      const hit = plCache.get(key);
+      const fromMemory = Boolean(hit && hit.until > now());
+      const images = await loadPrivateLabels(typed, retailer, []);
+      return {
+        ok: true,
+        answer: {
+          classification: "unknown",
+          match: null,
+          alternatives: [],
+          ...(images.length > 0 && { privateLabelAlternatives: images }),
+          searched: { prijsprofeet: images.length ? "match" : "none", off: "skipped" },
+        },
+        cached: fromMemory,
+      };
     },
     stats: () => ({ ...stats, entries: cache.size }),
   };

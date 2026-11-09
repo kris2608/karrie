@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { hasPhoto, ItemArt, useArt } from "../../components/ItemArt";
 import { NutriScoreMark } from "../../components/NutriScoreLogo";
 import { CameraIcon } from "../../components/ui/PhotoButton";
@@ -8,14 +8,15 @@ import { StarIcon } from "../../components/ui/StarIcon";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { brandLabel } from "../../domain/customProduct";
 import { hasSuggestion, missionOn } from "../../domain/discovery";
-import { nameImageLookupKey } from "../../domain/imageIdentity";
+import { privateLabelLookupKey, privateLabelQuery, wantsPrivateLabels } from "../../domain/imageIdentity";
 import { retailerName } from "../../domain/retailers";
-import type { AdventureItem } from "../../domain/types";
+import type { AdventureItem, NamePhoto } from "../../domain/types";
 import { productById } from "../../data/catalog";
 import { confirmPackSize } from "../../services/barcode/pack";
 import { useAdventure } from "../../state/AdventureContext";
-import { useNameAnswer } from "../../storage/nameImages";
+import { privateLabelImages, usePrivateLabelAnswer } from "../../storage/nameImages";
 import { PackConflict } from "../photo/PackConflict";
+import { AlternativePreviewSheet } from "./AlternativePreviewSheet";
 import { DrawingPicker } from "./DrawingPicker";
 import { PictureBlock } from "./PictureBlock";
 import { ProductInfo } from "./ProductInfo";
@@ -75,6 +76,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const { dispatch, adventure } = useAdventure();
   const [name, setName] = useState(item.name);
   const [editing, setEditing] = useState(false);
+  const [preview, setPreview] = useState<NamePhoto | null>(null);
   const parentPhoto = item.imageSource === "parent" && Boolean(item.photoId);
   const shown = useArt(item).pick;
   const variant = item.recognition?.variant;
@@ -82,8 +84,14 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const listRetailer = adventure?.retailer;
   const crossRetailer =
     item.privateLabelRetailer && listRetailer && item.privateLabelRetailer !== listRetailer ? item.privateLabelRetailer : undefined;
-  const altAnswer = useNameAnswer(crossRetailer && listRetailer ? nameImageLookupKey(item.name, listRetailer) : undefined);
-  const jumboAlt = altAnswer?.privateLabelAlternatives?.[0];
+  const plQuery = crossRetailer && listRetailer && wantsPrivateLabels(item, listRetailer) ? privateLabelQuery(item) : null;
+  const plKey = plQuery && listRetailer ? privateLabelLookupKey(plQuery, listRetailer) : undefined;
+  const altAnswer = usePrivateLabelAnswer(plKey);
+  const jumboAlt = altAnswer?.privateLabelAlternatives?.[0] ?? null;
+
+  useEffect(() => {
+    if (plKey) privateLabelImages.request(plKey);
+  }, [plKey]);
 
   function saveName() {
     const next = name.trim();
@@ -94,6 +102,19 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   function done() {
     saveName();
     onClose();
+  }
+
+  function adopt(photo: NamePhoto) {
+    if (!listRetailer) return;
+    dispatch({
+      type: "adopt-commercial",
+      itemId: item.id,
+      name: photo.productName.slice(0, 40),
+      ...(photo.brand && { brand: photo.brand.slice(0, 40) }),
+      privateLabelRetailer: listRetailer,
+      photo,
+    });
+    setPreview(null);
   }
 
   return (
@@ -126,22 +147,8 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
           {jumboAlt && (
             <>
               {" "}
-              <button
-                type="button"
-                className="text-button"
-                data-testid="view-retailer-alternative"
-                onClick={() =>
-                  dispatch({
-                    type: "adopt-commercial",
-                    itemId: item.id,
-                    name: jumboAlt.productName.slice(0, 40),
-                    brand: jumboAlt.productName.split(" ")[0],
-                    privateLabelRetailer: listRetailer,
-                    photo: jumboAlt,
-                  })
-                }
-              >
-                Bekijk een {retailerName(listRetailer)}-alternatief
+              <button type="button" className="text-button" data-testid="view-retailer-alternative" onClick={() => setPreview(jumboAlt)}>
+                Bekijk {retailerName(listRetailer)}-alternatief
               </button>
             </>
           )}
@@ -211,6 +218,8 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
       <PressButton variant="primary" wide onClick={done}>
         Klaar
       </PressButton>
+
+      <AlternativePreviewSheet open={Boolean(preview)} photo={preview} retailer={listRetailer} onClose={() => setPreview(null)} onConfirm={adopt} />
     </>
   );
 }

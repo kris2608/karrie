@@ -34,12 +34,38 @@ describe("POST /api/images/name", () => {
   });
 
   async function start(answer: (q: string) => SearchResult = () => ({ ok: true, rows: ROWS }), off: OffSearchResult = { ok: true, rows: [] }, perIpPerHour = 300) {
-    const calls = { pp: [] as string[], off: [] as string[] };
+    const calls = { pp: [] as string[], off: [] as string[], pl: [] as string[] };
     const limits = (hour: number) =>
       createLimits({ perIpPerHour: hour, perIpPerDay: 1500, dailyRequests: 20000, dailyBudgetUsd: 1, inputUsdPerMTok: 0, cachedInputUsdPerMTok: 0, outputUsdPerMTok: 0 });
     const candidates = createCandidateStore();
+    const ahHagel: OfferRow = {
+      retailer: "albert_heijn",
+      sourceProductId: "ah-hagel",
+      productName: "AH Hagelslag Melk",
+      brand: "AH",
+      imageUrl: "https://static.ah.nl/dam/product/AHI_hagelslag?rendition=800x800_WEBP&fileType=binary",
+      sourceUrl: "https://www.ah.nl/p",
+      privateLabel: true,
+      promotionStatus: "unknown",
+    };
+    const jumboHagel: OfferRow = {
+      ...ahHagel,
+      retailer: "jumbo",
+      sourceProductId: "jumbo-hagel",
+      productName: "Jumbo Hagelslag Puur",
+      brand: "Jumbo",
+      imageUrl: "https://www.jumbo.com/dam-images/fit-in/360x360/Products/jumbo_hagelslag.png",
+      sourceUrl: "https://www.jumbo.com/p",
+    };
     const lookup = createNameImageLookup({
-      prijsProfeet: { searchName: async (q) => (calls.pp.push(q), answer(q)) },
+      prijsProfeet: {
+        searchName: async (q) => (calls.pp.push(q), answer(q)),
+        searchPrivateLabel: async (q, retailer) => {
+          calls.pl.push(`${retailer}|${q}`);
+          const rows = retailer === "albert_heijn" ? [ahHagel] : retailer === "jumbo" ? [jumboHagel] : [];
+          return { ok: true, rows };
+        },
+      },
       off: { search: async (q) => (calls.off.push(q), off) },
     });
     const handler = createHandler({
@@ -128,5 +154,24 @@ describe("POST /api/images/name", () => {
     const down = await start(() => ({ ok: true, rows: [] }), { ok: false, code: "unavailable" });
     expect((await down.post({ name: "Nutella" })).status).toBe(502);
     expect(down.candidates.list()).toEqual([]);
+  });
+
+  it("returns retailer-scoped private labels without branded search or candidates", async () => {
+    const { post, calls, candidates } = await start();
+    expect((await post({ name: "Hagelslag", purpose: "private-label" })).status).toBe(400);
+    const ah = await (await post({ name: "Hagelslag", retailer: "albert_heijn", purpose: "private-label" })).json();
+    expect(ah.result.privateLabelAlternatives.map((row: { retailer: string }) => row.retailer)).toEqual(["albert_heijn"]);
+    expect(ah.result.match).toBeNull();
+    expect(calls.pp).toEqual([]);
+    expect(calls.off).toEqual([]);
+    expect(calls.pl).toEqual(["albert_heijn|hagelslag"]);
+    expect(candidates.list()).toEqual([]);
+
+    const again = await (await post({ name: "Hagelslag", retailer: "albert_heijn", purpose: "private-label" }, "10.0.0.9")).json();
+    expect(again.result.privateLabelAlternatives).toHaveLength(1);
+    expect(calls.pl).toEqual(["albert_heijn|hagelslag"]);
+
+    const jumbo = await (await post({ name: "Hagelslag", retailer: "jumbo", purpose: "private-label" }, "10.0.0.8")).json();
+    expect(jumbo.result.privateLabelAlternatives[0].productName).toBe("Jumbo Hagelslag Puur");
   });
 });

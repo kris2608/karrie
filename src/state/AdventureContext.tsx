@@ -7,7 +7,7 @@ import { loadPersisted, savePersisted, type Persisted } from "../storage/db";
 import { preparePhotos } from "../storage/photos";
 import { offerQueries, offers } from "../storage/offers";
 import { references } from "../storage/references";
-import { nameImages, useNameImagesVersion } from "../storage/nameImages";
+import { nameImages, privateLabelImages, useNameImagesVersion } from "../storage/nameImages";
 import { setStoreImageRetailer, storeImages, useStoreImagesVersion } from "../storage/storeImages";
 import { wantedReferences, wantedStoreImages } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
@@ -51,6 +51,7 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     void offers.hydrate();
     void storeImages.hydrate();
     void nameImages.hydrate();
+    void privateLabelImages.hydrate();
     void catalogSync.hydrate();
     let hydrated: Persisted | null = null;
     Promise.all([loadPersisted(), references.hydrate()])

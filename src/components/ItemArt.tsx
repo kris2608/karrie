@@ -76,13 +76,14 @@ export function useBroken(): (url: string | null | undefined) => string | null {
   return (url) => (url && !broken.has(url) ? url : null);
 }
 
-/** The photo for a typed product: the one the parent picked, else the reliable match from its name lookup. */
+/** The photo the parent confirmed, or for typed products the reliable match from its name lookup. */
 export function useNamePhoto(item: Pick<PackInfo, "ean" | "kind" | "namePhoto"> & { name: string }): NamePhoto | null {
   const { adventure } = useAdventure();
   const key = wantsNameImage(item) ? nameImageLookupKey(item.name, adventure?.retailer) : undefined;
   const answer = useNameAnswer(key);
+  if (item.namePhoto) return item.namePhoto;
   if (!wantsNameImage(item)) return null;
-  return item.namePhoto ?? (answer?.classification === "branded" ? answer.match : null);
+  return answer?.classification === "branded" ? answer.match : null;
 }
 
 /** What ItemArt shows for an item, and where it came from; also used for the credit line. */

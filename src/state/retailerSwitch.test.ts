@@ -91,6 +91,74 @@ describe("device cache keys for private-label suggestions", () => {
   });
 });
 
+describe("adopt-commercial after preview confirmation", () => {
+  it("preserves quantity and drops unverified EAN, nutrition and parent photo", () => {
+    let state = listWith("albert_heijn");
+    const id = state.adventure!.items[0].id;
+    state = reducer(state, {
+      type: "apply-recognition",
+      itemId: id,
+      photoId: "parent-1",
+      pack: {
+        ean: "8710496978722",
+        brand: "De Ruijter",
+        packageSize: "400 g",
+        recognition: { specific: true, genericName: "hagelslag", confidence: "high" },
+        nutrition: { nutriscore: "D" },
+      },
+    });
+    state = reducer(state, { type: "set-quantity", itemId: id, quantity: 3 });
+    state = reducer(state, {
+      type: "adopt-commercial",
+      itemId: id,
+      name: "Jumbo Hagelslag Puur",
+      brand: "Jumbo",
+      privateLabelRetailer: "jumbo",
+      photo: {
+        source: "prijsprofeet",
+        imageUrl: "https://www.jumbo.com/dam-images/fit-in/360x360/Products/jumbo_hagelslag.png",
+        productName: "Jumbo Hagelslag Puur",
+        brand: "Jumbo",
+        retailer: "jumbo",
+      },
+    });
+    const item = state.adventure!.items[0];
+    expect(item.quantity).toBe(3);
+    expect(item.name).toBe("Jumbo Hagelslag Puur");
+    expect(item.brand).toBe("Jumbo");
+    expect(item.privateLabelRetailer).toBe("jumbo");
+    expect(item.ean).toBeUndefined();
+    expect(item.nutrition).toBeUndefined();
+    expect(item.photoId).toBeUndefined();
+    expect(item.packageSize).toBeUndefined();
+    expect(item.namePhoto?.brand).toBe("Jumbo");
+    expect(item.imageChoice).toBe("reference");
+  });
+
+  it("keeps the AH product when switching Jumbo then back to AH", () => {
+    let state = listWith("albert_heijn");
+    const id = state.adventure!.items[0].id;
+    state = reducer(state, {
+      type: "adopt-commercial",
+      itemId: id,
+      name: "AH Hagelslag Melk",
+      brand: "AH",
+      privateLabelRetailer: "albert_heijn",
+      photo: {
+        source: "prijsprofeet",
+        imageUrl: "https://static.ah.nl/dam/product/AHI_x?rendition=800x800_WEBP&fileType=binary",
+        productName: "AH Hagelslag Melk",
+        brand: "AH",
+        retailer: "albert_heijn",
+      },
+    });
+    state = reducer(state, { type: "set-retailer", retailer: "jumbo" });
+    state = reducer(state, { type: "set-retailer", retailer: "albert_heijn" });
+    expect(state.adventure!.items[0].name).toBe("AH Hagelslag Melk");
+    expect(state.adventure!.items[0].privateLabelRetailer).toBe("albert_heijn");
+  });
+});
+
 describe("observed private labels from photo recognition", () => {
   it("marks an AH pack without remapping to the list supermarket", () => {
     expect(houseBrandRetailer("AH", "hagelslag")).toBe("albert_heijn");

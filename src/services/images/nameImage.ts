@@ -1,5 +1,5 @@
 import { CATEGORIES } from "../../domain/categories";
-import { parseNameImageLookupKey } from "../../domain/imageIdentity";
+import { parseNameImageLookupKey, parsePrivateLabelLookupKey } from "../../domain/imageIdentity";
 import { imageRetailerName, isImageSourceRetailer } from "../../domain/retailers";
 import type { CategoryId, NamePhoto } from "../../domain/types";
 import type { LookupOutcome } from "../../storage/lookupStore";
@@ -57,10 +57,12 @@ export function cleanNamePhoto(value: unknown): NamePhoto | null {
   } else if (raw.source !== "off" || image.hostname !== OFF_HOST) return null;
   const page = https(raw.sourceUrl);
   const packaging = text(raw.packaging, 40);
+  const brand = text(raw.brand, 40);
   return {
     source: raw.source,
     imageUrl: image.href,
     productName,
+    ...(brand && { brand }),
     ...(retailer && { retailer }),
     ...(page && { sourceUrl: page.href }),
     ...(packaging && { packaging }),
@@ -106,17 +108,24 @@ const UNKNOWN: NameAnswer = { classification: "unknown", match: null, alternativ
 
 export function createNameImageClient(deps: NameImageClientDeps) {
   return {
-    /** Lookup key may include `|r|{retailer}` for private-label scoping (see nameImageLookupKey). */
+    /**
+     * Lookup key may include `|r|{retailer}` for branded scoping, or `private-label|{retailer}|{name}` for
+     * private-label-only lookups (see privateLabelLookupKey).
+     */
     async find(key: string): Promise<NameImageOutcome> {
       if (!deps.online()) return { status: "offline" };
-      const { name, retailer } = parseNameImageLookupKey(key);
+      const privateLabel = parsePrivateLabelLookupKey(key);
+      const scoped = privateLabel ?? parseNameImageLookupKey(key);
+      const name = scoped.name;
+      const retailer = "retailer" in scoped ? scoped.retailer : undefined;
+      const purpose = privateLabel ? ("private-label" as const) : undefined;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), NAME_IMAGE_CLIENT_RULES.timeoutMs);
       try {
         const response = await deps.fetch(`${deps.origin.replace(/\/$/, "")}/api/images/name`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, ...(retailer && { retailer }) }),
+          body: JSON.stringify({ name, ...(retailer && { retailer }), ...(purpose && { purpose }) }),
           credentials: "omit",
           referrerPolicy: "no-referrer",
           signal: controller.signal,

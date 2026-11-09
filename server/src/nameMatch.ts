@@ -289,6 +289,14 @@ const canonical = (word: string) => SYNONYM[word] ?? word;
 const isQuantity = (word: string) => /^\d/.test(word) && !word.endsWith("%");
 const UNIT_WORDS = new Set(["ml", "cl", "dl", "l", "ltr", "liter", "liters", "g", "gr", "gram", "grams", "kg", "kilo"]);
 
+/** Formulation / flavour tokens from a word list (for catalog product selection). */
+export function formulationWords(list: string[]): string[] {
+  return list
+    .map(canonical)
+    .filter((word) => !NEUTRAL.has(word) && !isQuantity(word) && !UNIT_WORDS.has(word) && !Object.hasOwn(ROW_PACKAGING, word))
+    .filter((word) => FORMULATION.has(word) || word.endsWith("%") || Object.values(SYNONYM).includes(word));
+}
+
 /** The size on a row: its quantity field first, else a size written in its name. */
 export function rowSize(row: Pick<NameRow, "quantity" | "name">): Size | null {
   for (const text of [row.quantity, row.name]) {

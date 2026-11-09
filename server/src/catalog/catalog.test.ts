@@ -266,10 +266,80 @@ describe("name images and admin sync", () => {
     );
     const plain = await catalog.byAlias({ alias: "Chocomel" });
     expect(plain?.packMatched).toBe(true);
+    expect(plain?.exactPack).toBe(false);
     const litre = await catalog.byAlias({ alias: "Chocomel", size: { unit: "ml", amount: 1000 } });
     expect(litre?.packMatched).toBe(true);
+    expect(litre?.exactPack).toBe(false);
     const blik = await catalog.byAlias({ alias: "Chocomel", packaging: "can" });
     expect(blik?.packMatched).toBe(false);
+    expect(blik?.exactPack).toBe(false);
+  });
+
+  it("ranks packaging-aware images and keeps formulations apart", async () => {
+    const { catalog, pool } = await readyCatalog();
+    await pool.query(
+      `INSERT INTO catalog_products (id, normalized_key, name, product_type, brand, formulation, category_id, aliases, approval_status, is_default_catalog, origin)
+       VALUES
+         ('p-choco', 'chocomel', 'Chocomel', 'branded', 'Chocomel', NULL, 'dairy', '["Chocomel"]'::jsonb, 'approved', false, 'shared'),
+         ('p-pepsi', 'pepsi', 'Pepsi', 'branded', 'Pepsi', NULL, 'drinks', '["Pepsi"]'::jsonb, 'approved', false, 'shared'),
+         ('p-zero', 'pepsi zero', 'Pepsi Zero', 'branded', 'Pepsi', 'Zero', 'drinks', '["Pepsi Zero","Pepsi"]'::jsonb, 'approved', false, 'shared'),
+         ('p-cherry', 'pepsi zero cherry', 'Pepsi Zero Cherry', 'branded', 'Pepsi', 'Zero Cherry', 'drinks', '["Pepsi Zero Cherry","Pepsi"]'::jsonb, 'approved', false, 'shared')`,
+    );
+    await pool.query(
+      `INSERT INTO catalog_aliases (alias_normalized, product_id) VALUES
+         ('chocomel', 'p-choco'), ('pepsi', 'p-pepsi'), ('pepsi', 'p-zero'), ('pepsi', 'p-cherry'),
+         ('pepsi zero', 'p-zero'), ('pepsi zero cherry', 'p-cherry')`,
+    );
+    await pool.query(
+      `INSERT INTO product_variants (id, product_id, package_quantity, package_unit, multipack_count, package_type, pack_key, label) VALUES
+         ('v-can', 'p-choco', 250, 'ml', NULL, 'can', '250|ml||can', '250 ml blik'),
+         ('v-litre', 'p-choco', 1000, 'ml', NULL, 'carton', '1000|ml||carton', '1 l'),
+         ('v-multi', 'p-choco', 250, 'ml', 6, 'can', '250|ml|6|can', '6 x 250 ml'),
+         ('v-pepsi', 'p-pepsi', 1500, 'ml', NULL, NULL, '1500|ml||', '1.5 l'),
+         ('v-zero', 'p-zero', 1500, 'ml', NULL, NULL, '1500|ml||', '1.5 l'),
+         ('v-cherry', 'p-cherry', 330, 'ml', NULL, 'can', '330|ml||can', '330 ml')`,
+    );
+    await pool.query(
+      `INSERT INTO product_images (id, product_id, variant_id, url, source, usage_status, preferred) VALUES
+         ('i-rep', 'p-choco', NULL, 'https://cdn.example/chocomel-rep.jpg', 'prijsprofeet', 'link_only', true),
+         ('i-can', 'p-choco', 'v-can', 'https://cdn.example/chocomel-can.jpg', 'prijsprofeet', 'link_only', false),
+         ('i-litre', 'p-choco', 'v-litre', 'https://cdn.example/chocomel-litre.jpg', 'prijsprofeet', 'link_only', false),
+         ('i-multi', 'p-choco', 'v-multi', 'https://cdn.example/chocomel-multi.jpg', 'prijsprofeet', 'link_only', false),
+         ('i-pepsi', 'p-pepsi', 'v-pepsi', 'https://cdn.example/pepsi.jpg', 'prijsprofeet', 'link_only', true),
+         ('i-zero', 'p-zero', 'v-zero', 'https://cdn.example/pepsi-zero.jpg', 'prijsprofeet', 'link_only', true),
+         ('i-cherry', 'p-cherry', 'v-cherry', 'https://cdn.example/pepsi-zero-cherry.jpg', 'prijsprofeet', 'link_only', true)`,
+    );
+    await pool.query(
+      `INSERT INTO product_identifiers (gtin, variant_id, source, confidence) VALUES
+         ('8712345678901', 'v-can', 'openfoodfacts', 'off-exact'),
+         ('8712345678902', 'v-litre', 'openfoodfacts', 'off-exact')`,
+    );
+
+    const can = await catalog.byAlias({ alias: "Chocomel", packaging: "can", size: { unit: "ml", amount: 250 } });
+    expect(can?.exactPack).toBe(true);
+    expect(can?.answer.match?.imageUrl).toContain("chocomel-can");
+
+    const litre = await catalog.byAlias({ alias: "Chocomel", size: { unit: "ml", amount: 1000 } });
+    expect(litre?.exactPack).toBe(true);
+    expect(litre?.answer.match?.imageUrl).toContain("chocomel-litre");
+
+    const pepsi = await catalog.byAlias({ alias: "Pepsi" });
+    expect(pepsi?.answer.match?.imageUrl).toContain("pepsi.jpg");
+    expect(pepsi?.productId).toBe("p-pepsi");
+
+    const zero = await catalog.byAlias({ alias: "Pepsi Zero" });
+    expect(zero?.answer.match?.imageUrl).toContain("pepsi-zero.jpg");
+    expect(zero?.productId).toBe("p-zero");
+
+    const cherry = await catalog.byAlias({ alias: "Pepsi Zero Cherry" });
+    expect(cherry?.answer.match?.imageUrl).toContain("pepsi-zero-cherry");
+
+    const missingCan = await catalog.byAlias({ alias: "Chocomel", packaging: "can", size: { unit: "ml", amount: 330 } });
+    expect(missingCan?.packMatched).toBe(false);
+
+    const plain = await catalog.byAlias({ alias: "Chocomel" });
+    expect(plain?.answer.match?.imageUrl).toContain("chocomel-rep");
+    expect(new Set(plain?.answer.alternatives.map((image) => image.imageUrl) ?? []).size).toBe(plain?.answer.alternatives.length);
   });
 
   it("stores retailer images as link_only and skips unavailable ones", async () => {

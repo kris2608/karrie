@@ -1,3 +1,4 @@
+import { productById } from "../data/catalog";
 import { isRetailer, type RetailerId } from "./retailers";
 import { parseName, sizeLabel } from "./typedName";
 import type { PackInfo } from "./types";
@@ -74,6 +75,62 @@ export function parseNameImageLookupKey(key: string): { name: string; retailer?:
   if (at < 0) return { name: key };
   const retailer = key.slice(at + RETAILER_MARK.length);
   return isRetailer(retailer) ? { name: key.slice(0, at), retailer } : { name: key };
+}
+
+const PRIVATE_LABEL_MARK = "private-label|";
+
+/** Strip a known house-brand prefix so "AH Hagelslag Melk" becomes a generic search base. */
+function stripHouseBrandPrefix(name: string): string {
+  const trimmed = name.replace(/\s+/g, " ").trim();
+  const match = /^(ah|albert\s*heijn|jumbo|lidl)\b[\s-]*/i.exec(trimmed);
+  if (!match) return trimmed;
+  return trimmed.slice(match[0].length).trim() || trimmed;
+}
+
+type PrivateLabelItem = Identifiable &
+  Pick<PackInfo, "ean" | "privateLabelRetailer"> & {
+    productId?: string;
+  };
+
+/**
+ * The generic product type used when asking for private-label alternatives.
+ * Catalog items keep their catalog name; adopted private labels drop the house-brand prefix.
+ */
+export function privateLabelQuery(item: PrivateLabelItem): string | null {
+  if (item.ean) return null;
+  if (item.privateLabelRetailer) {
+    const stripped = stripHouseBrandPrefix(item.name);
+    return stripped || null;
+  }
+  const catalog = item.productId ? productById(item.productId) : undefined;
+  if (catalog) return catalog.name;
+  if (item.kind === "custom_generic" && !item.brand) return item.name.trim() || null;
+  const identity = identityOf(item);
+  if (identity?.generic) return identity.name;
+  return null;
+}
+
+/** Retailer-scoped private-label suggestions for generic or already-adopted private-label items (never manufacturer brands). */
+export function wantsPrivateLabels(item: PrivateLabelItem, retailer: RetailerId | undefined): boolean {
+  if (!retailer || item.ean) return false;
+  if (item.privateLabelRetailer) return Boolean(privateLabelQuery(item));
+  const identity = identityOf(item);
+  return Boolean(identity?.generic && privateLabelQuery(item));
+}
+
+/** Device + API cache key for private-label-only lookups (`private-label|{retailer}|{name}`). */
+export function privateLabelLookupKey(query: string, retailer: RetailerId): string {
+  return `${PRIVATE_LABEL_MARK}${retailer}|${nameImageKey(query)}`;
+}
+
+export function parsePrivateLabelLookupKey(key: string): { name: string; retailer: RetailerId; purpose: "private-label" } | null {
+  if (!key.startsWith(PRIVATE_LABEL_MARK)) return null;
+  const rest = key.slice(PRIVATE_LABEL_MARK.length);
+  const bar = rest.indexOf("|");
+  if (bar < 0) return null;
+  const retailer = rest.slice(0, bar);
+  const name = rest.slice(bar + 1);
+  return isRetailer(retailer) && name ? { name, retailer, purpose: "private-label" } : null;
 }
 
 /**

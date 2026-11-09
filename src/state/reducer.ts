@@ -641,13 +641,43 @@ export function reducer(state: AppState, action: Action): AppState {
         return rest as typeof item;
       });
     case "adopt-commercial":
-      return updateItem(state, action.itemId, (item) => ({
-        ...item,
-        name: action.name.slice(0, 40),
-        ...(action.brand && { brand: action.brand.slice(0, 40) }),
-        privateLabelRetailer: action.privateLabelRetailer,
-        ...(action.photo && { namePhoto: action.photo, imageChoice: "reference" as const }),
-      }));
+      return updateItem(state, action.itemId, (item) => {
+        const {
+          ean: _ean,
+          barcode: _barcode,
+          nutrition: _nutrition,
+          offAttribution: _off,
+          recognition: _recognition,
+          packConflict: _conflict,
+          packageSize: _packageSize,
+          photoId: _photoId,
+          imageUrl: _imageUrl,
+          imageKind: _imageKind,
+          imageSource: _imageSource,
+          fieldSources: previousFields,
+          alternative: _alternative,
+          missionEnabled: _missionEnabled,
+          brand: _oldBrand,
+          ...rest
+        } = item;
+        const draft = state.adventure?.phase === "draft";
+        const fieldSources = previousFields
+          ? (() => {
+              const { packageSize: _pack, ...kept } = previousFields;
+              return Object.keys(kept).length ? kept : undefined;
+            })()
+          : undefined;
+        return {
+          ...rest,
+          ...(draft ? {} : { alternative: item.alternative, missionEnabled: item.missionEnabled }),
+          name: action.name.slice(0, 40),
+          ...(action.brand ? { brand: action.brand.slice(0, 40) } : {}),
+          privateLabelRetailer: action.privateLabelRetailer,
+          ...(fieldSources && { fieldSources }),
+          ...(action.photo && { namePhoto: action.photo, imageChoice: "reference" as const }),
+          ...(!action.photo && item.namePhoto ? { namePhoto: item.namePhoto } : {}),
+        };
+      });
     case "set-illustration":
       return updateCustom(state, action.productId, (item) => {
         if (item.illustration === "none") return item;

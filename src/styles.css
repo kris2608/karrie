@@ -1859,6 +1859,15 @@ a.settings-link { text-decoration: none; color: inherit; }
 .picture-block { display: grid; gap: var(--space-2); }
 .picture-block > small { color: var(--ink-soft); font-weight: 700; }
 .picture-block .picture-source { font-weight: 600; overflow-wrap: anywhere; }
+.alt-preview { display: grid; gap: var(--space-4); }
+.alt-preview-art {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: var(--radius-m);
+  background: var(--card);
+  flex: none;
+}
 .picture-source a { color: inherit; }
 .picture-candidates { display: flex; gap: var(--space-2); overflow-x: auto; padding: 2px; }
 .picture-candidate {

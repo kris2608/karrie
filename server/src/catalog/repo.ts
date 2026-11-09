@@ -6,6 +6,8 @@ import type { NameAnswer } from "../nameImage.js";
 import type { NameImage } from "../nameMatch.js";
 import type { ProductCategory } from "../offers/match.js";
 import { PRODUCT_CATEGORIES } from "../offers/match.js";
+import { formulationWords, words } from "../nameMatch.js";
+import { parseName } from "../productName.js";
 import { aliasKey, normalizedKey, packFromQuantity, packKey, sizeMatches } from "./keys.js";
 import { quantityMlOf, summarizePack, type PackEvidence, type PackEvidenceSource } from "./pack.js";
 import type {
@@ -287,60 +289,120 @@ export function createCatalogStore(
       try {
         const key = aliasKey(request.alias);
         if (!key) return null;
-        const rows = await run("byAlias", async (db) => {
-          const { rows: found } = await db.query(
-            `SELECT p.id, p.name, p.brand, p.formulation, p.product_type, p.category_id,
-                    v.id AS variant_id, v.package_quantity, v.package_unit, v.multipack_count, v.package_type, v.label,
-                    img.url AS image_url, img.source AS image_source, img.retailer, img.source_url, img.usage_status, img.license
+        const packRequested = Boolean(request.packaging || request.size);
+        const typedFormulation = formulationWords(words(request.alias)).sort().join(" ");
+
+        const products = await run("byAlias:products", async (db) => {
+          const { rows } = await db.query(
+            `SELECT DISTINCT ON (p.id) p.id, p.name, p.brand, p.formulation, p.product_type, p.category_id, p.normalized_key
              FROM catalog_aliases a
              JOIN catalog_products p ON p.id = a.product_id
-             LEFT JOIN product_variants v ON v.product_id = p.id
-             LEFT JOIN product_images img ON img.product_id = p.id AND img.usage_status <> 'unavailable'
              WHERE a.alias_normalized = $1
                AND p.approval_status = 'approved'
-             ORDER BY img.preferred DESC, img.created_at ASC`,
+             ORDER BY p.id ASC`,
             [key],
           );
-          return found;
+          return rows;
         });
-        if (!rows.length) return null;
-        const productId = String(rows[0].id);
-        const packMatched = !request.packaging && !request.size
-          ? true
-          : rows.some((row) =>
+        if (!products.length) return null;
+
+        type ProductRow = (typeof products)[number];
+        const compatible = products
+          .map((row) => {
+            const brandWords = asString(row.brand) ? words(String(row.brand)) : [];
+            const fieldFormulation = formulationWords(words(asString(row.formulation) ?? ""));
+            let rest = words(String(row.name));
+            if (brandWords.length) {
+              for (let start = 0; start + brandWords.length <= rest.length; start += 1) {
+                if (brandWords.every((word, index) => rest[start + index] === word)) {
+                  rest = [...rest.slice(0, start), ...rest.slice(start + brandWords.length)];
+                  break;
+                }
+              }
+            }
+            const fromName = formulationWords(rest);
+            const productFormulation = [...new Set(fieldFormulation.length ? fieldFormulation : fromName)].sort().join(" ");
+            const formulationOk = typedFormulation === productFormulation;
+            const nameAlias = aliasKey(String(row.name)) === key;
+            return { row, formulationOk, nameAlias, key: String(row.normalized_key ?? "") };
+          })
+          .filter((entry) => entry.formulationOk);
+        if (!compatible.length) return null;
+        compatible.sort((a, b) => Number(b.nameAlias) - Number(a.nameAlias) || a.key.localeCompare(b.key) || String(a.row.id).localeCompare(String(b.row.id)));
+        const chosen = compatible[0].row as ProductRow;
+        const productId = String(chosen.id);
+
+        const variants = await run("byAlias:variants", async (db) => {
+          const { rows } = await db.query(
+            `SELECT id, package_quantity, package_unit, multipack_count, package_type, pack_key, label
+             FROM product_variants
+             WHERE product_id = $1
+             ORDER BY pack_key ASC, id ASC`,
+            [productId],
+          );
+          return rows;
+        });
+        const matchedVariants = packRequested
+          ? variants.filter((row) =>
               sizeMatches(request.size, request.packaging, {
                 packageQuantity: asNumber(row.package_quantity),
                 packageUnit: asString(row.package_unit),
                 multipackCount: asNumber(row.multipack_count),
                 packageType: asString(row.package_type),
               }),
-            );
-        if (!packMatched) return { answer: emptyNameAnswer(), productId, packMatched: false };
+            )
+          : [];
+        if (packRequested && !matchedVariants.length) {
+          return { answer: emptyNameAnswer(), productId, packMatched: false, exactPack: false } satisfies StoredNameHit;
+        }
+        const selectedVariantId = packRequested && matchedVariants[0] ? String(matchedVariants[0].id) : undefined;
 
-        const images: NameImage[] = [];
+        const imageRows = await run("byAlias:images", async (db) => {
+          const { rows } = await db.query(
+            `SELECT url, source, retailer, source_url, usage_status, variant_id, preferred, created_at, id
+             FROM product_images
+             WHERE product_id = $1 AND usage_status <> 'unavailable'
+             ORDER BY preferred DESC, created_at ASC, id ASC`,
+            [productId],
+          );
+          return rows;
+        });
+
+        type Ranked = { image: NameImage; rank: number };
+        const ranked: Ranked[] = [];
         const seen = new Set<string>();
-        for (const row of rows) {
-          const url = asString(row.image_url);
-          if (!url || seen.has(url) || row.usage_status === "unavailable") continue;
+        for (const row of imageRows) {
+          const url = asString(row.url);
+          if (!url || seen.has(url)) continue;
           seen.add(url);
-          images.push({
-            imageUrl: url,
-            productName: String(row.name),
-            confidence: "high",
-            brand: asString(row.brand) ?? String(row.name),
-            source: asString(row.image_source) === "openfoodfacts" ? "off" : "prijsprofeet",
-            ...(asString(row.retailer) && { retailer: asString(row.retailer) as NameImage["retailer"] }),
-            ...(asString(row.source_url) && { sourceUrl: asString(row.source_url) }),
+          const variantId = asString(row.variant_id);
+          let rank = 1;
+          if (selectedVariantId && variantId === selectedVariantId) rank = 0;
+          else if (variantId) rank = packRequested ? 99 : 2;
+          if (rank >= 99) continue;
+          ranked.push({
+            rank,
+            image: {
+              imageUrl: url,
+              productName: String(chosen.name),
+              confidence: rank === 0 ? "high" : "medium",
+              brand: asString(chosen.brand) ?? String(chosen.name),
+              source: asString(row.source) === "openfoodfacts" ? "off" : "prijsprofeet",
+              ...(asString(row.retailer) && { retailer: asString(row.retailer) as NameImage["retailer"] }),
+              ...(asString(row.source_url) && { sourceUrl: asString(row.source_url) }),
+            },
           });
         }
-        if (!images.length) return null;
+        ranked.sort((a, b) => a.rank - b.rank);
+        if (!ranked.length) return null;
         counters.centralHits += 1;
-        const [match, ...alternatives] = images;
-        const category = asString(rows[0].category_id);
+        const [match, ...alternatives] = ranked.map((entry) => entry.image);
+        const category = asString(chosen.category_id);
+        const exactPack = packRequested && ranked[0]?.rank === 0;
         const answer: NameAnswer = {
-          classification: rows[0].product_type === "branded" ? "branded" : "unknown",
-          ...(asString(rows[0].brand) ? { brand: asString(rows[0].brand) } : {}),
-          ...(asString(rows[0].formulation) ? { variant: asString(rows[0].formulation) } : {}),
+          classification: chosen.product_type === "branded" ? "branded" : "unknown",
+          ...(asString(chosen.brand) ? { brand: asString(chosen.brand) } : {}),
+          ...(asString(chosen.formulation) ? { variant: asString(chosen.formulation) } : {}),
           match,
           alternatives: alternatives.slice(0, 6),
           ...(category && PRODUCT_CATEGORIES.includes(category as ProductCategory)
@@ -348,7 +410,7 @@ export function createCatalogStore(
             : {}),
           searched: { prijsprofeet: "skipped", off: "skipped" },
         };
-        return { answer, productId, packMatched: true } satisfies StoredNameHit;
+        return { answer, productId, packMatched: true, exactPack } satisfies StoredNameHit;
       } catch {
         return null;
       }
@@ -521,6 +583,7 @@ export function createCatalogStore(
       try {
         const { answer } = input;
         if (answer.classification !== "branded" || !answer.brand) return;
+        const parsed = parseName(input.typed);
         await run("write:name", () =>
           tx(async (db) => {
             const name = answer.brand!;
@@ -546,6 +609,37 @@ export function createCatalogStore(
             const resolvedId = String(rows[0]?.id ?? productId);
             await replaceAliases(db, resolvedId, aliases);
 
+            const packWanted = Boolean(parsed?.packaging || parsed?.size);
+            let matchVariantId: string | null = null;
+            if (packWanted && answer.match?.packaging) {
+              const pack = packFromQuantity(answer.match.packaging, parsed?.packaging);
+              const keyPack = packKey(pack);
+              const variantId = variantIdOf(resolvedId, keyPack);
+              await db.query(
+                `INSERT INTO product_variants (
+                   id, product_id, package_quantity, package_unit, multipack_count, package_type, pack_key, label, updated_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+                 ON CONFLICT (product_id, pack_key) DO UPDATE SET
+                   label = COALESCE(EXCLUDED.label, product_variants.label),
+                   updated_at = now()`,
+                [
+                  variantId,
+                  resolvedId,
+                  pack.packageQuantity ?? null,
+                  pack.packageUnit ?? null,
+                  pack.multipackCount ?? null,
+                  pack.packageType ?? null,
+                  keyPack,
+                  pack.label ?? null,
+                ],
+              );
+              const { rows: variantRows } = await db.query(
+                `SELECT id FROM product_variants WHERE product_id = $1 AND pack_key = $2`,
+                [resolvedId, keyPack],
+              );
+              matchVariantId = asString(variantRows[0]?.id) ?? variantId;
+            }
+
             const images = [answer.match, ...answer.alternatives, ...(answer.privateLabelAlternatives ?? [])].filter(
               (image): image is NameImage => Boolean(image),
             );
@@ -554,6 +648,7 @@ export function createCatalogStore(
               const id = imageIdOf(resolvedId, image.imageUrl);
               const fromOff = image.source === "off";
               const isPrivate = image.privateLabel === true;
+              const attachVariant = !isPrivate && image === answer.match ? matchVariantId : null;
               if (isPrivate && image.retailer) {
                 const plKey = normalizedKey([image.productName, image.retailer].join(" "), image.brand ?? image.productName);
                 const plId = productIdFromKey(plKey, "pl");
@@ -583,13 +678,15 @@ export function createCatalogStore(
               await db.query(
                 `INSERT INTO product_images (
                    id, product_id, variant_id, url, source, retailer, source_url, license, usage_status, preferred, last_checked_at
-                 ) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, now())
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
                  ON CONFLICT (product_id, url) DO UPDATE SET
+                   variant_id = COALESCE(EXCLUDED.variant_id, product_images.variant_id),
                    preferred = product_images.preferred OR EXCLUDED.preferred,
                    last_checked_at = now()`,
                 [
                   id,
                   resolvedId,
+                  attachVariant,
                   image.imageUrl,
                   fromOff ? "openfoodfacts" : "prijsprofeet",
                   image.retailer ?? null,

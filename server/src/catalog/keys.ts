@@ -52,6 +52,7 @@ export function sizeMatches(requested: Size | undefined, packaging: Packaging | 
   if (Number(variant.packageQuantity) !== requested.amount) return false;
   const wantCount = requested.count ?? null;
   const haveCount = variant.multipackCount ?? null;
-  if (wantCount && haveCount !== wantCount) return false;
-  return true;
+  if (wantCount) return haveCount === wantCount;
+  /** A plain size request is a single pack; multipacks need an explicit count. */
+  return !haveCount || haveCount === 1;
 }

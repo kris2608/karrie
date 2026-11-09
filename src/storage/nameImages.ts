@@ -11,6 +11,7 @@ import { createLookupStore, LOOKUP_RULES, type LookupEntry, type LookupStatus } 
 export type NameImageEntry = LookupEntry<NameAnswer>;
 
 const KV_KEY = "nameImages";
+const PRIVATE_LABEL_KV = "privateLabels";
 
 export function createNameImageStore(deps: {
   client: Pick<NameImageClient, "find">;
@@ -22,13 +23,37 @@ export function createNameImageStore(deps: {
   return createLookupStore<NameAnswer>({ ...deps, rules: LOOKUP_RULES, found: (answer) => Boolean(answer.match) });
 }
 
+/** Private-label-only answers: found when the retailer returned at least one house-brand alternative. */
+export function createPrivateLabelStore(deps: {
+  client: Pick<NameImageClient, "find">;
+  now: () => number;
+  load: () => Promise<Record<string, NameImageEntry> | undefined>;
+  save: (entries: Record<string, NameImageEntry>) => Promise<void>;
+  online: (listener: () => void) => void;
+}) {
+  return createLookupStore<NameAnswer>({
+    ...deps,
+    rules: LOOKUP_RULES,
+    found: (answer) => Boolean(answer.privateLabelAlternatives?.length),
+  });
+}
+
 export type NameImageStore = ReturnType<typeof createNameImageStore>;
+export type PrivateLabelStore = ReturnType<typeof createPrivateLabelStore>;
 
 export const nameImages = createNameImageStore({
   client: nameImageClient,
   now: Date.now,
   load: () => readKv<Record<string, NameImageEntry>>(KV_KEY),
   save: (entries) => writeKv(KV_KEY, entries),
+  online: (listener) => window.addEventListener("online", listener, { once: true }),
+});
+
+export const privateLabelImages = createPrivateLabelStore({
+  client: nameImageClient,
+  now: Date.now,
+  load: () => readKv<Record<string, NameImageEntry>>(PRIVATE_LABEL_KV),
+  save: (entries) => writeKv(PRIVATE_LABEL_KV, entries),
   online: (listener) => window.addEventListener("online", listener, { once: true }),
 });
 
@@ -42,4 +67,8 @@ export function useNameImagesVersion(): number {
 
 export function useNameImageStatus(key: string | undefined): LookupStatus {
   return useSyncExternalStore(nameImages.subscribe, () => nameImages.status(key));
+}
+
+export function usePrivateLabelAnswer(key: string | undefined): NameAnswer | null {
+  return useSyncExternalStore(privateLabelImages.subscribe, () => privateLabelImages.value(key));
 }

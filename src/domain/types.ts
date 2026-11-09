@@ -147,6 +147,8 @@ export type NamePhoto = {
   source: "prijsprofeet" | "off";
   imageUrl: string;
   productName: string;
+  /** Structured brand from the source when known; never guessed from the first word. */
+  brand?: string;
   /** Any image-source retailer slug (jumbo, plus, …), not only the shopping picker. */
   retailer?: string;
   sourceUrl?: string;

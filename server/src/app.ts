@@ -48,7 +48,7 @@ export type StoreImageDeps = {
 };
 
 export type NameImageDeps = {
-  lookup: Pick<NameImageLookup, "find" | "cached" | "stats">;
+  lookup: Pick<NameImageLookup, "find" | "cached" | "stats" | "privateLabels">;
   /** The offers' per-IP limits; each source keeps its own server-wide limit. */
   limits: Limits;
   off?: Pick<OffSearch, "stats">;
@@ -423,8 +423,10 @@ export function createHandler(deps: AppDeps) {
       const parsed = parseName(request.data.name);
       if (!parsed) return send(422, { status: "error", code: "not-a-product" });
       const ip = clientIp(req);
+      const purpose = request.data.purpose;
+      const retailer = request.data.retailer;
 
-      const reply = (result: NameImageResult) => {
+      const reply = (result: NameImageResult, recordCandidate: boolean) => {
         if (!result.ok) {
           count(nameImageOutcomes, `error-${result.code}`);
           return send(result.code === "limit" ? 429 : 502, { status: "error", code: result.code === "limit" ? "rate-limited" : "unavailable" });
@@ -432,27 +434,40 @@ export function createHandler(deps: AppDeps) {
         const { answer } = result;
         count(nameImageOutcomes, `${answer.classification}-${answer.match ? answer.match.source : "none"}`);
         entry.found = answer.match ? answer.match.source : answer.classification;
-        deps.products?.candidates.recordName(
-          {
-            base: parsed.base,
-            classification: answer.classification,
-            brand: answer.brand,
-            variant: answer.variant,
-            packaging: packagingLabel(parsed),
-            category: answer.category,
-            prijsprofeetMatch: answer.searched.prijsprofeet === "match",
-            offMatch: answer.searched.off === "match",
-            imageAvailable: Boolean(answer.match),
-          },
-          ip,
-        );
+        if (recordCandidate) {
+          deps.products?.candidates.recordName(
+            {
+              base: parsed.base,
+              classification: answer.classification,
+              brand: answer.brand,
+              variant: answer.variant,
+              packaging: packagingLabel(parsed),
+              category: answer.category,
+              prijsprofeetMatch: answer.searched.prijsprofeet === "match",
+              offMatch: answer.searched.off === "match",
+              imageAvailable: Boolean(answer.match),
+            },
+            ip,
+          );
+        }
         return send(200, { status: "ok", result: answer });
       };
-      const retailer = request.data.retailer;
+
+      if (purpose === "private-label" && retailer) {
+        const denial = images.limits.admit(ip);
+        if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+        const callStarted = now();
+        const result = await images.lookup.privateLabels(parsed.name, retailer);
+        if (result.ok && result.cached) entry.cached = true;
+        images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+        entry.lookupMs = now() - callStarted;
+        return reply(result, false);
+      }
+
       const hit = images.lookup.cached(parsed.name);
       if (hit && !retailer) {
         entry.cached = true;
-        return reply(hit);
+        return reply(hit, true);
       }
       const denial = images.limits.admit(ip);
       if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
@@ -461,7 +476,7 @@ export function createHandler(deps: AppDeps) {
       if (result.ok && result.cached) entry.cached = true;
       images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
       entry.lookupMs = now() - callStarted;
-      return reply(result);
+      return reply(result, true);
     }
 
     /** Only the product's name, kind and barcode go to PrijsProfeet; nothing about the family. */
@@ -638,8 +653,15 @@ const NameRequestSchema = z
     name: z.string().max(40),
     /** Shopping-list supermarket: scopes private-label alternatives only. */
     retailer: z.enum(RETAILERS).optional(),
+    /** Skip branded name search; return private-label alternatives for the given retailer only. */
+    purpose: z.enum(["private-label"]).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.purpose === "private-label" && !value.retailer) {
+      ctx.addIssue({ code: "custom", message: "retailer required", path: ["retailer"] });
+    }
+  });
 
 /** "blik", "1 l", "6 x 200 ml": how a requested pack is kept on a candidate. */
 function packagingLabel(parsed: ParsedName): string | undefined {
