@@ -100,6 +100,20 @@ export function ReviewScreen() {
     show(`${item.name} verwijderd`, { label: "Ongedaan maken", run: () => dispatch({ type: "insert-item", item, index }) });
   }
 
+  function clearList() {
+    if (!adventure) return;
+    const removed = adventure.items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.status !== "found");
+    if (!removed.length) return;
+    dispatch({ type: "clear-open-items" });
+    setEditId(null);
+    show("Lijstje geleegd", {
+      label: "Ongedaan maken",
+      run: () => removed.forEach(({ item, index }) => dispatch({ type: "insert-item", item, index })),
+    });
+  }
+
   function moveGroup(category: CategoryId, direction: -1 | 1) {
     if (!adventure) return;
     const visible = groups.map((group) => group.category);
@@ -176,9 +190,48 @@ export function ReviewScreen() {
       ))}
       <div className="dock dock-fixed">
         {adventure.phase === "draft" && (
-          <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={() => setSaving(true)}>
-            Bewaren
-          </PressButton>
+          <>
+            <PressButton
+              variant="quiet"
+              size="l"
+              className="dock-icon-btn"
+              data-testid="clear-list"
+              aria-label="Lijstje legen"
+              disabled={!hasOpen}
+              onClick={clearList}
+            >
+              <svg className="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M8 7h8M9.5 7V6a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 6v1M9 10v7M12 10v7M15 10v7M7.5 7l.7 12.2A1.5 1.5 0 0 0 9.7 20.5h4.6a1.5 1.5 0 0 0 1.5-1.3L16.5 7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </PressButton>
+            <PressButton
+              variant="quiet"
+              size="l"
+              className="dock-icon-btn"
+              data-testid="save-later"
+              aria-label="Bewaren"
+              disabled={!hasOpen}
+              onClick={() => setSaving(true)}
+            >
+              <svg className="dock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M7 4.5h8.2L19 8.3V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V6A1.5 1.5 0 0 1 6.5 4.5H7z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinejoin="round"
+                />
+                <path d="M9 4.5v5.5h6V4.5M9 19v-5h6v5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+              </svg>
+            </PressButton>
+          </>
         )}
         <PressButton variant="primary" size="l" wide data-testid="start" disabled={!hasOpen} onClick={start}>
           {adventure.phase === "shopping" ? "Verder winkelen" : "Start avontuur"}

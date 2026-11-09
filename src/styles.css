@@ -949,6 +949,15 @@ a.settings-link { text-decoration: none; color: inherit; }
 .dock-fixed > .pbtn { flex: 1; white-space: nowrap; }
 .dock-fixed > .pbtn-quiet { flex: none; padding: 0 var(--space-5); }
 .dock-fixed > .pbtn-l { padding: 0 var(--space-5); font-size: 1.2rem; }
+.dock-fixed > .dock-icon-btn {
+  flex: none;
+  width: 56px;
+  min-width: 56px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.dock-fixed > .dock-icon-btn .dock-icon { width: 24px; height: 24px; }
 .dock-count {
   display: inline-grid;
   place-items: center;

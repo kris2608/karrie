@@ -114,6 +114,8 @@ export type Action =
   | { type: "add-lines"; lines: { product: Product; quantity: number }[] }
   | { type: "set-quantity"; itemId: string; quantity: number }
   | { type: "remove-item"; itemId: string }
+  /** Drop every open (non-found) line; found items and list metadata stay. */
+  | { type: "clear-open-items" }
   | { type: "move-item"; itemId: string; direction: -1 | 1 }
   | { type: "move-category"; category: CategoryId; direction: -1 | 1 }
   | { type: "set-category-order"; order: CategoryId[] }
@@ -514,6 +516,12 @@ export function reducer(state: AppState, action: Action): AppState {
     case "remove-item": {
       if (!state.adventure) return state;
       const items = state.adventure.items.filter((item) => item.id !== action.itemId || item.status === "found");
+      return { ...state, adventure: touch(state.adventure, { items }) };
+    }
+    case "clear-open-items": {
+      if (!state.adventure) return state;
+      const items = state.adventure.items.filter((item) => item.status === "found");
+      if (items.length === state.adventure.items.length) return state;
       return { ...state, adventure: touch(state.adventure, { items }) };
     }
     case "move-item": {

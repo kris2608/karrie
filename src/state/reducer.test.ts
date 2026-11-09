@@ -64,6 +64,29 @@ it("bewaart een nieuw lijstje voor later zonder het avontuur te starten", () => 
   expect(state.saved[0].items.map((item) => item.productId)).toEqual(["banaan"]);
 });
 
+it("wist open producten van het lijstje maar laat gevonden regels en de winkel staan", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  const melk = recognizeList("melk")[0].product!;
+  let state = reducer(initialState, { type: "set-retailer", retailer: "jumbo" });
+  state = reducer(state, { type: "add-product", product: banaan });
+  state = reducer(state, { type: "add-product", product: melk });
+  state = reducer(state, { type: "start-shopping" });
+  const firstId = state.adventure!.items[0].id;
+  state = reducer(state, { type: "found" });
+  expect(state.adventure?.items.find((item) => item.id === firstId)?.status).toBe("found");
+
+  const open = state.adventure!.items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.status !== "found");
+  state = reducer(state, { type: "clear-open-items" });
+  expect(state.adventure?.retailer).toBe("jumbo");
+  expect(state.adventure?.items.map((item) => item.id)).toEqual([firstId]);
+
+  for (const { item, index } of open) state = reducer(state, { type: "insert-item", item, index });
+  expect(state.adventure?.items).toHaveLength(2);
+  expect(state.adventure?.items.some((item) => item.status !== "found")).toBe(true);
+});
+
 it("wist een bewaard lijstje, zet het terug op zijn plek en wist alles", () => {
   const banaan = recognizeList("banaan")[0].product!;
   let state = initialState;
