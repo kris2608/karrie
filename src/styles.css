@@ -477,6 +477,19 @@ h1, h2, p { margin: 0; }
   text-align: left;
   touch-action: pan-y;
 }
+/* On PC the bottom sheet sits under the taskbar; float it as a centered dialog instead. */
+@media (pointer: fine) and (min-height: 560px) {
+  .sheet {
+    align-items: center;
+    padding: var(--space-6);
+  }
+  .sheet-card {
+    max-height: min(88vh, calc(100% - 2 * var(--space-6)));
+    max-height: min(88dvh, calc(100% - 2 * var(--space-6)));
+    border-radius: 28px;
+    padding-bottom: var(--space-5);
+  }
+}
 .sheet-handle {
   display: grid;
   justify-items: center;

@@ -39,7 +39,7 @@ function Arrow({ up }: { up?: boolean }) {
 }
 
 export function ReviewScreen() {
-  const { adventure, dispatch } = useAdventure();
+  const { adventure, saved, dispatch } = useAdventure();
   const navigate = useNavigate();
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
@@ -51,6 +51,7 @@ export function ReviewScreen() {
   const items = adventure?.items ?? NO_ITEMS;
   const retailer = adventure?.phase === "draft" ? adventure.retailer : undefined;
   const { views, deals } = useOfferViews(items, retailer);
+  const editingFavorite = Boolean(adventure && saved.some((list) => list.id === adventure.id && list.favorite));
 
   useEffect(() => {
     if ((location.state as { editItem?: string } | null)?.editItem) navigate(".", { replace: true, state: null });
@@ -85,6 +86,16 @@ export function ReviewScreen() {
 
   function saveForLater(name: string, store: string) {
     dispatch({ type: "save-favorite", name, store });
+    navigate("/", { state: { notice: "Lijstje bewaard" } });
+  }
+
+  function updateFavorite() {
+    dispatch({ type: "save-favorite" });
+    navigate("/", { state: { notice: "Lijstje bijgewerkt!" } });
+  }
+
+  function saveAsNew(name: string, store: string) {
+    dispatch({ type: "save-favorite-as-new", name, store });
     navigate("/", { state: { notice: "Lijstje bewaard" } });
   }
 
@@ -213,7 +224,7 @@ export function ReviewScreen() {
       <div className="dock dock-fixed">
         {adventure.phase === "draft" && (
           <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={() => setSaving(true)}>
-            Bewaren
+            {editingFavorite ? "Bewaar wijzigingen" : "Bewaren"}
           </PressButton>
         )}
         <PressButton variant="primary" size="l" wide data-testid="start" disabled={!hasOpen} onClick={start}>
@@ -237,7 +248,15 @@ export function ReviewScreen() {
         onRemove={() => editing && remove(editing)}
       />
       <OfferSheet open={offerOpen} onClose={() => setOfferOpen(null)} />
-      <SaveListSheet open={saving} adventure={adventure} onClose={() => setSaving(false)} onSave={saveForLater} />
+      <SaveListSheet
+        open={saving}
+        adventure={adventure}
+        editingFavorite={editingFavorite}
+        onClose={() => setSaving(false)}
+        onSave={saveForLater}
+        onUpdate={updateFavorite}
+        onSaveAsNew={saveAsNew}
+      />
       <ShareListSheet open={sharing} source={adventure} onClose={() => setSharing(false)} />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <Toast notice={notice} onDismiss={dismiss} />

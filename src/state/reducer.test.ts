@@ -162,6 +162,7 @@ it("bewaart een lijstje met een naam en supermarkt en neemt die mee bij openen",
 
   state = reducer(state, { type: "new-draft" });
   state = reducer(state, { type: "open-saved", id: state.saved[0].id });
+  expect(state.adventure?.id).toBe(state.saved[0].id);
   expect(listName(state.adventure!)).toBe("Weekboodschappen");
   expect(state.adventure?.store).toBe("Albert Heijn");
 
@@ -169,6 +170,50 @@ it("bewaart een lijstje met een naam en supermarkt en neemt die mee bij openen",
   expect(state.saved[0].name).toBe(DEFAULT_LIST_NAME);
   expect(state.saved[0].store).toBeUndefined();
   expect(listName(state.saved[0])).toBeUndefined();
+});
+
+it("werkt een heropend favoriet bij zonder een tweede kopie", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  const melk = recognizeList("melk")[0].product!;
+  let state = reducer(initialState, { type: "add-product", product: banaan });
+  state = reducer(state, { type: "save-favorite", name: "Week" });
+  const id = state.saved[0].id;
+
+  state = reducer(state, { type: "new-draft" });
+  state = reducer(state, { type: "open-saved", id });
+  expect(state.adventure?.id).toBe(id);
+  state = reducer(state, { type: "add-product", product: melk });
+  state = reducer(state, { type: "save-favorite" });
+  expect(state.saved.filter((list) => list.favorite)).toHaveLength(1);
+  expect(state.saved[0]).toMatchObject({ id, name: "Week", favorite: true });
+  expect(state.saved[0].items.map((item) => item.productId).sort()).toEqual(["banaan", "melk"]);
+
+  state = reducer(state, { type: "remove-item", itemId: state.adventure!.items.find((item) => item.productId === "banaan")!.id });
+  state = reducer(state, { type: "save-favorite" });
+  state = reducer(state, { type: "save-favorite" });
+  expect(state.saved.filter((list) => list.favorite)).toHaveLength(1);
+  expect(state.saved[0].items.map((item) => item.productId)).toEqual(["melk"]);
+});
+
+it("bewaart als nieuw een aparte favoriet en laat het origineel staan", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  const melk = recognizeList("melk")[0].product!;
+  let state = reducer(initialState, { type: "add-product", product: banaan });
+  state = reducer(state, { type: "save-favorite", name: "Origineel" });
+  const originalId = state.saved[0].id;
+
+  state = reducer(state, { type: "new-draft" });
+  state = reducer(state, { type: "open-saved", id: originalId });
+  state = reducer(state, { type: "add-product", product: melk });
+  state = reducer(state, { type: "save-favorite-as-new", name: "Kopie" });
+
+  expect(state.adventure?.id).not.toBe(originalId);
+  expect(state.adventure).toMatchObject({ id: state.saved[0].id, name: "Kopie" });
+  expect(state.saved.filter((list) => list.favorite)).toHaveLength(2);
+  const original = state.saved.find((list) => list.id === originalId)!;
+  expect(original).toMatchObject({ name: "Origineel", favorite: true });
+  expect(original.items.map((item) => item.productId)).toEqual(["banaan"]);
+  expect(state.saved[0].items.map((item) => item.productId).sort()).toEqual(["banaan", "melk"]);
 });
 
 it("importeert een gedeeld lijstje als nieuw avontuur met verse ids", () => {

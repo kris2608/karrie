@@ -72,8 +72,8 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
     }
   }
 
-  if (action.type === "save-favorite" && next.items.length) {
-    const wasFavorite = before.saved.some((list) => list.id === next.id && list.favorite);
+  if ((action.type === "save-favorite" || action.type === "save-favorite-as-new") && next.items.length) {
+    const wasFavorite = action.type === "save-favorite" && before.saved.some((list) => list.id === next.id && list.favorite);
     events.push({ event: { name: "shopping_list_saved", data: { action: wasFavorite ? "updated" : "new" } }, once: `save:${next.id}:${wasFavorite ? "u" : "n"}` });
   }
 

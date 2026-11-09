@@ -161,6 +161,8 @@ export type Action =
   | { type: "skip" }
   | { type: "undo" }
   | { type: "save-favorite"; name?: string; store?: string }
+  /** Save a copy under a new id; the previous favorite row (if any) stays unchanged. */
+  | { type: "save-favorite-as-new"; name?: string; store?: string }
   | { type: "open-saved"; id: string }
   | { type: "forget-saved"; id: string }
   | { type: "restore-saved"; list: SavedList; index: number }
@@ -739,13 +741,27 @@ export function reducer(state: AppState, action: Action): AppState {
       const adventure = action.name === undefined && action.store === undefined ? current : { ...current, name: name || DEFAULT_LIST_NAME, store: store || undefined };
       return { ...state, adventure, saved: upsertSaved(state.saved, adventure, true) };
     }
+    case "save-favorite-as-new": {
+      if (!state.adventure?.items.length) return state;
+      const name = action.name?.trim().slice(0, 40);
+      const store = action.store?.trim().slice(0, 40);
+      const { forgotten: _forgotten, ...current } = state.adventure;
+      const adventure = {
+        ...current,
+        id: crypto.randomUUID(),
+        name: name || DEFAULT_LIST_NAME,
+        store: store || undefined,
+        updatedAt: Date.now(),
+      };
+      return { ...state, adventure, saved: upsertSaved(state.saved, adventure, true) };
+    }
     case "open-saved": {
       const list = state.saved.find((entry) => entry.id === action.id);
       if (!list) return state;
       const adventure = createAdventure(list.name, [], state.categoryOrder, "draft");
       const items = sortByCategory(list.items.map(itemFromSaved), state.categoryOrder);
       const retailer = isRetailer(list.retailer) ? list.retailer : state.settings.retailer;
-      return { ...state, adventure: withRetailer({ ...adventure, ...(list.store && { store: list.store }), items }, retailer) };
+      return { ...state, adventure: withRetailer({ ...adventure, id: list.id, ...(list.store && { store: list.store }), items }, retailer) };
     }
     case "forget-saved":
       return { ...state, saved: state.saved.filter((list) => list.id !== action.id), adventure: forget(state.adventure, [action.id]) };
