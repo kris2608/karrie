@@ -18,6 +18,8 @@ import { useLongPress } from "../../components/ui/useLongPress";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { activeSection } from "./sectionSpy";
 import { NewProductSheet, type NewProductChoice } from "./NewProductSheet";
+import { ProductPreviewSheet } from "./ProductPreviewSheet";
+import { infoCorner, previewCategory, previewMine, previewName, previewPack, previewQuantity, type PreviewTarget } from "./productPreview";
 import { Attribution, OfferTag, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { RETAILERS, retailerName, type RetailerId } from "../../domain/retailers";
@@ -67,13 +69,14 @@ type GridTileProps = {
   pop: { token: number } | null;
   onAdd: () => void;
   onRemove: () => void;
+  onInfo: () => void;
   /** Mijn producten can always be long-pressed: that also forgets them. */
   mine?: boolean;
   /** Only reliable offers show on a tile; doubtful ones stay on the parent's list screen. */
   offer?: RetailerId;
 };
 
-function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, mine = false, offer }: GridTileProps) {
+function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo, mine = false, offer }: GridTileProps) {
   const { pressing, handlers } = useLongPress(onRemove, quantity === 0 && !mine);
   const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : "", mine ? "is-mine" : ""].filter(Boolean).join(" ");
   const deal = offer && quantity ? `, in de aanbieding bij ${retailerName(offer)}` : "";
@@ -82,60 +85,77 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, mine = 
     : quantity
       ? `${name}, ${quantity} op de lijst${deal}. Lang drukken om te verwijderen`
       : name;
+  const corner = infoCorner(quantity);
   return (
-    <motion.button
-      type="button"
-      className={classes}
-      style={{ ["--blob" as string]: TINT[category] }}
-      aria-label={label}
-      data-testid="product-card"
-      whileTap={{ scale: 0.94 }}
-      transition={{ duration: 0.09 }}
-      onClick={onAdd}
-      {...handlers}
-    >
-      <motion.span
-        key={pop ? pop.token : "still"}
-        className="card-art"
-        initial={pop ? { scale: 1 } : false}
-        animate={pop ? { scale: [1, 1.24, 0.94, 1], rotate: [0, -6, 3, 0] } : { scale: 1 }}
-        transition={{ duration: 0.45, ease: "easeOut" }}
+    <div className="product-card-shell">
+      <motion.button
+        type="button"
+        className={classes}
+        style={{ ["--blob" as string]: TINT[category] }}
+        aria-label={label}
+        data-testid="product-card"
+        whileTap={{ scale: 0.94 }}
+        transition={{ duration: 0.09 }}
+        onClick={onAdd}
+        {...handlers}
       >
-        {art}
-      </motion.span>
-      <span className="card-name">{name}</span>
-      {mine && (
-        <span className="card-mine" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="currentColor" />
-          </svg>
-        </span>
-      )}
-      {offer && quantity > 0 && <OfferTag shown="deal" retailer={offer} className="card-offer" compact />}
-      <AnimatePresence>
-        {quantity > 0 && (
-          <motion.span key="badge" className="card-badge" variants={badgeSpring} initial="hidden" animate="shown" exit="gone">
-            <motion.span key={quantity} initial={{ scale: 1.5 }} animate={{ scale: 1 }} transition={spring}>
-              {quantity}
+        <motion.span
+          key={pop ? pop.token : "still"}
+          className="card-art"
+          initial={pop ? { scale: 1 } : false}
+          animate={pop ? { scale: [1, 1.24, 0.94, 1], rotate: [0, -6, 3, 0] } : { scale: 1 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
+          {art}
+        </motion.span>
+        <span className="card-name">{name}</span>
+        {mine && (
+          <span className="card-mine" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="currentColor" />
+            </svg>
+          </span>
+        )}
+        {offer && quantity > 0 && <OfferTag shown="deal" retailer={offer} className="card-offer" compact />}
+        <AnimatePresence>
+          {quantity > 0 && (
+            <motion.span key="badge" className="card-badge" variants={badgeSpring} initial="hidden" animate="shown" exit="gone">
+              <motion.span key={quantity} initial={{ scale: 1.5 }} animate={{ scale: 1 }} transition={spring}>
+                {quantity}
+              </motion.span>
             </motion.span>
+          )}
+        </AnimatePresence>
+        {pop && (
+          <motion.span
+            key={`burst-${pop.token}`}
+            className="card-burst"
+            aria-hidden="true"
+            initial={{ scale: 0.2, opacity: 0, y: 0 }}
+            animate={{ scale: [0.2, 1.2, 1, 0.8], opacity: [0, 1, 1, 0], y: [0, -10, -60, -110] }}
+            transition={{ duration: BURST_MS / 1000, times: [0, 0.2, 0.65, 1], ease: "easeOut" }}
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M6 12.5l4 4 8-9" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </motion.span>
         )}
-      </AnimatePresence>
-      {pop && (
-        <motion.span
-          key={`burst-${pop.token}`}
-          className="card-burst"
-          aria-hidden="true"
-          initial={{ scale: 0.2, opacity: 0, y: 0 }}
-          animate={{ scale: [0.2, 1.2, 1, 0.8], opacity: [0, 1, 1, 0], y: [0, -10, -60, -110] }}
-          transition={{ duration: BURST_MS / 1000, times: [0, 0.2, 0.65, 1], ease: "easeOut" }}
-        >
-          <svg viewBox="0 0 24 24">
-            <path d="M6 12.5l4 4 8-9" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </motion.span>
-      )}
-    </motion.button>
+      </motion.button>
+      <button
+        type="button"
+        className={`card-info is-${corner}`}
+        data-testid="product-info-btn"
+        data-no-long-press
+        aria-label={`Informatie over ${name}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onInfo();
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <span aria-hidden="true">i</span>
+      </button>
+    </div>
   );
 }
 
@@ -163,6 +183,7 @@ export function AddScreen() {
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [burst, setBurst] = useState<{ id: string; token: number } | null>(null);
   const [pickingStore, setPickingStore] = useState(false);
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
   const draft = adventure?.phase === "draft" ? adventure : null;
@@ -330,6 +351,20 @@ export function AddScreen() {
     buzz(8);
   }
 
+  function addFromPreview(target: PreviewTarget) {
+    if (target.kind === "catalog") addProduct(target.product);
+    else if (target.kind === "mine") addMine(target.entry);
+    else addMore(target.item);
+  }
+
+  function previewArt(target: PreviewTarget) {
+    if (target.kind === "catalog") {
+      return <ItemArt item={target.listed ?? { icon: artIdOf(target.product), name: target.product.name }} />;
+    }
+    if (target.kind === "mine") return <ItemArt item={target.listed ?? target.entry} />;
+    return <ItemArt item={target.item} />;
+  }
+
   /** What the sheet already found goes straight onto the new item, so the background tidy-up has nothing left to ask. */
   function confirmCustom(name: string, { tidy, answer }: NewProductChoice, after: "more" | "list") {
     const productId = customProductId(name);
@@ -392,6 +427,7 @@ export function AddScreen() {
   const mineTile = (entry: SavedItem) => {
     const key = mineKey(entry);
     const listed = onList.get(key);
+    const offer = offerOn(listed?.item);
     return (
       <GridTile
         key={key}
@@ -402,28 +438,34 @@ export function AddScreen() {
         pop={burst?.id === key ? burst : null}
         onAdd={() => addMine(entry)}
         onRemove={() => forgetMine(entry)}
+        onInfo={() => setPreview({ kind: "mine", entry, listed: listed?.item, quantity: listed?.quantity ?? 0, offer })}
         mine
-        offer={offerOn(listed?.item)}
+        offer={offer}
       />
     );
   };
 
-  const extraTile = (entry: OnList) => (
-    <GridTile
-      key={entry.item.id}
-      name={entry.item.name}
-      category={entry.item.category}
-      art={<ItemArt item={entry.item} />}
-      quantity={entry.quantity}
-      pop={burst?.id === entry.item.productId ? burst : null}
-      onAdd={() => addMore(entry.item)}
-      onRemove={() => removeProduct(tileOf(entry.item))}
-      offer={offerOn(entry.item)}
-    />
-  );
+  const extraTile = (entry: OnList) => {
+    const offer = offerOn(entry.item);
+    return (
+      <GridTile
+        key={entry.item.id}
+        name={entry.item.name}
+        category={entry.item.category}
+        art={<ItemArt item={entry.item} />}
+        quantity={entry.quantity}
+        pop={burst?.id === entry.item.productId ? burst : null}
+        onAdd={() => addMore(entry.item)}
+        onRemove={() => removeProduct(tileOf(entry.item))}
+        onInfo={() => setPreview({ kind: "extra", item: entry.item, quantity: entry.quantity, offer })}
+        offer={offer}
+      />
+    );
+  };
 
   const productTile = (product: Product) => {
     const entry = onList.get(product.id);
+    const offer = offerOn(entry?.item);
     return (
       <GridTile
         key={product.id}
@@ -434,7 +476,8 @@ export function AddScreen() {
         pop={burst?.id === product.id ? burst : null}
         onAdd={() => addProduct(product)}
         onRemove={() => removeProduct(product.id)}
-        offer={offerOn(entry?.item)}
+        onInfo={() => setPreview({ kind: "catalog", product, listed: entry?.item, quantity: entry?.quantity ?? 0, offer })}
+        offer={offer}
       />
     );
   };
@@ -630,6 +673,21 @@ export function AddScreen() {
         />
         <Attribution />
       </Sheet>
+
+      <ProductPreviewSheet
+        open={!!preview}
+        name={preview ? previewName(preview) : ""}
+        category={preview ? previewCategory(preview) : CATEGORIES[0].id}
+        art={preview ? previewArt(preview) : null}
+        pack={preview ? previewPack(preview) : undefined}
+        mine={preview ? previewMine(preview) : false}
+        offer={preview?.offer}
+        quantity={preview ? previewQuantity(preview) : 0}
+        onAdd={() => {
+          if (preview) addFromPreview(preview);
+        }}
+        onClose={() => setPreview(null)}
+      />
 
       <PhotoFlow
         ref={photo}
