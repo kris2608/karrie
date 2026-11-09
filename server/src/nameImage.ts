@@ -190,13 +190,13 @@ export function createNameImageLookup(
     const first = await prijsProfeetRows(query, typed);
     if (first.failed === "limit") return { ok: false, code: "limit" };
     let found = first.rows;
-    let matched = matchName(typed, found);
+    let matched = matchName(typed, found, retailer);
     const brandWord = query.split(" ")[0];
     if (!first.failed && matched.classification === "unknown" && query.includes(" ")) {
       const again = await prijsProfeetRows(brandWord, typed);
       if (again.failed === "limit") return { ok: false, code: "limit" };
       found = [...found, ...again.rows];
-      matched = matchName(typed, found);
+      matched = matchName(typed, found, retailer);
     }
     const searched: NameAnswer["searched"] = { prijsprofeet: first.failed ? "error" : outcomeOf(matched), off: "skipped" };
     let second: NameMatch | null = null;
@@ -204,7 +204,7 @@ export function createNameImageLookup(
     if (!matched.match && providers.off) {
       const off = await offRows(query);
       if (!off.failed) {
-        second = matchName(typed, off.rows);
+        second = matchName(typed, off.rows, retailer);
         searched.off = outcomeOf(second);
       } else {
         searched.off = "error";

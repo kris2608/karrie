@@ -16,6 +16,7 @@ import type {
   CatalogStore,
   NameLookupRequest,
   ParentPackInput,
+  RetailerPackInput,
   SetDefaultInput,
   StoredBarcodeHit,
   StoredNameHit,
@@ -253,7 +254,7 @@ export function createCatalogStore(
         counters.centralHits += 1;
         const verified = new Date(String(row.last_verified_at ?? row.refreshed_at ?? 0)).getTime();
         const stale = !Number.isFinite(verified) || now() - verified > refreshMs;
-        const pack = await loadPackSummary(pool, ean, now).catch(() => summarizePack([]));
+        const pack = await loadPackSummary(pool, ean).catch(() => summarizePack([]));
         const answer = rebuildAnswer(row);
         if (answer.product) {
           if (pack.displayQuantity) answer.product = { ...answer.product, quantity: pack.displayQuantity };
@@ -634,15 +635,6 @@ export function createCatalogStore(
                  last_checked_at = now()`,
               [id, hit.product_id, hit.variant_id, input.imageUrl, input.retailer, input.sourceUrl ?? null],
             );
-            await upsertEvidence(db, {
-              gtin: input.ean,
-              source: "prijsprofeet",
-              quantityRaw: input.quantity,
-              productName: input.productName,
-              brand: input.brand,
-              at: now(),
-            });
-            await refreshConflictFlag(db, input.ean);
             counters.writes += 1;
           }),
         );
@@ -651,7 +643,7 @@ export function createCatalogStore(
       }
     },
 
-    async storeImageByGtin(ean) {
+    async storeImageByGtin(ean, preferRetailer) {
       try {
         const row = await run("storeImageByGtin", async (db) => {
           const { rows } = await db.query(
@@ -662,16 +654,22 @@ export function createCatalogStore(
                AND img.usage_status = 'link_only'
                AND img.source = 'prijsprofeet'
              WHERE i.gtin = $1
-             ORDER BY CASE WHEN img.variant_id = v.id THEN 0 ELSE 1 END, img.preferred DESC, img.created_at ASC
+             ORDER BY
+               CASE WHEN $2::text IS NOT NULL AND img.retailer = $2 THEN 0 ELSE 1 END,
+               CASE WHEN img.variant_id = v.id THEN 0 ELSE 1 END,
+               img.preferred DESC,
+               img.created_at ASC
              LIMIT 1`,
-            [ean],
+            [ean, preferRetailer ?? null],
           );
           return rows[0] ?? null;
         });
         if (!row?.url) return null;
         counters.centralHits += 1;
-        const pack = await loadPackSummary(pool, ean, now).catch(() => summarizePack([]));
-        const retailerEvidence = pack.sources.find((entry) => entry.source === "prijsprofeet");
+        const pack = await loadPackSummary(pool, ean, preferRetailer).catch(() => summarizePack([]));
+        const retailerEvidence =
+          pack.sources.find((entry) => entry.source === "prijsprofeet" && entry.retailer === String(row.retailer)) ??
+          pack.sources.find((entry) => entry.source === "prijsprofeet");
         return {
           ean,
           imageUrl: String(row.url),
@@ -686,11 +684,38 @@ export function createCatalogStore(
       }
     },
 
-    async packForGtin(ean) {
+    async packForGtin(ean, listRetailer) {
       try {
-        return await loadPackSummary(pool, ean, now);
+        return await loadPackSummary(pool, ean, listRetailer);
       } catch {
         return summarizePack([]);
+      }
+    },
+
+    async recordRetailerPack(input: RetailerPackInput) {
+      if (!input.rows.length) return null;
+      try {
+        return await run("write:retailerPack", () =>
+          tx(async (db) => {
+            for (const row of input.rows) {
+              await upsertEvidence(db, {
+                gtin: input.ean,
+                source: "prijsprofeet",
+                retailer: row.retailer,
+                quantityRaw: row.quantity,
+                productName: row.productName,
+                brand: row.brand,
+                at: now(),
+              });
+            }
+            await refreshConflictFlag(db, input.ean);
+            counters.writes += 1;
+            return loadPackSummary(db, input.ean);
+          }),
+        );
+      } catch {
+        counters.writeErrors += 1;
+        return null;
       }
     },
 
@@ -706,12 +731,33 @@ export function createCatalogStore(
             });
             await refreshConflictFlag(db, input.ean);
             counters.writes += 1;
-            return loadPackSummary(db, input.ean, now);
+            return loadPackSummary(db, input.ean);
           }),
         );
       } catch {
         counters.writeErrors += 1;
         return null;
+      }
+    },
+
+    async gtinsMissingRetailerPack(limit) {
+      try {
+        return await run("gtinsMissingRetailerPack", async (db) => {
+          const { rows } = await db.query(
+            `SELECT i.gtin
+             FROM product_identifiers i
+             WHERE NOT EXISTS (
+               SELECT 1 FROM product_pack_evidence e
+               WHERE e.gtin = i.gtin AND e.source = 'prijsprofeet'
+             )
+             ORDER BY i.last_verified_at DESC
+             LIMIT $1`,
+            [Math.max(1, Math.min(limit, 50))],
+          );
+          return rows.map((row) => String(row.gtin));
+        });
+      } catch {
+        return [];
       }
     },
 
@@ -725,7 +771,7 @@ export function createCatalogStore(
               const before = await db.query(`SELECT pack_conflict FROM product_identifiers WHERE gtin = $1`, [row.gtin]);
               await refreshConflictFlag(db, String(row.gtin));
               const after = await db.query(`SELECT pack_conflict FROM product_identifiers WHERE gtin = $1`, [row.gtin]);
-              if (Boolean(after.rows[0]?.pack_conflict) && !before.rows[0]?.pack_conflict) fixed += 1;
+              if (Boolean(before.rows[0]?.pack_conflict) && !after.rows[0]?.pack_conflict) fixed += 1;
             }
             counters.writes += 1;
             return fixed;
@@ -992,16 +1038,18 @@ async function upsertEvidence(
   input: {
     gtin: string;
     source: PackEvidenceSource;
+    retailer?: string;
     quantityRaw?: string;
     productName?: string;
     brand?: string;
     at: number;
   },
 ) {
+  const retailer = input.source === "prijsprofeet" ? (input.retailer ?? "").trim().toLowerCase() : "";
   await db.query(
-    `INSERT INTO product_pack_evidence (gtin, source, quantity_raw, quantity_ml, product_name, brand, retrieved_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz)
-     ON CONFLICT (gtin, source) DO UPDATE SET
+    `INSERT INTO product_pack_evidence (gtin, source, retailer, quantity_raw, quantity_ml, product_name, brand, retrieved_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)
+     ON CONFLICT (gtin, source, retailer) DO UPDATE SET
        quantity_raw = COALESCE(EXCLUDED.quantity_raw, product_pack_evidence.quantity_raw),
        quantity_ml = COALESCE(EXCLUDED.quantity_ml, product_pack_evidence.quantity_ml),
        product_name = COALESCE(EXCLUDED.product_name, product_pack_evidence.product_name),
@@ -1010,6 +1058,7 @@ async function upsertEvidence(
     [
       input.gtin,
       input.source,
+      retailer,
       input.quantityRaw ?? null,
       quantityMlOf(input.quantityRaw) ?? null,
       input.productName ?? null,
@@ -1019,26 +1068,26 @@ async function upsertEvidence(
   );
 }
 
-async function loadPackSummary(db: Queryable, gtin: string, clock: () => number) {
-  void clock;
+async function loadPackSummary(db: Queryable, gtin: string, listRetailer?: string) {
   const { rows } = await db.query(
-    `SELECT source, quantity_raw, quantity_ml, product_name, brand, retrieved_at
+    `SELECT source, retailer, quantity_raw, quantity_ml, product_name, brand, retrieved_at
      FROM product_pack_evidence WHERE gtin = $1`,
     [gtin],
   );
   const evidence: PackEvidence[] = rows.map((row) => ({
     source: String(row.source) as PackEvidenceSource,
+    ...(asString(row.retailer) && { retailer: asString(row.retailer) }),
     ...(asString(row.quantity_raw) && { quantityRaw: asString(row.quantity_raw) }),
     ...(asNumber(row.quantity_ml) != null && { quantityMl: asNumber(row.quantity_ml) }),
     ...(asString(row.product_name) && { productName: asString(row.product_name) }),
     ...(asString(row.brand) && { brand: asString(row.brand) }),
     retrievedAt: new Date(String(row.retrieved_at)).getTime(),
   }));
-  return summarizePack(evidence);
+  return summarizePack(evidence, listRetailer);
 }
 
 async function refreshConflictFlag(db: Queryable, gtin: string) {
-  const pack = await loadPackSummary(db, gtin, Date.now);
+  const pack = await loadPackSummary(db, gtin);
   await db.query(`UPDATE product_identifiers SET pack_conflict = $2 WHERE gtin = $1`, [gtin, pack.conflict]);
 }
 

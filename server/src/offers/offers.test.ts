@@ -118,9 +118,15 @@ describe("PrijsProfeet adapter", () => {
   it("keeps only retailer photo links from the retailer's own image host", () => {
     const row = (retailer: string, image_url: unknown) => parseSearch({ results: [{ ...ARLA_RAW, retailer, image_url }] })?.[0]?.imageUrl;
     const ah = "https://static.ah.nl/dam/product/AHI_43545231?revLabel=1&rendition=800x800_WEBP&fileType=binary";
+    const plus = "https://images.ctfassets.net/s0lodsnpsezb/abc/def/plus.png";
+    const dirk = "https://web-fileserver.dirk.nl/artikelen/12345.png";
     expect(row("albert_heijn", ah)).toBe(ah);
     expect(row("jumbo", "https://www.jumbo.com/dam-images/fit-in/360x360/Products/8713788124340_H1N1.png")).toMatch(/^https:\/\/www\.jumbo\.com\/dam-images\//);
     expect(row("lidl", "https://www.lidl.nl/assets/gcp2145aa892ba745debbdc4d907952461a.png")).toMatch(/^https:\/\/www\.lidl\.nl\/assets\//);
+    expect(row("plus", plus)).toBe(plus);
+    expect(row("dirk", dirk)).toBe(dirk);
+    expect(row("plus", "https://images.ctfassets.net/other-space/x.png")).toBeUndefined();
+    expect(row("dirk", "https://web-fileserver.dirk.nl/elsewhere/x.png")).toBeUndefined();
     expect(row("albert_heijn", "http://static.ah.nl/dam/product/x")).toBeUndefined();
     expect(row("albert_heijn", "https://www.jumbo.com/dam-images/x.png")).toBeUndefined();
     expect(row("jumbo", "https://www.jumbo.com/elders/x.png")).toBeUndefined();
@@ -130,13 +136,46 @@ describe("PrijsProfeet adapter", () => {
     expect(retailerImage("lidl", "javascript:alert(1)")).toBeUndefined();
   });
 
-  it("asks for photos by barcode across all supported retailers and every promotion status, sharing the limits", async () => {
+  it("keeps Plus and Dirk product data when the image host is not allowed", () => {
+    const rows = parseSearch({
+      results: [
+        {
+          ...ARLA_RAW,
+          retailer: "plus",
+          name: "Kips vega paté",
+          brand: "Kips",
+          ean: "8710628130123",
+          quantity: "100 g",
+          image_url: "https://www.prijsprofeet.nl/images/x.png",
+          product_url: "https://www.plus.nl/product/kips",
+        },
+        {
+          ...ARLA_RAW,
+          product_id: "dirk_1",
+          retailer: "dirk",
+          name: "Optimel drinkyoghurt framboos",
+          brand: "Optimel",
+          ean: "8710628130456",
+          quantity: "1 l",
+          image_url: "https://evil.example/x.png",
+        },
+      ],
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows?.[0]).toMatchObject({ retailer: "plus", productName: "Kips vega paté", quantity: "100 g" });
+    expect(rows?.[0]?.imageUrl).toBeUndefined();
+    expect(rows?.[1]).toMatchObject({ retailer: "dirk", productName: "Optimel drinkyoghurt framboos", quantity: "1 l" });
+    expect(rows?.[1]?.imageUrl).toBeUndefined();
+  });
+
+  it("asks for photos by barcode across every retailer and every promotion status, sharing the limits", async () => {
     const urls: string[] = [];
     const provider = createPrijsProfeet({ userAgent: "Karrie", eanPerDay: 2, perMinute: 3 }, async (url) => (urls.push(url), json({ results: [] })), () => NOW);
     expect(await provider.searchImage("8718166011021")).toMatchObject({ ok: true });
     const params = Object.fromEntries(new URL(urls[0]).searchParams);
-    expect(params).toEqual({ q: "8718166011021", retailer: "jumbo,albert_heijn,lidl", page_size: "20", page: "1" });
+    expect(params).toEqual({ q: "8718166011021", page_size: "20", page: "1" });
     expect(imageSearchUrl("8718166011021")).not.toContain("promotion_status");
+    expect(imageSearchUrl("8718166011021")).not.toContain("retailer=");
     expect(searchUrl("8718166011021", "jumbo")).toContain("promotion_status=active");
     await provider.search("8718166011021", "jumbo");
     expect(await provider.searchImage("8718166011021")).toEqual({ ok: false, code: "ean-limit" });

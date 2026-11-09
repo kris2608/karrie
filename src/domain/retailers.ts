@@ -16,6 +16,29 @@ export function retailerName(id: RetailerId): string {
   return RETAILERS.find((retailer) => retailer.id === id)?.name ?? id;
 }
 
+/** Retailers whose product photos Karrie may link to (mirrors the server allowlist). */
+export const IMAGE_SOURCE_RETAILERS = ["jumbo", "albert_heijn", "lidl", "plus", "dirk", "hoogvliet", "dekamarkt", "poiesz"] as const;
+export type ImageSourceRetailerId = (typeof IMAGE_SOURCE_RETAILERS)[number];
+
+export function isImageSourceRetailer(value: unknown): value is ImageSourceRetailerId {
+  return typeof value === "string" && (IMAGE_SOURCE_RETAILERS as readonly string[]).includes(value);
+}
+
+export const IMAGE_RETAILER_NAMES: Record<ImageSourceRetailerId, string> = {
+  jumbo: "Jumbo",
+  albert_heijn: "Albert Heijn",
+  lidl: "Lidl",
+  plus: "Plus",
+  dirk: "Dirk",
+  hoogvliet: "Hoogvliet",
+  dekamarkt: "Dekamarkt",
+  poiesz: "Poiesz",
+};
+
+export function imageRetailerName(id: string): string {
+  return isImageSourceRetailer(id) ? IMAGE_RETAILER_NAMES[id] : id.replace(/_/g, " ");
+}
+
 /** The short code anonymous statistics use. */
 export function analyticsRetailer(id: RetailerId): "jumbo" | "ah" | "lidl" {
   return id === "albert_heijn" ? "ah" : id;

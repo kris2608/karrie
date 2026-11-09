@@ -147,7 +147,8 @@ export type NamePhoto = {
   source: "prijsprofeet" | "off";
   imageUrl: string;
   productName: string;
-  retailer?: RetailerId;
+  /** Any image-source retailer slug (jumbo, plus, …), not only the shopping picker. */
+  retailer?: string;
   sourceUrl?: string;
   packaging?: string;
 };

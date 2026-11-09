@@ -55,10 +55,10 @@ describe("catalog migrations and seed", () => {
     const { pool } = memoryPg();
     const client = pool();
     const first = await migrate(client, MIGRATIONS);
-    expect(first.applied).toEqual(["001", "002", "003", "004"]);
+    expect(first.applied).toEqual(["001", "002", "003", "004", "005"]);
     const second = await migrate(client, MIGRATIONS);
     expect(second.applied).toEqual([]);
-    expect(second.skipped).toEqual(["001", "002", "003", "004"]);
+    expect(second.skipped).toEqual(["001", "002", "003", "004", "005"]);
     const seeded = await seedCatalog(client);
     expect(seeded.products).toBe(BOOTSTRAP_PRODUCTS.length);
     await seedCatalog(client);
@@ -323,7 +323,7 @@ describe("name images and admin sync", () => {
     expect(after.products.some((product) => product.id === linked!.productId)).toBe(true);
   });
 
-  it("keeps GTIN on the first Campina variant when OFF 220 ml and retailer 1 l disagree", async () => {
+  it("keeps GTIN on the first Campina variant and lets PrijsProfeet win over Open Food Facts", async () => {
     const CAMPINA = "8712800001256";
     const { catalog, pool } = await readyCatalog();
     await catalog.upsertBarcodeRecord({
@@ -343,6 +343,10 @@ describe("name images and admin sync", () => {
     const variantId = String(before.rows[0].variant_id);
     expect(before.rows[0].pack_conflict).toBe(false);
 
+    await catalog.recordRetailerPack({
+      ean: CAMPINA,
+      rows: [{ retailer: "jumbo", quantity: "1 l", productName: "Campina Magere yoghurt", brand: "Campina" }],
+    });
     await catalog.upsertStoreImage({
       ean: CAMPINA,
       imageUrl: "https://static.jumbo.com/campina.jpg",
@@ -355,18 +359,15 @@ describe("name images and admin sync", () => {
 
     const after = await pool.query(`SELECT variant_id, pack_conflict FROM product_identifiers WHERE gtin = $1`, [CAMPINA]);
     expect(String(after.rows[0].variant_id)).toBe(variantId);
-    expect(after.rows[0].pack_conflict).toBe(true);
+    expect(after.rows[0].pack_conflict).toBe(false);
 
     const hit = await catalog.byGtin(CAMPINA);
-    expect(hit?.pack.conflict).toBe(true);
+    expect(hit?.pack.conflict).toBe(false);
+    expect(hit?.pack.displayQuantity).toBe("1 l");
     expect(hit?.pack.sources.map((entry) => entry.quantityRaw)).toEqual(expect.arrayContaining(["220 ml", "1 l"]));
     expect(hit?.storeImage?.imageUrl).toContain("jumbo.com");
+    expect(hit?.answer.status === "none" ? undefined : hit?.answer.product?.quantity).toBe("1 l");
     expect(hit?.answer.status === "none" ? undefined : hit?.answer.product.nutriScore).toBe("C");
-
-    await catalog.recordParentPack({ ean: CAMPINA, quantity: "1 l" });
-    const parent = await catalog.packForGtin(CAMPINA);
-    expect(parent.conflict).toBe(false);
-    expect(parent.displayQuantity).toBe("1 l");
     const still = await pool.query(`SELECT variant_id FROM product_identifiers WHERE gtin = $1`, [CAMPINA]);
     expect(String(still.rows[0].variant_id)).toBe(variantId);
   });

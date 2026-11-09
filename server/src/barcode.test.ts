@@ -3,8 +3,11 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { createHandler } from "./app.js";
 import { BARCODE_RULES, checkWebPage, createBarcodeLookup, fromOff, webSearchRequest, type OffProduct } from "./barcode.js";
+import type { PackSummary } from "./catalog/pack.js";
 import { canonicalEan, eanForms } from "./ean.js";
 import { createLimits } from "./limits.js";
+import type { OfferRow } from "./offers/prijsprofeet.js";
+
 
 const CALVE = "8710400000006";
 const OTHER = "8712345678906";
@@ -199,6 +202,100 @@ describe("barcode lookup", () => {
     await lookup.lookup(OTHER, { allowWeb: true });
     expect(webCalls).toHaveLength(1);
     expect(calls.filter((call) => call.url.startsWith(BARCODE_RULES.offOrigin))).toHaveLength(2);
+  });
+
+  it("uses PrijsProfeet pack size in the first Open Food Facts answer", async () => {
+    const pack: PackSummary = {
+      sources: [
+        { source: "openfoodfacts", quantityRaw: "220 ml", quantityMl: 220, retrievedAt: 1 },
+        { source: "prijsprofeet", retailer: "jumbo", quantityRaw: "1 l", quantityMl: 1000, retrievedAt: 2 },
+      ],
+      conflict: false,
+      displayQuantity: "1 l",
+    };
+    const storeRows: OfferRow[] = [
+      {
+        retailer: "jumbo",
+        sourceProductId: "j1",
+        productName: "Campina vanillevla",
+        brand: "Campina",
+        ean: CALVE,
+        quantity: "1 l",
+        promotionStatus: "unknown",
+        sourceUrl: "https://www.jumbo.com/producten/campina",
+      },
+    ];
+    let time = 1_000_000;
+    const lookup = createBarcodeLookup(
+      {
+        userAgent: "Karrie/1.0 (https://karrieapp.onrender.com)",
+        storeImages: { find: async () => ({ ok: true, image: null, rows: storeRows, cached: false }) },
+        catalog: {
+          byGtin: async () => null,
+          cacheGet: async () => null,
+          cachePut: async () => undefined,
+          rememberSeen: async () => undefined,
+          upsertBarcodeRecord: async () => undefined,
+          packForGtin: async () => pack,
+        },
+      },
+      async () => offResponse(OFF_CALVE),
+      () => time,
+      async () => undefined,
+    );
+    const result = await lookup.lookup(CALVE, { allowWeb: true });
+    expect(result).toMatchObject({
+      ok: true,
+      answer: { status: "off-exact", product: { quantity: "1 l" }, pack: { displayQuantity: "1 l", conflict: false } },
+    });
+  });
+
+  it("answers from PrijsProfeet without a paid web search when Open Food Facts has nothing", async () => {
+    const storeRows: OfferRow[] = [
+      {
+        retailer: "plus",
+        sourceProductId: "p1",
+        productName: "Pampers Sensitive billendoekjes",
+        brand: "Pampers",
+        ean: OTHER,
+        quantity: "80 stuks",
+        promotionStatus: "unknown",
+        sourceUrl: "https://www.plus.nl/product/pampers",
+      },
+    ];
+    let time = 1_000_000;
+    const webCalls: unknown[] = [];
+    const lookup = createBarcodeLookup(
+      {
+        userAgent: "Karrie/1.0 (https://karrieapp.onrender.com)",
+        web: {
+          client: {
+            responses: {
+              create: async (body: never) => {
+                webCalls.push(body);
+                return webResponse({ found: true, name: "Should not run" });
+              },
+            },
+          },
+          model: "m",
+        },
+        storeImages: { find: async () => ({ ok: true, image: null, rows: storeRows, cached: false }) },
+      },
+      async () => offResponse(null, 404),
+      () => time,
+      async () => undefined,
+    );
+    const result = await lookup.lookup(OTHER, { allowWeb: true });
+    expect(result).toMatchObject({
+      ok: true,
+      answer: {
+        status: "web-page",
+        product: { name: "Pampers Sensitive billendoekjes", brand: "Pampers", quantity: "80 stuks" },
+        source: { kind: "web", name: "Plus", url: "https://www.plus.nl/product/pampers" },
+      },
+      failures: ["off:not-found"],
+    });
+    expect(webCalls).toHaveLength(0);
   });
 });
 

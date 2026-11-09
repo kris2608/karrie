@@ -1,6 +1,6 @@
 import { CATEGORIES } from "../../domain/categories";
 import { parseNameImageLookupKey } from "../../domain/imageIdentity";
-import { isRetailer, retailerName, type RetailerId } from "../../domain/retailers";
+import { imageRetailerName, isImageSourceRetailer } from "../../domain/retailers";
 import type { CategoryId, NamePhoto } from "../../domain/types";
 import type { LookupOutcome } from "../../storage/lookupStore";
 import { RETAILER_IMAGE_HOSTS } from "./storeImage";
@@ -48,9 +48,9 @@ export function cleanNamePhoto(value: unknown): NamePhoto | null {
   const image = https(raw.imageUrl);
   const productName = text(raw.productName, 120);
   if (!image || !productName) return null;
-  let retailer: RetailerId | undefined;
+  let retailer: string | undefined;
   if (raw.source === "prijsprofeet") {
-    if (!isRetailer(raw.retailer)) return null;
+    if (!isImageSourceRetailer(raw.retailer)) return null;
     const allowed = RETAILER_IMAGE_HOSTS[raw.retailer];
     if (image.hostname !== allowed.host || !image.pathname.startsWith(allowed.path)) return null;
     retailer = raw.retailer;
@@ -96,7 +96,7 @@ export function cleanNameAnswer(value: unknown): NameAnswer | null {
 
 /** "Foto: Albert Heijn, via PrijsProfeet" or "Foto: Open Food Facts (CC BY-SA)", always marked as an example. */
 export function namePhotoCredit(photo: Pick<NamePhoto, "source" | "retailer">): string {
-  const from = photo.source === "off" ? "Open Food Facts (CC BY-SA)" : `${photo.retailer ? retailerName(photo.retailer) : "supermarkt"}, via PrijsProfeet`;
+  const from = photo.source === "off" ? "Open Food Facts (CC BY-SA)" : `${photo.retailer ? imageRetailerName(photo.retailer) : "supermarkt"}, via PrijsProfeet`;
   return `Foto: ${from} · een voorbeeld van dit product.`;
 }
 

@@ -88,8 +88,12 @@ describe("cleaning the answer", () => {
   it("accepts only the same barcode and the retailer's own image host", () => {
     expect(cleanStoreImage(STORE, EAN)).toEqual(STORE);
     expect(cleanStoreImage(STORE, "8718166011021")).toBeNull();
-    expect(cleanStoreImage({ ...STORE, retailer: "plus" }, EAN)).toBeNull();
     expect(cleanStoreImage({ ...STORE, retailer: "jumbo" }, EAN)).toBeNull();
+    const plusUrl = "https://images.ctfassets.net/s0lodsnpsezb/abc/def/plus.png";
+    const dirkUrl = "https://web-fileserver.dirk.nl/artikelen/123.png";
+    expect(cleanStoreImage({ ean: EAN, imageUrl: plusUrl, retailer: "plus" }, EAN)).toEqual({ ean: EAN, imageUrl: plusUrl, retailer: "plus" });
+    expect(cleanStoreImage({ ean: EAN, imageUrl: dirkUrl, retailer: "dirk" }, EAN)).toEqual({ ean: EAN, imageUrl: dirkUrl, retailer: "dirk" });
+    expect(cleanStoreImage({ ean: EAN, imageUrl: "https://images.ctfassets.net/other/x.png", retailer: "plus" }, EAN)).toBeNull();
     expect(cleanStoreImage({ ...STORE, imageUrl: "http://static.ah.nl/dam/product/x" }, EAN)).toBeNull();
     expect(cleanStoreImage({ ...STORE, imageUrl: "https://images.openfoodfacts.org/x.jpg" }, EAN)).toBeNull();
     expect(cleanStoreImage({ ...STORE, imageUrl: "https://static.ah.nl/elders/x" }, EAN)).toBeNull();
@@ -101,6 +105,8 @@ describe("cleaning the answer", () => {
   it("credits the retailer and PrijsProfeet, never Open Food Facts", () => {
     expect(storeCredit(STORE)).toBe("Foto: Albert Heijn, via PrijsProfeet.");
     expect(storeCredit({ retailer: "jumbo" })).not.toMatch(/Open Food Facts/);
+    expect(storeCredit({ retailer: "plus" })).toBe("Foto: Plus, via PrijsProfeet.");
+    expect(storeCredit({ retailer: "dirk" })).toBe("Foto: Dirk, via PrijsProfeet.");
   });
 
   it("sends only the barcode and maps answers to outcomes", async () => {

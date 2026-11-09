@@ -371,6 +371,7 @@ export function createHandler(deps: AppDeps) {
       if (!images) return send(503, { status: "error", code: "misconfigured" });
       const request = BarcodeRequestSchema.safeParse(body);
       const ean = request.success ? canonicalEan(request.data.ean) : null;
+      const prefer = request.success ? request.data.retailer : undefined;
       if (!ean) return send(400, { status: "error", code: "bad-request" });
 
       const reply = (result: StoreImageResult) => {
@@ -382,7 +383,7 @@ export function createHandler(deps: AppDeps) {
         count(storeImageOutcomes, result.image ? `found-${result.image.retailer}` : "none");
         return send(200, { status: "ok", image: result.image });
       };
-      const hit = images.lookup.cached(ean);
+      const hit = images.lookup.cached(ean, prefer);
       if (hit) {
         entry.cached = true;
         return reply(hit);
@@ -390,7 +391,7 @@ export function createHandler(deps: AppDeps) {
       const denial = images.limits.admit(clientIp(req));
       if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
       const callStarted = now();
-      const result = await images.lookup.find(ean);
+      const result = await images.lookup.find(ean, prefer);
       images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
       entry.lookupMs = now() - callStarted;
       return reply(result);
@@ -682,6 +683,6 @@ const OfferRequestSchema = z
   })
   .strict();
 
-const BarcodeRequestSchema = z.object({ ean: z.string().max(14) }).strict();
+const BarcodeRequestSchema = z.object({ ean: z.string().max(14), retailer: z.enum(RETAILERS).optional() }).strict();
 
 const ImageRequestSchema = z.object({ identity: ImageIdentitySchema, refresh: z.boolean().optional() }).strict();

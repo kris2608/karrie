@@ -69,6 +69,18 @@ export type StoreImageInput = {
   brand?: string;
 };
 
+export type RetailerPackRow = {
+  retailer: string;
+  quantity?: string;
+  productName?: string;
+  brand?: string;
+};
+
+export type RetailerPackInput = {
+  ean: string;
+  rows: RetailerPackRow[];
+};
+
 export type ParentPackInput = {
   ean: string;
   quantity: string;
@@ -100,10 +112,12 @@ export type CatalogStore = {
   upsertBarcodeRecord: (input: UpsertBarcodeInput) => Promise<void>;
   upsertNameImages: (input: UpsertNameImagesInput) => Promise<void>;
   upsertStoreImage: (input: StoreImageInput) => Promise<void>;
-  storeImageByGtin: (ean: string) => Promise<StoreImageInput | null>;
+  storeImageByGtin: (ean: string, preferRetailer?: string) => Promise<StoreImageInput | null>;
+  recordRetailerPack: (input: RetailerPackInput) => Promise<PackSummary | null>;
   recordParentPack: (input: ParentPackInput) => Promise<PackSummary | null>;
-  packForGtin: (ean: string) => Promise<PackSummary>;
+  packForGtin: (ean: string, listRetailer?: string) => Promise<PackSummary>;
   repairPackConflicts: () => Promise<number>;
+  gtinsMissingRetailerPack: (limit: number) => Promise<string[]>;
   cacheGet: <T>(key: string) => Promise<T | null>;
   cachePut: (key: string, kind: string, payload: unknown, expiresAt: number) => Promise<void>;
   changesSince: (since: string | null, limit: number) => Promise<{ products: CatalogChange[]; next: string | null }>;

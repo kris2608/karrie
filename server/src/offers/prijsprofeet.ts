@@ -20,16 +20,66 @@ export const PRIJSPROFEET_RULES = {
 export const RETAILERS = ["jumbo", "albert_heijn", "lidl"] as const;
 export type RetailerId = (typeof RETAILERS)[number];
 
+export function isRetailer(value: unknown): value is RetailerId {
+  return typeof value === "string" && (RETAILERS as readonly string[]).includes(value);
+}
+
+/** Any PrijsProfeet retailer slug (jumbo, plus, dirk, …). */
+export type SourceRetailer = string;
+
 /**
  * Retailers whose product photos may be used as image sources. Kept separate from the shopping
  * picker; expand only with validated image hosts (never invent hosts).
  */
-export const IMAGE_SOURCE_RETAILERS = ["jumbo", "albert_heijn", "lidl"] as const;
+export const IMAGE_SOURCE_RETAILERS = ["jumbo", "albert_heijn", "lidl", "plus", "dirk", "hoogvliet", "dekamarkt", "poiesz"] as const;
 export type ImageSourceRetailerId = (typeof IMAGE_SOURCE_RETAILERS)[number];
 
-/** One promoted product as the app shows it; prices in euros. */
+export function isImageSourceRetailer(value: unknown): value is ImageSourceRetailerId {
+  return typeof value === "string" && (IMAGE_SOURCE_RETAILERS as readonly string[]).includes(value);
+}
+
+/** Dutch labels for photo credits; shopping picker names stay in the client retailers module. */
+export const IMAGE_RETAILER_NAMES: Record<ImageSourceRetailerId, string> = {
+  jumbo: "Jumbo",
+  albert_heijn: "Albert Heijn",
+  lidl: "Lidl",
+  plus: "Plus",
+  dirk: "Dirk",
+  hoogvliet: "Hoogvliet",
+  dekamarkt: "Dekamarkt",
+  poiesz: "Poiesz",
+};
+
+/**
+ * House brands that mark a private-label row. Used for name search scoping; barcode scans keep
+ * the scanned product even when it is a house brand.
+ */
+export const HOUSE_BRANDS: Record<string, readonly string[]> = {
+  albert_heijn: ["ah", "albert heijn"],
+  jumbo: ["jumbo"],
+  lidl: ["lidl"],
+  plus: ["plus"],
+  dirk: ["1 de beste", "dirk"],
+  hoogvliet: ["hoogvliet"],
+  dekamarkt: ["dekamarkt", "1 de beste"],
+  poiesz: ["poiesz"],
+};
+
+/** Prefer shopping-list retailers, then the extended image sources, then everyone else. */
+export const RETAILER_RANK: Record<string, number> = {
+  albert_heijn: 0,
+  jumbo: 1,
+  lidl: 2,
+  plus: 3,
+  dirk: 4,
+  hoogvliet: 5,
+  dekamarkt: 6,
+  poiesz: 7,
+};
+
+/** One product row from PrijsProfeet search; prices in euros when present. */
 export type OfferRow = {
-  retailer: RetailerId;
+  retailer: SourceRetailer;
   sourceProductId: string;
   baseProductId?: string;
   productName: string;
@@ -80,6 +130,11 @@ const amount = z.number().finite().nonnegative().max(10_000).nullish().catch(und
 const count = z.number().int().positive().max(100).nullish().catch(undefined);
 const flag = z.boolean().nullish().catch(undefined);
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}/).nullish().catch(undefined);
+const sourceRetailer = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z_]{2,30}$/);
 
 const RowSchema = z.object({
   product_id: z.string().min(1).max(200),
@@ -94,7 +149,7 @@ const RowSchema = z.object({
   original_price: amount,
   unit_price: amount,
   unit: text,
-  retailer: z.enum(IMAGE_SOURCE_RETAILERS),
+  retailer: sourceRetailer,
   promotion_status: z.string().max(40).nullish().catch(undefined),
   promotion_type: text,
   promotional_keywords: z.array(z.string().max(200)).max(20).nullish().catch(undefined),
@@ -141,14 +196,33 @@ export const RETAILER_IMAGE_HOSTS: Record<ImageSourceRetailerId, { host: string;
   albert_heijn: { host: "static.ah.nl", path: "/dam/product/" },
   jumbo: { host: "www.jumbo.com", path: "/dam-images/" },
   lidl: { host: "www.lidl.nl", path: "/assets/" },
+  plus: { host: "images.ctfassets.net", path: "/s0lodsnpsezb/" },
+  dirk: { host: "web-fileserver.dirk.nl", path: "/artikelen/" },
+  hoogvliet: { host: "static.hoogvliet.nl", path: "/" },
+  dekamarkt: { host: "web-fileserver.dekamarkt.nl", path: "/" },
+  poiesz: { host: "images.poiesz-supermarkten.nl", path: "/" },
 };
 
-export function retailerImage(retailer: ImageSourceRetailerId, value: string | null | undefined): string | undefined {
+export function retailerImage(retailer: SourceRetailer, value: string | null | undefined): string | undefined {
+  if (!isImageSourceRetailer(retailer)) return undefined;
   const href = httpsUrl(value);
   if (!href) return undefined;
   const url = new URL(href);
   const allowed = RETAILER_IMAGE_HOSTS[retailer];
   return url.hostname === allowed.host && url.pathname.startsWith(allowed.path) && !url.username && !url.password && !url.port ? url.href : undefined;
+}
+
+export function imageRetailerName(retailer: SourceRetailer): string {
+  return isImageSourceRetailer(retailer) ? IMAGE_RETAILER_NAMES[retailer] : retailer.replace(/_/g, " ");
+}
+
+/** True when the row is a house brand for its retailer (flag or known brand name). */
+export function isHouseBrandRow(row: Pick<OfferRow, "retailer" | "brand" | "productName" | "privateLabel">): boolean {
+  if (row.privateLabel === true) return true;
+  const brands = HOUSE_BRANDS[row.retailer];
+  if (!brands?.length) return false;
+  const text = `${row.brand ?? ""} ${row.productName}`.toLowerCase();
+  return brands.some((brand) => text.includes(brand));
 }
 
 export function toOfferRow(row: Row): OfferRow {
@@ -206,22 +280,20 @@ export function searchUrl(q: string, retailer: RetailerId): string {
   return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
 }
 
-/** A product photo by barcode: every promotion status and every image-source retailer in one call. */
+/** A product by barcode: every promotion status and every retailer PrijsProfeet knows. */
 export function imageSearchUrl(ean: string, page = 1): string {
   const params = new URLSearchParams({
     q: ean,
-    retailer: IMAGE_SOURCE_RETAILERS.join(","),
     page_size: String(PRIJSPROFEET_RULES.pageSize),
     page: String(page),
   });
   return `${PRIJSPROFEET_RULES.origin}/api/v1/search?${params}`;
 }
 
-/** A product photo by typed name: every promotion status and every image-source retailer. */
+/** A product by typed name: every promotion status and every retailer. */
 export function nameSearchUrl(name: string, page = 1): string {
   const params = new URLSearchParams({
     q: name,
-    retailer: IMAGE_SOURCE_RETAILERS.join(","),
     page_size: String(PRIJSPROFEET_RULES.pageSize),
     page: String(page),
   });
@@ -338,7 +410,8 @@ export function createPrijsProfeet(config: PrijsProfeetConfig, fetchImpl: Fetch 
 
   return {
     search: (q: string, retailer: RetailerId) => call(searchUrl(q, retailer), isBareEan(q)),
-    searchImage: (ean: string) => paginated((page) => imageSearchUrl(ean, page), true, (rows) => rows.some((row) => row.imageUrl && row.ean)),
+    searchImage: (ean: string) =>
+      paginated((page) => imageSearchUrl(ean, page), true, (rows) => rows.some((row) => row.ean)),
     searchName: (name: string, enough?: (rows: OfferRow[]) => boolean) =>
       paginated((page) => nameSearchUrl(name, page), isBareEan(name), enough),
     searchPrivateLabel: (name: string, retailer: RetailerId, enough?: (rows: OfferRow[]) => boolean) =>

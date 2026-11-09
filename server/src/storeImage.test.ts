@@ -30,12 +30,14 @@ function provider(answer: (ean: string) => SearchResult | Promise<SearchResult>)
 describe("store image lookup", () => {
   it("only takes a photo from a row with exactly the scanned barcode, never a similar name", async () => {
     const similar = provider(() => ({ ok: true, rows: [row({ ean: "8710496978739" }), row({ ean: undefined })] }));
-    expect(await createStoreImageLookup(similar, () => NOW).find(EAN)).toEqual({ ok: true, image: null, cached: false });
+    expect(await createStoreImageLookup(similar, () => NOW).find(EAN)).toEqual({ ok: true, image: null, rows: [], cached: false });
 
-    const exact = provider(() => ({ ok: true, rows: [row({ ean: "8710496978739", imageUrl: "https://static.ah.nl/dam/product/other" }), row({ retailer: "jumbo", imageUrl: undefined }), row()] }));
+    const exactRows = [row({ ean: "8710496978739", imageUrl: "https://static.ah.nl/dam/product/other" }), row({ retailer: "jumbo", imageUrl: undefined }), row()];
+    const exact = provider(() => ({ ok: true, rows: exactRows }));
     expect(await createStoreImageLookup(exact, () => NOW).find(EAN)).toEqual({
       ok: true,
       cached: false,
+      rows: [exactRows[1], exactRows[2]],
       image: {
         ean: EAN,
         imageUrl: IMAGE,

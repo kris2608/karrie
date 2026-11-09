@@ -1,9 +1,12 @@
 import { parseSize } from "../productName.js";
+import { RETAILER_RANK } from "../offers/prijsprofeet.js";
 
 export type PackEvidenceSource = "openfoodfacts" | "prijsprofeet" | "parent_unverified";
 
 export type PackEvidence = {
   source: PackEvidenceSource;
+  /** Empty for OFF and parent; PrijsProfeet slug when known. */
+  retailer?: string;
   quantityRaw?: string;
   quantityMl?: number;
   productName?: string;
@@ -13,8 +16,9 @@ export type PackEvidence = {
 
 export type PackSummary = {
   sources: PackEvidence[];
+  /** True only when PrijsProfeet retailers disagree with no majority (parent must choose). */
   conflict: boolean;
-  /** Quantity to show when sources agree, or the first OFF value when they conflict (until a parent confirms). */
+  /** Preferred quantity: parent, then PrijsProfeet majority, then Open Food Facts. */
   displayQuantity?: string;
 };
 
@@ -48,15 +52,64 @@ export function packsConflict(a?: number | null, b?: number | null, rawA?: strin
   return false;
 }
 
-export function summarizePack(evidence: PackEvidence[]): PackSummary {
+function packKey(entry: PackEvidence): string {
+  if (entry.quantityMl != null) return `ml:${entry.quantityMl}`;
+  return `raw:${(entry.quantityRaw ?? "").replace(/\s+/g, " ").trim().toLowerCase()}`;
+}
+
+/**
+ * Prefer the parent's confirmation, then the PrijsProfeet majority size (ties broken by listRetailer,
+ * then retailer rank), then Open Food Facts. A disagreement with Open Food Facts no longer asks the parent.
+ */
+export function summarizePack(evidence: PackEvidence[], listRetailer?: string): PackSummary {
   const withQty = evidence.filter((entry) => entry.quantityRaw || entry.quantityMl != null);
-  const off = withQty.find((entry) => entry.source === "openfoodfacts");
-  const retailer = withQty.find((entry) => entry.source === "prijsprofeet");
   const parent = withQty.find((entry) => entry.source === "parent_unverified");
-  const conflict =
-    !parent && packsConflict(off?.quantityMl, retailer?.quantityMl, off?.quantityRaw, retailer?.quantityRaw);
-  const displayQuantity = parent?.quantityRaw ?? (conflict ? undefined : retailer?.quantityRaw ?? off?.quantityRaw);
-  return { sources: withQty, conflict, ...(displayQuantity && { displayQuantity }) };
+  const off = withQty.find((entry) => entry.source === "openfoodfacts");
+  const retailers = withQty.filter((entry) => entry.source === "prijsprofeet");
+
+  if (parent?.quantityRaw) {
+    return { sources: withQty, conflict: false, displayQuantity: parent.quantityRaw };
+  }
+
+  if (retailers.length === 0) {
+    return { sources: withQty, conflict: false, ...(off?.quantityRaw && { displayQuantity: off.quantityRaw }) };
+  }
+
+  const groups = new Map<string, PackEvidence[]>();
+  for (const entry of retailers) {
+    const key = packKey(entry);
+    const list = groups.get(key) ?? [];
+    list.push(entry);
+    groups.set(key, list);
+  }
+
+  const ranked = [...groups.values()].sort((a, b) => {
+    if (b.length !== a.length) return b.length - a.length;
+    const score = (entries: PackEvidence[]) => {
+      if (listRetailer && entries.some((entry) => entry.retailer === listRetailer)) return 0;
+      return Math.min(...entries.map((entry) => RETAILER_RANK[entry.retailer ?? ""] ?? 99));
+    };
+    return score(a) - score(b);
+  });
+
+  const best = ranked[0];
+  const runner = ranked[1];
+  const tied =
+    Boolean(runner) &&
+    runner.length === best.length &&
+    packsConflict(best[0].quantityMl, runner[0].quantityMl, best[0].quantityRaw, runner[0].quantityRaw);
+  /** A list-supermarket hit uniquely in one tied group breaks the tie; otherwise the parent chooses. */
+  const listBreaksTie =
+    Boolean(listRetailer) &&
+    tied &&
+    best.some((entry) => entry.retailer === listRetailer) !== runner!.some((entry) => entry.retailer === listRetailer);
+
+  if (tied && !listBreaksTie) {
+    return { sources: withQty, conflict: true };
+  }
+
+  const displayQuantity = best[0].quantityRaw ?? off?.quantityRaw;
+  return { sources: withQty, conflict: false, ...(displayQuantity && { displayQuantity }) };
 }
 
 /** Dutch labels for conflict copy: "220 ml" / "1 liter". */

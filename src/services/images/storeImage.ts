@@ -1,4 +1,4 @@
-import { isRetailer, retailerName, type RetailerId } from "../../domain/retailers";
+import { imageRetailerName, isImageSourceRetailer, type ImageSourceRetailerId } from "../../domain/retailers";
 
 /**
  * Mirrors StoreImage on the server: a link to a retailer's own product photo for one exact barcode, found through
@@ -7,7 +7,7 @@ import { isRetailer, retailerName, type RetailerId } from "../../domain/retailer
 export type StoreImage = {
   ean: string;
   imageUrl: string;
-  retailer: RetailerId;
+  retailer: ImageSourceRetailerId;
   sourceUrl?: string;
   quantity?: string;
   productName?: string;
@@ -23,15 +23,20 @@ export type StoreImageOutcome =
 export const STORE_IMAGE_CLIENT_RULES = { timeoutMs: 15_000 };
 
 /** Same allowlist as the server: each retailer's own image host and path. */
-export const RETAILER_IMAGE_HOSTS: Record<RetailerId, { host: string; path: string }> = {
+export const RETAILER_IMAGE_HOSTS: Record<ImageSourceRetailerId, { host: string; path: string }> = {
   albert_heijn: { host: "static.ah.nl", path: "/dam/product/" },
   jumbo: { host: "www.jumbo.com", path: "/dam-images/" },
   lidl: { host: "www.lidl.nl", path: "/assets/" },
+  plus: { host: "images.ctfassets.net", path: "/s0lodsnpsezb/" },
+  dirk: { host: "web-fileserver.dirk.nl", path: "/artikelen/" },
+  hoogvliet: { host: "static.hoogvliet.nl", path: "/" },
+  dekamarkt: { host: "web-fileserver.dekamarkt.nl", path: "/" },
+  poiesz: { host: "images.poiesz-supermarkten.nl", path: "/" },
 };
 
 /** The credit for a retailer photo: always the retailer and PrijsProfeet, never Open Food Facts. */
 export function storeCredit(image: Pick<StoreImage, "retailer">): string {
-  return `Foto: ${retailerName(image.retailer)}, via PrijsProfeet.`;
+  return `Foto: ${imageRetailerName(image.retailer)}, via PrijsProfeet.`;
 }
 
 const LIMIT_CODES = new Set(["rate-limited", "daily-limit", "budget"]);
@@ -49,7 +54,7 @@ function parsed(value: unknown): URL | null {
 /** Checked again here: the same barcode, an allowed retailer image host, and an https product page if any. */
 export function cleanStoreImage(value: unknown, ean: string): StoreImage | null {
   const raw = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
-  if (raw.ean !== ean || !isRetailer(raw.retailer)) return null;
+  if (raw.ean !== ean || !isImageSourceRetailer(raw.retailer)) return null;
   const image = parsed(raw.imageUrl);
   const allowed = RETAILER_IMAGE_HOSTS[raw.retailer];
   if (!image || image.hostname !== allowed.host || !image.pathname.startsWith(allowed.path)) return null;
@@ -65,8 +70,8 @@ export type StoreImageClientDeps = {
 
 export function createStoreImageClient(deps: StoreImageClientDeps) {
   return {
-    /** Only the barcode is sent. */
-    async find(ean: string): Promise<StoreImageOutcome> {
+    /** Only the barcode is sent. Optional listRetailer prefers that supermarket's photo when several exist. */
+    async find(ean: string, listRetailer?: string): Promise<StoreImageOutcome> {
       if (!deps.online()) return { status: "offline" };
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), STORE_IMAGE_CLIENT_RULES.timeoutMs);
@@ -74,7 +79,7 @@ export function createStoreImageClient(deps: StoreImageClientDeps) {
         const response = await deps.fetch(`${deps.origin.replace(/\/$/, "")}/api/images/ean`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ean }),
+          body: JSON.stringify({ ean, ...(listRetailer && { retailer: listRetailer }) }),
           credentials: "omit",
           referrerPolicy: "no-referrer",
           signal: controller.signal,

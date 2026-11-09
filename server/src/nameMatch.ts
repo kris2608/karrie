@@ -1,5 +1,5 @@
 import { PRODUCT_CATEGORIES, type ProductCategory } from "./offers/match.js";
-import type { RetailerId } from "./offers/prijsprofeet.js";
+import { HOUSE_BRANDS, isHouseBrandRow, RETAILER_RANK, type RetailerId, type SourceRetailer } from "./offers/prijsprofeet.js";
 import { parseName, parseSize, type Packaging, type ParsedName, type Size } from "./productName.js";
 
 /**
@@ -13,7 +13,7 @@ export type NameSource = "prijsprofeet" | "off";
 /** One product from a name search, from PrijsProfeet or Open Food Facts. */
 export type NameRow = {
   source: NameSource;
-  retailer?: RetailerId;
+  retailer?: SourceRetailer;
   name: string;
   brands: string[];
   quantity?: string;
@@ -21,7 +21,7 @@ export type NameRow = {
   sourceUrl?: string;
   ean?: string;
   category?: string;
-  /** Only true when the source marked it; missing/false is never treated as a house brand here. */
+  /** True when PrijsProfeet marked it, or when the brand is a known house brand. */
   privateLabel?: boolean;
   promotionStatus?: string;
 };
@@ -34,7 +34,7 @@ export type NameImage = {
   packaging?: string;
   /** No barcode on purpose: a name match is never evidence for an EAN. */
   imageUrl: string;
-  retailer?: RetailerId;
+  retailer?: SourceRetailer;
   sourceUrl?: string;
   confidence: "high" | "medium";
   privateLabel?: boolean;
@@ -269,8 +269,6 @@ const ROW_PACKAGING: Record<string, Packaging> = {
   knijpfles: "bottle",
 };
 
-const RETAILER_RANK: Record<string, number> = { albert_heijn: 0, jumbo: 1, lidl: 2 };
-
 /** longerBrandShare: a longer brand needs at least 1/n of the rows the best-supported brand has. */
 export const NAME_RULES = { alternatives: 6, sizeTolerance: 0.05, maxUnknownWords: 1, longerBrandShare: 2, otherBrandShare: 1 };
 
@@ -400,15 +398,43 @@ function judge(row: NameRow, brand: string[], requested: string[], parsed: Parse
   return { row, brandHit, hasAll, eligible, score };
 }
 
-function order(a: Judged, b: Judged): number {
+function order(a: Judged, b: Judged, listRetailer?: string, wantedSize?: Size | null): number {
   const promo = (row: NameRow) => (row.promotionStatus === "active" ? 1 : 0);
+  const listScore = (row: NameRow) => (listRetailer && row.retailer === listRetailer ? 0 : 1);
+  const sizeScore = (row: NameRow) => (wantedSize && sameSize(wantedSize, rowSize(row)) ? 0 : 1);
   return (
     b.score - a.score ||
+    sizeScore(a.row) - sizeScore(b.row) ||
+    listScore(a.row) - listScore(b.row) ||
     promo(a.row) - promo(b.row) ||
-    (RETAILER_RANK[a.row.retailer ?? ""] ?? 3) - (RETAILER_RANK[b.row.retailer ?? ""] ?? 3) ||
+    (RETAILER_RANK[a.row.retailer ?? ""] ?? 99) - (RETAILER_RANK[b.row.retailer ?? ""] ?? 99) ||
     a.row.name.length - b.row.name.length ||
     a.row.name.localeCompare(b.row.name)
   );
+}
+
+function productKey(row: NameRow): string {
+  if (row.ean) return `ean:${row.ean}`;
+  const size = rowSize(row);
+  return `name:${words(row.name).join(" ")}|${size ? `${size.count ?? 1}x${size.amount}${size.unit}` : row.quantity ?? ""}`;
+}
+
+function rowLooksHouseBrand(row: NameRow): boolean {
+  return isHouseBrandRow({
+    retailer: row.retailer ?? "",
+    brand: row.brands[0],
+    productName: row.name,
+    privateLabel: row.privateLabel,
+  });
+}
+
+/** House brands from another supermarket are out, unless the parent typed that house brand. */
+function allowHouseBrand(row: NameRow, typedBrand: string[], listRetailer?: string): boolean {
+  if (!rowLooksHouseBrand(row)) return true;
+  const house = HOUSE_BRANDS[row.retailer ?? ""] ?? [];
+  const typedIsHouse = typedBrand.length > 0 && house.some((brand) => startsWith(typedBrand, words(brand)) || startsWith(words(brand), typedBrand));
+  if (typedIsHouse) return true;
+  return Boolean(listRetailer && row.retailer === listRetailer);
 }
 
 function imageOf(row: NameRow, confidence: NameImage["confidence"], brand: string | undefined): NameImage {
@@ -425,14 +451,14 @@ function imageOf(row: NameRow, confidence: NameImage["confidence"], brand: strin
   };
 }
 
-/** Strict private-label rows for one supermarket: only `private_label === true` for that retailer. */
+/** House-brand rows for one supermarket: flagged private_label or a known house brand for that retailer. */
 export function privateLabelImages(typed: string, rows: NameRow[], retailer: RetailerId, limit = NAME_RULES.alternatives): NameImage[] {
   const parsed = parseName(typed);
   if (!parsed) return [];
   const query = words(parsed.base);
   const core = query.filter((word) => !NEUTRAL.has(word));
   const candidates = rows
-    .filter((row) => row.privateLabel === true && row.retailer === retailer && row.imageUrl)
+    .filter((row) => row.retailer === retailer && row.imageUrl && rowLooksHouseBrand(row))
     .map((row) => {
       const nameWords = words(row.name);
       const hasAll = core.every((word) => nameWords.includes(word) || words(row.brands.join(" ")).includes(word));
@@ -444,7 +470,9 @@ export function privateLabelImages(typed: string, rows: NameRow[], retailer: Ret
   const out: NameImage[] = [];
   for (const entry of candidates) {
     if (out.length >= limit) break;
-    if (seen.has(entry.row.imageUrl!)) continue;
+    const key = productKey(entry.row);
+    if (seen.has(key) || seen.has(entry.row.imageUrl!)) continue;
+    seen.add(key);
     seen.add(entry.row.imageUrl!);
     out.push(imageOf(entry.row, "medium", entry.row.brands[0]));
   }
@@ -491,29 +519,43 @@ function typedWords(base: string, from: number, to?: number): string {
   return base.split(" ").slice(from, to).join(" ");
 }
 
-export function matchName(typed: string, rows: NameRow[]): NameMatch {
+export function matchName(typed: string, rows: NameRow[], listRetailer?: RetailerId): NameMatch {
   const parsed = parseName(typed);
   if (!parsed) return { classification: "unknown", match: null, alternatives: [] };
   const query = words(parsed.base);
   const brand = brandOf(query, rows);
   if (!brand) return { classification: "unknown", match: null, alternatives: [] };
   const requested = query.slice(brand.length);
-  const branded = rows.map((row) => judge(row, brand, requested, parsed)).filter((entry) => entry.brandHit);
   const brandName = typedWords(parsed.base, 0, brand.length);
+  const branded = rows
+    .filter((row) => allowHouseBrand(row, brand, listRetailer))
+    .map((row) => judge(row, brand, requested, parsed))
+    .filter((entry) => entry.brandHit);
   /** Prefer manufacturer rows for the automatic photo; private labels stay in dedicated alternatives. */
   const byPreference = (a: Judged, b: Judged) =>
-    (a.row.privateLabel === true ? 1 : 0) - (b.row.privateLabel === true ? 1 : 0) || order(a, b);
-  const best = branded.filter((entry) => entry.eligible).sort(byPreference)[0];
+    (rowLooksHouseBrand(a.row) ? 1 : 0) - (rowLooksHouseBrand(b.row) ? 1 : 0) || order(a, b, listRetailer, parsed.size);
+  const best = branded.filter((entry) => entry.eligible && !rowLooksHouseBrand(entry.row)).sort(byPreference)[0]
+    ?? branded.filter((entry) => entry.eligible).sort(byPreference)[0];
   const match = best ? imageOf(best.row, "high", brandName) : null;
-  const seen = new Set(match ? [match.imageUrl] : []);
+  const seen = new Set<string>();
+  if (match && best) {
+    seen.add(match.imageUrl);
+    seen.add(productKey(best.row));
+  }
   const alternatives: NameImage[] = [];
-  for (const entry of branded.filter((item) => item.row.imageUrl && item.hasAll && item.row.privateLabel !== true).sort(order)) {
+  /** With a plain match, only other plain packs; without one, flavour rows the parent can pick from. */
+  const altPool = best
+    ? branded.filter((item) => item.eligible && !rowLooksHouseBrand(item.row))
+    : branded.filter((item) => item.row.imageUrl && item.hasAll && item.brandHit && !rowLooksHouseBrand(item.row));
+  for (const entry of altPool.sort((a, b) => order(a, b, listRetailer, parsed.size))) {
     if (alternatives.length >= NAME_RULES.alternatives) break;
-    if (seen.has(entry.row.imageUrl!)) continue;
+    const key = productKey(entry.row);
+    if (seen.has(entry.row.imageUrl!) || seen.has(key)) continue;
     seen.add(entry.row.imageUrl!);
+    seen.add(key);
     alternatives.push(imageOf(entry.row, "medium", brandName));
   }
-  const category = categoryOf((best ?? [...branded].sort(order)[0])?.row.category);
+  const category = categoryOf((best ?? [...branded].sort((a, b) => order(a, b, listRetailer, parsed.size))[0])?.row.category);
   const variant = typedWords(parsed.base, brand.length);
   return { classification: "branded", brand: brandName, ...(variant && { variant }), match, alternatives, ...(category && { category }) };
 }

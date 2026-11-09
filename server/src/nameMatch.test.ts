@@ -9,7 +9,7 @@ const AH = "https://static.ah.nl/dam/product/";
 const JUMBO = "https://www.jumbo.com/dam-images/";
 
 function pp(name: string, quantity: string, retailer: OfferRow["retailer"] = "albert_heijn", brand = "Chocomel", image = true, category = "zuivel-eieren"): NameRow {
-  const host = retailer === "jumbo" ? JUMBO : AH;
+  const host = retailer === "jumbo" ? JUMBO : retailer === "plus" ? "https://images.ctfassets.net/s0lodsnpsezb/" : retailer === "dirk" ? "https://web-fileserver.dirk.nl/artikelen/" : AH;
   return {
     source: "prijsprofeet",
     retailer,
@@ -19,7 +19,6 @@ function pp(name: string, quantity: string, retailer: OfferRow["retailer"] = "al
     category,
     ...(image && { imageUrl: `${host}${encodeURIComponent(name)}.jpg` }),
     sourceUrl: `https://example.test/${encodeURIComponent(name)}`,
-    ean: "8712345678906",
   };
 }
 
@@ -88,6 +87,30 @@ describe("matchName", () => {
     const nuts = [pp("AH Walnoten", "200 g", "albert_heijn", "AH"), pp("Jumbo Ongebrande Walnoten", "150 g", "jumbo", "Jumbo")];
     expect(matchName("walnoten", nuts).classification).toBe("unknown");
     expect(matchName("AH walnoten", nuts)).toMatchObject({ classification: "branded", brand: "AH", match: { productName: "AH Walnoten" } });
+  });
+
+  it('generic "Cola" keeps no automatic photo', () => {
+    const rows = [
+      pp("Coca-Cola Regular", "1.5 l", "albert_heijn", "Coca-Cola"),
+      pp("Pepsi Regular", "1.5 l", "jumbo", "Pepsi"),
+      pp("AH Cola", "1.5 l", "albert_heijn", "AH"),
+    ];
+    expect(matchName("Cola", rows)).toEqual({ classification: "unknown", match: null, alternatives: [] });
+  });
+
+  it("deduplicates Coca-Cola across retailers and prefers the list supermarket", () => {
+    const rows = [
+      { ...pp("Coca-Cola Regular", "1.5 l", "plus", "Coca-Cola"), ean: "5449000000996" },
+      { ...pp("Coca-Cola Regular", "1.5 l", "dirk", "Coca-Cola"), ean: "5449000000996" },
+      { ...pp("Coca-Cola Regular", "1.5 l", "jumbo", "Coca-Cola"), ean: "5449000000996" },
+      { ...pp("Coca-Cola Regular", "1.5 l", "albert_heijn", "Coca-Cola"), ean: "5449000000996" },
+      { ...pp("Coca-Cola Zero", "1.5 l", "albert_heijn", "Coca-Cola"), ean: "5449000131803" },
+      { ...pp("Coca-Cola Regular", "4 x 250 ml", "jumbo", "Coca-Cola"), ean: "5449000214919" },
+    ];
+    const result = matchName("Coca cola", rows, "albert_heijn");
+    expect(result.match).toMatchObject({ productName: "Coca-Cola Regular", retailer: "albert_heijn", packaging: "1.5 l" });
+    expect(result.alternatives.map((entry) => `${entry.retailer}|${entry.packaging}`)).toEqual(["jumbo|4 x 250 ml"]);
+    expect(result.alternatives.every((entry) => !/Zero/i.test(entry.productName))).toBe(true);
   });
 
   it("a product type that one Open Food Facts row lists as its brand stays a product type", () => {

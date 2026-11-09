@@ -139,10 +139,24 @@ if (pgPool) {
 
 const catalogStore = catalog.enabled ? catalog : undefined;
 
+const storeImageLookup =
+  prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off" ? createStoreImageLookup(prijsProfeet, Date.now, catalogStore) : undefined;
+
+if (catalogStore && storeImageLookup) {
+  void catalogStore
+    .gtinsMissingRetailerPack(20)
+    .then(async (gtins) => {
+      for (const gtin of gtins) await storeImageLookup.find(gtin).catch(() => undefined);
+      await catalogStore.repairPackConflicts().catch(() => 0);
+    })
+    .catch(() => undefined);
+}
+
 const barcode = createBarcodeLookup({
   userAgent: env.OFF_USER_AGENT || "Karrie/1.0 (https://karrie.eu)",
   web: client && env.BARCODE_WEB_SEARCH !== "off" ? { client, model: env.OPENAI_IMAGE_SEARCH_MODEL || config.model } : undefined,
   catalog: catalogStore,
+  storeImages: storeImageLookup,
 });
 
 const nameImages =
@@ -201,10 +215,7 @@ const handler = createHandler({
     : undefined,
   barcode: { lookup: barcode, limits: barcodeLimits, searchCallUsd: number("PRICE_WEB_SEARCH_CALL", 0.01) },
   offers: prijsProfeet ? { lookup: createOfferLookup(prijsProfeet), provider: prijsProfeet, limits: offerLimits } : undefined,
-  storeImages:
-    prijsProfeet && env.PRIJSPROFEET_IMAGES !== "off"
-      ? { lookup: createStoreImageLookup(prijsProfeet, Date.now, catalogStore), limits: offerLimits }
-      : undefined,
+  storeImages: storeImageLookup ? { lookup: storeImageLookup, limits: offerLimits } : undefined,
   nameImages,
   products: {
     normalize: (name) => normalizeProduct(client!, { model: env.OPENAI_PRODUCT_MODEL || config.model, maxOutputTokens: number("PRODUCT_MAX_OUTPUT_TOKENS", 600) }, name),

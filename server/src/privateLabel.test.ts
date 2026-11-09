@@ -41,9 +41,25 @@ describe("private-label suggestions stay retailer-scoped", () => {
     expect(privateLabelImages("hagelslag", rows, "lidl").map((entry) => entry.retailer)).toEqual(["lidl"]);
   });
 
-  it("missing private_label is never treated as a house brand suggestion", () => {
-    const unclear = [row({ name: "Hagelslag Melk", retailer: "albert_heijn", brands: ["AH"], imageUrl: AH })];
+  it("treats a known house brand as private label even without the flag", () => {
+    const house = [row({ name: "AH Hagelslag Melk", retailer: "albert_heijn", brands: ["AH"], imageUrl: AH })];
+    expect(privateLabelImages("hagelslag", house, "albert_heijn").map((entry) => entry.productName)).toEqual(["AH Hagelslag Melk"]);
+  });
+
+  it("ignores manufacturer brands without the private_label flag", () => {
+    const unclear = [row({ name: "De Ruijter Hagelslag", retailer: "albert_heijn", brands: ["De Ruijter"], imageUrl: AH })];
     expect(privateLabelImages("hagelslag", unclear, "albert_heijn")).toEqual([]);
+  });
+
+  it("excludes another supermarket's house brand unless the parent typed it", () => {
+    const rows: NameRow[] = [
+      row({ name: "Jumbo Hagelslag", retailer: "jumbo", brands: ["Jumbo"], imageUrl: JUMBO }),
+      row({ name: "De Ruijter Hagelslag", retailer: "albert_heijn", brands: ["De Ruijter"], imageUrl: AH }),
+    ];
+    expect(matchName("hagelslag", rows, "albert_heijn").classification).toBe("unknown");
+    expect(matchName("De Ruijter hagelslag", rows, "albert_heijn").match?.productName).toBe("De Ruijter Hagelslag");
+    expect(matchName("Jumbo hagelslag", rows, "albert_heijn").match?.productName).toBe("Jumbo Hagelslag");
+    expect(matchName("Jumbo hagelslag", rows, "albert_heijn").match?.retailer).toBe("jumbo");
   });
 
   it("keeps private-label cache keys isolated per supermarket", () => {
@@ -79,9 +95,10 @@ describe("shopping retailers stay separate from image-source coverage", () => {
     expect([...RETAILERS]).toEqual(["jumbo", "albert_heijn", "lidl"]);
   });
 
-  it("name search uses the image-source set and supports pagination", () => {
+  it("name search covers every retailer and supports pagination", () => {
     expect(nameSearchUrl("cola", 2)).toContain("page=2");
-    expect(nameSearchUrl("cola")).toContain(`retailer=${IMAGE_SOURCE_RETAILERS.join("%2C")}`);
+    expect(nameSearchUrl("cola")).not.toContain("retailer=");
+    expect(IMAGE_SOURCE_RETAILERS).toEqual(expect.arrayContaining(["plus", "dirk"]));
     expect(privateLabelSearchUrl("hagelslag", "jumbo")).toContain("retailer=jumbo");
     expect(privateLabelSearchUrl("hagelslag", "jumbo")).not.toContain("albert_heijn");
   });

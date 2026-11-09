@@ -33,8 +33,16 @@ export function createStoreImageStore(deps: {
 
 export type StoreImageStore = ReturnType<typeof createStoreImageStore>;
 
+/** Shopping-list supermarket: prefers that retailer's photo when several exact-EAN hits exist. */
+let preferredRetailer: string | undefined;
+export function setStoreImageRetailer(retailer?: string) {
+  preferredRetailer = retailer;
+}
+
 export const storeImages = createStoreImageStore({
-  client: storeImageClient,
+  client: {
+    find: (ean) => storeImageClient.find(ean, preferredRetailer),
+  },
   now: Date.now,
   load: () => readKv<Record<string, StoreImageEntry>>(KV_KEY),
   save: (entries) => writeKv(KV_KEY, entries),

@@ -8,7 +8,7 @@ import { preparePhotos } from "../storage/photos";
 import { offerQueries, offers } from "../storage/offers";
 import { references } from "../storage/references";
 import { nameImages, useNameImagesVersion } from "../storage/nameImages";
-import { storeImages, useStoreImagesVersion } from "../storage/storeImages";
+import { setStoreImageRetailer, storeImages, useStoreImagesVersion } from "../storage/storeImages";
 import { wantedReferences, wantedStoreImages } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
 import { analyticsEvents, commitMilestoneEvents } from "./analyticsEvents";
@@ -84,8 +84,9 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   const storeVersion = useStoreImagesVersion();
   const storeEans = useMemo(() => (ready ? wantedStoreImages(state.adventure) : []), [ready, state.adventure]);
   useEffect(() => {
+    setStoreImageRetailer(state.adventure?.phase === "draft" || state.adventure?.phase === "shopping" ? state.adventure.retailer : undefined);
     for (const ean of storeEans) storeImages.request(ean);
-  }, [storeEans]);
+  }, [storeEans, state.adventure]);
 
   const nameVersion = useNameImagesVersion();
   const wanted = useMemo(

@@ -5,6 +5,9 @@ import type { CatalogStore } from "./catalog/types.js";
 import { eanForms } from "./ean.js";
 import { cleanUrl, get, readLimited, stripHtml, usageOf, type Fetch, type RawResponse } from "./images.js";
 import type { Usage } from "./limits.js";
+import { categoryOf } from "./nameMatch.js";
+import { imageRetailerName, RETAILER_RANK, type OfferRow } from "./offers/prijsprofeet.js";
+import type { StoreImageLookup } from "./storeImage.js";
 
 /**
  * A product found by its barcode. Open Food Facts data is community-edited (ODbL, photos CC BY-SA);
@@ -260,6 +263,8 @@ export type BarcodeConfig = {
     CatalogStore,
     "byGtin" | "upsertBarcodeRecord" | "cacheGet" | "cachePut" | "rememberSeen" | "packForGtin"
   >;
+  /** PrijsProfeet exact-EAN lookup (all retailers); asked together with Open Food Facts. */
+  storeImages?: Pick<StoreImageLookup, "find">;
 };
 
 class OffError extends Error {
@@ -351,7 +356,12 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       at: answer.at,
     });
     const pack = await config.catalog.packForGtin(answer.ean).catch(() => null);
-    return pack ? { ...answer, pack } : answer;
+    if (!pack) return answer;
+    const product = {
+      ...answer.product,
+      ...(pack.displayQuantity ? { quantity: pack.displayQuantity } : pack.conflict ? { quantity: undefined } : {}),
+    };
+    return { ...answer, product, pack };
   }
 
   function persistMiss(ean: string) {
@@ -384,8 +394,52 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     return null;
   }
 
+  function pickRetailerRow(rows: OfferRow[]): OfferRow | undefined {
+    if (!rows.length) return undefined;
+    return [...rows].sort((a, b) => (RETAILER_RANK[a.retailer] ?? 99) - (RETAILER_RANK[b.retailer] ?? 99))[0];
+  }
+
+  function fromPrijsProfeet(ean: string, rows: OfferRow[]): BarcodeAnswer | null {
+    const row = pickRetailerRow(rows);
+    if (!row) return null;
+    const source: BarcodeSource = {
+      kind: "web",
+      name: imageRetailerName(row.retailer),
+      url: row.sourceUrl ?? `https://www.prijsprofeet.nl/?q=${ean}`,
+    };
+    const product: BarcodeProduct = {
+      ...(row.productName && { name: row.productName.slice(0, 80) }),
+      ...(row.brand && { brand: row.brand.slice(0, 40) }),
+      ...(row.quantity && { quantity: row.quantity.slice(0, 40) }),
+      ...(row.category && categoryOf(row.category) && { categories: [row.category] }),
+    };
+    if (!product.name && !product.brand) return null;
+    return { ean, status: "web-page", product, source, at: now() };
+  }
+
+  async function withStore(ean: string): Promise<{ rows: OfferRow[]; image?: NonNullable<BarcodeAnswer["storeImage"]> }> {
+    if (!config.storeImages) return { rows: [] };
+    const result = await config.storeImages.find(ean).catch(() => null);
+    if (!result?.ok) return { rows: [] };
+    return {
+      rows: result.rows,
+      ...(result.image && {
+        image: {
+          ean,
+          imageUrl: result.image.imageUrl,
+          retailer: result.image.retailer,
+          ...(result.image.sourceUrl && { sourceUrl: result.image.sourceUrl }),
+          ...(result.image.quantity && { quantity: result.image.quantity }),
+          ...(result.image.productName && { productName: result.image.productName }),
+          ...(result.image.brand && { brand: result.image.brand }),
+        },
+      }),
+    };
+  }
+
   async function lookupFresh(ean: string, allowWeb: boolean, options: { refreshOnly?: boolean } = {}): Promise<LookupResult> {
     const failures: string[] = [];
+    const storePromise = withStore(ean);
     let raw: OffProduct | null;
     try {
       raw = await askOff(ean);
@@ -394,16 +448,33 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       if (!options.refreshOnly) remember(ean, { error: true, until: now() + BARCODE_RULES.errorTtlMs });
       return { ok: false, code: "unavailable", failures };
     }
+    const store = await storePromise;
     const off = raw ? fromOff(ean, raw) : null;
     if (off) {
       const source: BarcodeSource = { kind: "off", name: "Open Food Facts", url: `${BARCODE_RULES.offOrigin}/product/${ean}`, dataLicense: "ODbL", ...(off.product.imageUrl && { imageLicense: "CC BY-SA" as const }) };
-      let answer: BarcodeAnswer = { ean, status: off.status, product: off.product, source, at: now() };
+      let answer: BarcodeAnswer = {
+        ean,
+        status: off.status,
+        product: off.product,
+        source,
+        at: now(),
+        ...(store.image && { storeImage: store.image }),
+      };
       answer = await persist(answer);
       remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
       return { ok: true, answer, cached: false, searchCalls: 0, failures };
     }
     failures.push(raw ? "off:not-credible" : "off:not-found");
     if (options.refreshOnly) return { ok: true, answer: { ean, status: "none", at: now() }, cached: false, searchCalls: 0, failures };
+
+    const fromPp = fromPrijsProfeet(ean, store.rows);
+    if (fromPp) {
+      let answer: BarcodeAnswer = { ...fromPp, ...(store.image && { storeImage: store.image }) };
+      answer = await persist(answer);
+      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
+      return { ok: true, answer, cached: false, searchCalls: 0, failures };
+    }
+
     if (!allowWeb || !config.web) {
       // Without the web search the miss is not final, so it is kept briefly.
       const answer: BarcodeAnswer = { ean, status: "none", at: now() };
@@ -414,7 +485,7 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     }
     const web = await askWeb(ean, failures);
     let answer = web.answer ?? { ean, status: "none" as const, at: now() };
-    if (web.answer) answer = await persist(answer);
+    if (web.answer) answer = await persist({ ...answer, ...(store.image && { storeImage: store.image }) });
     else persistMiss(ean);
     remember(ean, { answer, until: now() + (web.answer ? BARCODE_RULES.foundTtlMs : BARCODE_RULES.missTtlMs) });
     return { ok: true, answer, cached: false, usage: web.usage, searchCalls: web.searchCalls, failures };
