@@ -47,9 +47,9 @@ describe("tile gestures", () => {
 });
 
 describe("infoCorner", () => {
-  it("sits top-trailing when there is no quantity badge, bottom-leading when there is", () => {
-    expect(infoCorner(0)).toBe("top-trailing");
-    expect(infoCorner(3)).toBe("bottom-leading");
+  it("stays top-leading so the quantity badge can keep the top-trailing corner", () => {
+    expect(infoCorner(0)).toBe("top-leading");
+    expect(infoCorner(3)).toBe("top-leading");
   });
 });
 

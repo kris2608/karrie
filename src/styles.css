@@ -856,12 +856,15 @@ a.settings-link { text-decoration: none; color: inherit; }
   box-shadow: 0 1px 0 rgba(43, 54, 64, 0.08);
   cursor: pointer;
 }
+.card-info.is-top-leading {
+  top: 6px;
+  left: 6px;
+}
 .card-info.is-top-trailing {
   top: 6px;
   right: 6px;
 }
 .card-info.is-bottom-leading {
-  /* Above the name row so it clears the quantity badge without covering the label. */
   bottom: 34px;
   left: 6px;
 }
@@ -1989,7 +1992,18 @@ a.settings-link { text-decoration: none; color: inherit; }
 .offer-tag.is-maybe svg circle { fill: #fff; }
 .offer-tag.is-compact { padding: 4px; }
 .offer-tag.is-compact svg { width: 18px; height: 18px; }
-.card-offer { position: absolute; z-index: 2; top: 6px; left: 6px; pointer-events: none; }
+/** Trailing side: clears the top-leading ⓘ; sits under the quantity badge when present. */
+.card-offer {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 6px;
+  left: auto;
+  pointer-events: none;
+}
+.product-card.is-added .card-offer {
+  top: 38px;
+}
 .offer-tag-button {
   justify-self: start;
   display: inline-flex;

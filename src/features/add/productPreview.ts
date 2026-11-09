@@ -7,9 +7,9 @@ export type PreviewTarget =
   | { kind: "mine"; entry: SavedItem; listed?: AdventureItem; quantity: number; offer?: RetailerId }
   | { kind: "extra"; item: AdventureItem; quantity: number; offer?: RetailerId };
 
-/** Keeps the ⓘ clear of the heart (top-leading) and quantity badge (top-trailing). */
-export function infoCorner(quantity: number): "top-trailing" | "bottom-leading" {
-  return quantity > 0 ? "bottom-leading" : "top-trailing";
+/** Top-leading: quantity badge stays top-trailing. */
+export function infoCorner(_quantity?: number): "top-leading" {
+  return "top-leading";
 }
 
 export function previewName(target: PreviewTarget): string {
