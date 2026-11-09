@@ -9,6 +9,26 @@ const list: SharedListV1 = {
 };
 
 describe("shareListClient", () => {
+  it("calls the browser fetch without rebinding it", async () => {
+    vi.stubEnv("VITE_API_ORIGIN", "https://api.example");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(function (this: unknown) {
+        if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ status: "ok", id: "abcdefghijklmnop", url: "https://www.karrie.eu/l/abcdefghijklmnop", expiresAt: "2099-01-01T00:00:00.000Z" }),
+        });
+      }),
+    );
+    vi.resetModules();
+    const { shareListClient } = await import("./client");
+    await expect(shareListClient.create(list)).resolves.toMatchObject({ status: "ok", id: "abcdefghijklmnop" });
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
   it("creates a short link from the API", async () => {
     const fetchFn = vi.fn().mockResolvedValue({
       ok: true,

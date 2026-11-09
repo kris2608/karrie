@@ -79,5 +79,5 @@ export function createShareListClient(deps: Deps) {
 
 export const shareListClient = createShareListClient({
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
-  fetch,
+  fetch: (...args) => fetch(...args),
 });

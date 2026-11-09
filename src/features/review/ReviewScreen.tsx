@@ -216,15 +216,20 @@ export function ReviewScreen() {
           </ul>
         </motion.section>
       ))}
+      {groups.length > 0 && (
+        <PressButton variant="quiet" wide className="review-add" data-testid="add-products" onClick={() => navigate("/toevoegen")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="dock-icon">
+            <path d="M12 6v12M6 12h12" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+          </svg>
+          Toevoegen
+        </PressButton>
+      )}
       {adventure.phase === "draft" && hasOpen && (
         <button type="button" className="text-button clear-list" data-testid="clear-list" onClick={clearList}>
           Lijstje leegmaken
         </button>
       )}
       <div className="dock dock-fixed dock-review">
-        <PressButton variant="quiet" size="l" data-testid="add-products" onClick={() => navigate("/toevoegen")}>
-          Toevoegen
-        </PressButton>
         {adventure.phase === "draft" && (
           <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={() => setSaving(true)}>
             Bewaar
