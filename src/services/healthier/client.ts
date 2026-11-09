@@ -23,6 +23,14 @@ export function evidenceForItem(item: AdventureItem, pageFacts?: ProductFacts): 
   return assembleProductEvidence(item, pageFacts);
 }
 
+/** Prefer these catalog types first when preparing missions (Phase 1 focus). */
+export const HEALTHIER_PRIORITY_IDS = ["pindakaas", "yoghurt", "brood", "muesli", "havermout", "noten"] as const;
+
+export function healthierPriority(item: AdventureItem): number {
+  const index = (HEALTHIER_PRIORITY_IDS as readonly string[]).indexOf(item.productId ?? "");
+  return index === -1 ? HEALTHIER_PRIORITY_IDS.length : index;
+}
+
 /** Eligible draft items that still need an assessment for the current evidence. */
 export function needsHealthierAssess(item: AdventureItem, pageFacts?: ProductFacts): boolean {
   if (item.status === "found") return false;

@@ -156,6 +156,45 @@ describe("realistic healthier scenarios", () => {
     ).toBe("possible");
     expect(labelCheck(["unsalted"], "label", "Pinda's, zout")).toEqual({ criteria: ["unsalted"], evidence: "label" });
     expect(labelCheck(["unsalted"], "label", "Pinda's")).toEqual({ criteria: [], evidence: "inferred" });
+    expect(samePurpose("noten", "noten")).toBe(true);
+    expect(
+      resolveAssessment(
+        { ...SWEET_PEANUT, criteria: ["unsalted"], alternativeType: "ongezouten noten", targetType: "noten", childPrompt: "Kun jij ongezouten noten vinden?" },
+        "noten",
+        "Cashewnoten, zout",
+      )?.status,
+    ).toBe("possible");
+  });
+
+  it("offers a Calvé-style peanut butter mission when smartDiscovery is on", () => {
+    const ingredients = "Pinda's 90%, suiker, plantaardige oliën (raapzaad, palm), zout";
+    const resolved = resolveAssessment(
+      {
+        status: "possible",
+        evidence: "label",
+        criteria: ["no-added-sugar", "no-added-salt"],
+        alternativeType: "100% pindakaas zonder toegevoegd zout of suiker",
+        targetType: "pindakaas",
+        reason: "Suiker en zout staan op het etiket.",
+        parentExplanation: "Er staan suiker en zout in de ingrediënten",
+        childPrompt: "Kun jij pindakaas met alleen pinda's vinden?",
+      },
+      "pindakaas",
+      ingredients,
+      { source: "barcode", evidenceVersion: "calve-fixture-v1" },
+    );
+    expect(resolved).toMatchObject({
+      status: "possible",
+      evidence: "label",
+      targetType: "pindakaas",
+      parentExplanation: expect.stringMatching(/etiket/i),
+    });
+    const calve = item("calve", resolved, { name: "Calvé Pindakaas", brand: "Calvé", ingredients });
+    const melk = item("melk", undefined, { productId: "melk", name: "Melk", icon: "melk", category: "dairy" });
+    expect(pickMissions([calve, melk], true)).toEqual(["calve"]);
+    expect(pickMissions([calve, melk], false)).toEqual([]);
+    expect(isBareGeneric(melk)).toBe(true);
+    expect(isAssessable(assembleProductEvidence(melk))).toBe(false);
   });
 
   it("does not invent missions for bare melk or empty evidence", () => {

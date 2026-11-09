@@ -1,5 +1,6 @@
 import { productById } from "../data/catalog";
 import type { RecognizedAlternative } from "../services/vision/types";
+import { pickPlayOffers } from "./bonusPlay";
 import { normalize } from "./matchProduct";
 import type { ProductEvidence } from "./productEvidence";
 import type { AdventureItem, AlternativeAssessment, Criterion, Evidence, Nutrition, PackInfo } from "./types";
@@ -202,6 +203,21 @@ export function pickMissions(items: AdventureItem[], enabled: boolean, declined:
     .filter((item) => item.status !== "found" && missionOn(item, declined))
     .slice(0, MAX_MISSIONS)
     .map((item) => item.id);
+}
+
+/** Healthier mission ids first, then offline play offers — one bonus max per product. */
+export function assignBonuses(items: AdventureItem[], enabled: boolean, declined: readonly string[], seed: string): AdventureItem[] {
+  const missionIds = pickMissions(items, enabled, declined);
+  const offered = new Set(missionIds);
+  const plays = pickPlayOffers(items, missionIds, enabled, seed);
+  return items.map((item) => {
+    const next: AdventureItem = { ...item };
+    delete next.mission;
+    delete next.play;
+    if (offered.has(item.id)) next.mission = { status: "offered" };
+    if (plays[item.id]) next.play = plays[item.id];
+    return next;
+  });
 }
 
 export type MissionBadge = "hundred" | "grain" | "no-sugar" | "no-salt" | "less-fat";

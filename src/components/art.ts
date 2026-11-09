@@ -73,6 +73,7 @@ export const ART: Record<string, ArtSpec> = {
   crackers: { kind: "cracker", color: "#e8c07a", accent: "#c48a3a" },
   havermout: { kind: "bag", color: "#e7d3a4", accent: "#c4a060" },
   pindakaas: { kind: "jar", color: "#e2a04a", accent: "#c47a22" },
+  noten: { kind: "bag", color: "#c48a3a", accent: "#8a5a22" },
   jam: { kind: "jar", color: "#d23b4a", accent: "#f2c14a" },
   hagelslag: { kind: "box", color: "#ff8a1a", accent: "#5b4636" },
   muesli: { kind: "bag", color: "#d8b06a", accent: "#8a5a32" },

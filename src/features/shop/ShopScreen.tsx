@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Karrie } from "../../components/mascot/Karrie";
+import { Karrie, type Mood } from "../../components/mascot/Karrie";
 import { ItemArt } from "../../components/ItemArt";
 import { ShopScene } from "../../components/scenery/ShopScene";
 import { DiscoverySwitch } from "../../components/ui/DiscoverySwitch";
@@ -10,6 +10,7 @@ import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { productById } from "../../data/catalog";
+import { playActive } from "../../domain/bonusPlay";
 import { SCORING, starTotal } from "../../domain/scoring";
 import { activeItem, foundCount } from "../../domain/shopQueue";
 import type { AdventureItem } from "../../domain/types";
@@ -22,6 +23,7 @@ import { useScreenWakeLock } from "../../hooks/useScreenWakeLock";
 import { useAdventure } from "../../state/AdventureContext";
 import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { OfferTag, offerLabel } from "../offers/OfferTag";
+import { GuessProductCard } from "./GuessProductCard";
 import { MissionCard, ParentCheck } from "./MissionCard";
 
 const SWIPE_DISTANCE = 90;
@@ -38,6 +40,7 @@ export function ShopScreen() {
   const [checkOpen, setCheckOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const [missionShown, setMissionShown] = useState<string | null>(null);
+  const [playMood, setPlayMood] = useState<Mood | null>(null);
   const location = useLocation();
   /** Shown once when a list collected at home goes shopping; a tap or a moment later it is gone. */
   const [intro, setIntro] = useState(() => Boolean((location.state as { intro?: boolean } | null)?.intro));
@@ -50,6 +53,7 @@ export function ShopScreen() {
   const basketRef = useRef<SVGRectElement>(null);
   const starRef = useRef<HTMLSpanElement>(null);
   const dragged = useRef(false);
+  const dragCollected = useRef(false);
 
   const sequence = useFoundSequence({
     reduced,
@@ -67,7 +71,10 @@ export function ShopScreen() {
   const retailer = adventure?.retailer;
   const { views: offerViews } = useOfferViews(adventure?.items ?? [], retailer);
   const offer = current ? offerViews.get(current.id) : undefined;
+  const healthierBusy = current?.mission?.status === "active" || current?.mission?.status === "offered";
+  const play = !healthierBusy ? playActive(current) : undefined;
   const offered = current?.mission?.status === "offered" && !sequence.locked && !intro ? current.id : null;
+  const showGuess = Boolean(play?.kind === "guess" && play.status === "offered" && current && !sequence.locked && !intro);
 
   useEffect(() => {
     if (!offered) return;
@@ -85,6 +92,16 @@ export function ShopScreen() {
     return () => window.clearTimeout(timer);
   }, [intro]);
 
+  useEffect(() => {
+    if (!play || play.status !== "offered") return;
+    if (play.kind === "color" || play.kind === "drag") dispatch({ type: "play-activate" });
+  }, [play, dispatch]);
+
+  useEffect(() => {
+    dragCollected.current = false;
+    setPlayMood(null);
+  }, [current?.id]);
+
   if (!adventure || adventure.items.length === 0) return <Navigate to="/" replace />;
   if (adventure.phase === "draft") return <Navigate to="/controleren" replace />;
   if (adventure.phase === "done" && !sequence.finishing) return <Navigate to="/klaar" replace />;
@@ -93,18 +110,49 @@ export function ShopScreen() {
   const found = foundCount(adventure.items) - (sequence.starPending ? 1 : 0);
   const stars = starTotal(adventure.items) - sequence.starPending;
   const openItems = adventure.items.filter((item) => item.status !== "found");
-  const canSkip = openItems.length > 1 && !sequence.locked;
+  const dragPlay = play?.kind === "drag" && (play.status === "offered" || play.status === "active");
+  const colorPlay = play?.kind === "color" && (play.status === "offered" || play.status === "active");
+  const canSkip = openItems.length > 1 && !sequence.locked && !dragPlay;
   const searching = current?.mission?.status === "active" ? current : null;
   const missionTarget = searching?.alternative?.targetType ? productById(searching.alternative.targetType) : undefined;
-  const showMission = Boolean(current && offered === current.id && missionShown === current.id);
+  const showMission = Boolean(current && offered === current.id && missionShown === current.id && !showGuess);
+
+  function finishPlay(kind: "guess" | "color" | "drag") {
+    dispatch({ type: "play-done" });
+    trackEvent({ name: "bonus_play_completed", data: { kind } });
+  }
 
   function collect() {
-    if (!current) return;
+    if (!current || showGuess) return;
     if (searching) {
       setCheckOpen(true);
       return;
     }
+    if (play && (play.kind === "color" || play.kind === "drag") && play.status !== "done" && play.status !== "skipped") {
+      finishPlay(play.kind);
+    }
     sequence.collect(current, openItems.length === 1);
+  }
+
+  function celebrateGuess() {
+    finishPlay("guess");
+    setPlayMood("celebrating");
+    window.setTimeout(() => setPlayMood(null), 1200);
+  }
+
+  function dropOnBasket(_: unknown, info: { point: { x: number; y: number } }) {
+    if (!dragPlay || !current || sequence.locked || dragCollected.current) return;
+    const basket = basketRef.current?.getBoundingClientRect();
+    if (!basket) return;
+    const pad = 48;
+    const hit =
+      info.point.x >= basket.left - pad &&
+      info.point.x <= basket.right + pad &&
+      info.point.y >= basket.top - pad &&
+      info.point.y <= basket.bottom + pad;
+    if (!hit) return;
+    dragCollected.current = true;
+    collect();
   }
 
   function missionFound(choice: "original" | "alternative") {
@@ -145,40 +193,67 @@ export function ShopScreen() {
       </header>
 
       <section className="shop-guide">
-        <Karrie mood={sequence.mood} beat={sequence.beat} basketRef={basketRef} className="shop-mascot" />
+        <Karrie mood={playMood ?? sequence.mood} beat={sequence.beat} basketRef={basketRef} className="shop-mascot" />
         <AnimatePresence mode="wait">
           <motion.p
-            key={!current ? "done" : showMission ? "mission" : searching ? "bonus" : "search"}
+            key={
+              !current
+                ? "done"
+                : showMission
+                  ? "mission"
+                  : searching
+                    ? "bonus"
+                    : showGuess
+                      ? "guess"
+                      : colorPlay
+                        ? "color"
+                        : dragPlay
+                          ? "drag"
+                          : "search"
+            }
             className="speech"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
             transition={spring}
           >
-            {!current ? "Alles gevonden!" : showMission ? "Ik heb een bonusmissie!" : searching ? "Zoek de bonus!" : "Zoek dit product!"}
+            {!current
+              ? "Alles gevonden!"
+              : showMission
+                ? "Ik heb een bonusmissie!"
+                : searching
+                  ? "Zoek de bonus!"
+                  : showGuess
+                    ? "Raad het product!"
+                    : colorPlay
+                      ? `Zoek iets ${play?.colorLabel ?? "kleurigs"}!`
+                      : dragPlay
+                        ? "Sleep het in mijn karretje!"
+                        : "Zoek dit product!"}
           </motion.p>
         </AnimatePresence>
       </section>
 
       <section className="stage">
         <AnimatePresence initial={false} custom={sequence.exitKind}>
-          {current && (
+          {current && !showGuess && (
             <motion.button
               key={current.id}
               type="button"
-              className="stage-product"
+              className={`stage-product${dragPlay ? " is-drag-play" : ""}`}
               data-testid="product-stage"
-              aria-label={`Gevonden: ${current.name}`}
+              aria-label={dragPlay ? `Sleep ${current.name} naar het karretje` : `Gevonden: ${current.name}`}
               disabled={sequence.locked}
               custom={sequence.enterDelay}
               variants={{ ...productEnter, ...productExit }}
               initial="hidden"
               animate="shown"
               exit={sequence.exitKind}
-              whileTap={sequence.locked ? undefined : { scale: 0.93 }}
-              drag={canSkip ? "x" : false}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={{ left: 0.9, right: 0.12 }}
+              whileTap={sequence.locked || dragPlay ? undefined : { scale: 0.93 }}
+              drag={dragPlay ? true : canSkip ? "x" : false}
+              dragConstraints={dragPlay ? undefined : { left: 0, right: 0 }}
+              dragElastic={dragPlay ? 0.35 : { left: 0.9, right: 0.12 }}
+              dragSnapToOrigin={dragPlay}
               onPointerDown={() => {
                 dragged.current = false;
               }}
@@ -186,13 +261,24 @@ export function ShopScreen() {
                 dragged.current = true;
               }}
               onDragEnd={(_, info) => {
+                if (dragPlay) {
+                  dropOnBasket(_, info);
+                  return;
+                }
                 if (info.offset.x < -SWIPE_DISTANCE || info.velocity.x < -SWIPE_VELOCITY) sequence.skip();
+              }}
+              onKeyDown={(event) => {
+                if (dragPlay && (event.key === "Enter" || event.key === " ")) {
+                  event.preventDefault();
+                  collect();
+                }
               }}
               onClick={() => {
                 if (dragged.current) {
                   dragged.current = false;
                   return;
                 }
+                if (dragPlay) return;
                 collect();
               }}
             >
@@ -207,7 +293,7 @@ export function ShopScreen() {
 
       <div className="product-title" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
-          {current && (
+          {current && !showGuess && (
             <motion.h1
               key={current.id}
               initial={{ y: 10, opacity: 0 }}
@@ -260,6 +346,40 @@ export function ShopScreen() {
               </button>
             </motion.div>
           )}
+          {colorPlay && play?.colorLabel && !searching && (
+            <motion.div
+              key={`color-${current?.id}`}
+              className="scan-pill mission-pill"
+              data-testid="color-hunt"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1, transition: spring }}
+              exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
+            >
+              <span>{`Zoek iets ${play.colorLabel}!`}</span>
+              <button type="button" className="mission-stop" aria-label="Stop kleurjacht" data-testid="color-skip" onClick={() => dispatch({ type: "play-skip" })}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </motion.div>
+          )}
+          {dragPlay && !searching && (
+            <motion.div
+              key={`drag-${current?.id}`}
+              className="scan-pill mission-pill"
+              data-testid="drag-play"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1, transition: spring }}
+              exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
+            >
+              <span>In Karrie's karretje!</span>
+              <button type="button" className="mission-stop" aria-label="Stop sleepmissie" data-testid="drag-skip" onClick={() => dispatch({ type: "play-skip" })}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -299,6 +419,18 @@ export function ShopScreen() {
             reduced={reduced}
             onGo={() => dispatch({ type: "mission-accept" })}
             onSkip={() => dispatch({ type: "mission-skip" })}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showGuess && current && (
+          <GuessProductCard
+            key={`guess-${current.id}`}
+            item={current}
+            reduced={reduced}
+            onCorrect={celebrateGuess}
+            onSkip={() => dispatch({ type: "play-skip" })}
           />
         )}
       </AnimatePresence>

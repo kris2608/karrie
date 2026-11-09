@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { resolveAssessment } from "../../domain/discovery";
 import { factsFor } from "../../domain/productFacts";
 import type { Adventure, AdventureItem } from "../../domain/types";
-import { createHealthierClient, needsHealthierAssess } from "../../services/healthier/client";
+import { createHealthierClient, healthierPriority, needsHealthierAssess } from "../../services/healthier/client";
 import { references } from "../../storage/references";
 import type { Action } from "../../state/reducer";
 
@@ -28,10 +28,12 @@ export function useHealthierPreflight(
     let cancelled = false;
 
     const run = async () => {
-      const eligible = adventure.items.filter((item) => {
-        const page = factsFor(item, references.entry);
-        return needsHealthierAssess(item, page) && !inFlight.current.has(item.id);
-      });
+      const eligible = adventure.items
+        .filter((item) => {
+          const page = factsFor(item, references.entry);
+          return needsHealthierAssess(item, page) && !inFlight.current.has(item.id);
+        })
+        .sort((a, b) => healthierPriority(a) - healthierPriority(b));
       for (const item of eligible.slice(0, 5)) {
         if (cancelled) return;
         inFlight.current.add(item.id);

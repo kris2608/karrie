@@ -15,6 +15,7 @@ export type AnalyticsEvent =
   | { name: "adventure_started"; data: { item_count: number } }
   | { name: "adventure_completed"; data: { item_count: number; completed_missions: number } }
   | { name: "bonus_mission_completed"; data: { choice: "alternative" | "original" } }
+  | { name: "bonus_play_completed"; data: { kind: "guess" | "color" | "drag" } }
   | { name: "offer_opened"; data: { retailer: "jumbo" | "ah" | "lidl"; match_type: "exact" | "likely" } }
   | { name: "app_first_open" }
   | { name: "new_adventure_clicked" }

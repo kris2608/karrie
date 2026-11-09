@@ -102,4 +102,47 @@ describe("bonus missions", () => {
     const again = reducer(reopened, { type: "start-shopping" });
     expect(items(again).every((item) => item.mission?.status === "offered")).toBe(true);
   });
+
+  it("assigns offline play under Bonusmissies without stacking on healthier offers", () => {
+    let state = initialState;
+    for (const [name, productId, category] of [
+      ["Banaan", "banaan", "produce"],
+      ["Broccoli", "broccoli", "produce"],
+      ["Wortel", "wortel", "produce"],
+      ["Melk", "melk", "dairy"],
+      ["Yoghurt", "yoghurt", "dairy"],
+      ["Brood", "brood", "bakery"],
+    ] as const) {
+      state = reducer(state, { type: "add-recognized", name, category, icon: productId, productId, pack: { recognition: { confidence: "high" } } });
+    }
+    state = reducer(state, { type: "start-shopping" });
+    const plays = items(state).filter((item) => item.play);
+    expect(plays.length).toBeGreaterThanOrEqual(1);
+    expect(plays.every((item) => !item.mission)).toBe(true);
+
+    const off = reducer(reducer(state, { type: "set-discovery", enabled: false }), { type: "new-draft" });
+    let plain = off;
+    plain = reducer(plain, { type: "add-recognized", name: "Banaan", category: "produce", icon: "banaan", productId: "banaan", pack: { recognition: { confidence: "high" } } });
+    plain = reducer(plain, { type: "start-shopping" });
+    expect(items(plain).every((item) => !item.play && !item.mission)).toBe(true);
+  });
+
+  it("play skip and done update status without inventing stars", () => {
+    let state = initialState;
+    state = reducer(state, { type: "add-recognized", name: "Banaan", category: "produce", icon: "banaan", productId: "banaan", pack: { recognition: { confidence: "high" } } });
+    state = reducer(state, { type: "add-recognized", name: "Broccoli", category: "produce", icon: "broccoli", productId: "broccoli", pack: { recognition: { confidence: "high" } } });
+    state = reducer(state, { type: "add-recognized", name: "Wortel", category: "produce", icon: "wortel", productId: "wortel", pack: { recognition: { confidence: "high" } } });
+    state = reducer(state, { type: "start-shopping" });
+    const playItem = items(state).find((item) => item.play);
+    expect(playItem?.play).toBeTruthy();
+    // Move play item to front by skipping others if needed — use dispatch on whatever is active after sorting.
+    while (activeItem(items(state)) && !activeItem(items(state))!.play && items(state).some((item) => item.status === "pending" && item.play)) {
+      state = reducer(state, { type: "skip" });
+    }
+    const current = activeItem(items(state));
+    if (!current?.play) return;
+    state = reducer(state, { type: "play-done" });
+    expect(activeItem(items(state))?.play?.status).toBe("done");
+    expect(starTotal(items(state))).toBe(0);
+  });
 });

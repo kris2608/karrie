@@ -47,6 +47,7 @@ export const products: Product[] = [
   product("crackers", "Crackers", "breakfast", "crackers", ["cracker"]),
   product("havermout", "Havermout", "breakfast", "oats", ["havervlokken"]),
   product("pindakaas", "Pindakaas", "breakfast", "peanut-butter"),
+  product("noten", "Noten", "breakfast", "nuts", ["ongezouten noten", "gezouten noten", "pinda's", "cashewnoten", "amandelen"]),
   product("jam", "Jam", "breakfast", "jam", ["confituur", "aardbeienjam"]),
   product("hagelslag", "Hagelslag", "breakfast", "sprinkles"),
   product("muesli", "Muesli", "breakfast", "cereal", ["cruesli"]),

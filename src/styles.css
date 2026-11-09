@@ -2035,6 +2035,36 @@ a.settings-link { text-decoration: none; color: inherit; }
   background: rgba(14, 53, 50, 0.55);
   overflow-y: auto;
 }
+.guess-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  width: 100%;
+}
+.guess-choice {
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  color: inherit;
+}
+.guess-choice:focus-visible { outline: 3px solid var(--teal-shade); outline-offset: 3px; }
+.guess-choice .product-art { width: min(100%, 120px); }
+.guess-retry { margin: 0; font-weight: 800; color: var(--teal-shade); }
+.stage-product.is-drag-play { touch-action: none; cursor: grab; }
+.stage-product.is-drag-play:active { cursor: grabbing; }
+.basket-hit {
+  position: fixed;
+  z-index: 5;
+  pointer-events: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(242, 193, 74, 0.55);
+}
 .mission {
   position: relative;
   display: grid;

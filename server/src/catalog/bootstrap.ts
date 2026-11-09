@@ -71,6 +71,7 @@ export const BOOTSTRAP_PRODUCTS: BootstrapProduct[] = [
   p("crackers", "Crackers", "breakfast", "crackers", ["cracker"]),
   p("havermout", "Havermout", "breakfast", "oats", ["havervlokken"]),
   p("pindakaas", "Pindakaas", "breakfast", "peanut-butter"),
+  p("noten", "Noten", "breakfast", "nuts", ["ongezouten noten", "gezouten noten", "pinda's", "cashewnoten", "amandelen"]),
   p("jam", "Jam", "breakfast", "jam", ["confituur", "aardbeienjam"]),
   p("hagelslag", "Hagelslag", "breakfast", "sprinkles"),
   p("muesli", "Muesli", "breakfast", "cereal", ["cruesli"]),

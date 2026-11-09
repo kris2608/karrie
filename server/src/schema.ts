@@ -20,7 +20,7 @@ export const FOOD_TYPES = [
   "sperziebonen", "prei", "verse-spinazie", "wokgroenten", "pastagroenten",
   "brood", "bolletjes", "krentenbollen", "croissant", "stokbrood",
   "kipfilet", "gehakt", "zalm", "vegaburger",
-  "beschuit", "crackers", "havermout", "pindakaas", "jam", "hagelslag", "muesli", "honing", "appelstroop",
+  "beschuit", "crackers", "havermout", "pindakaas", "noten", "jam", "hagelslag", "muesli", "honing", "appelstroop",
   "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "bloem", "suiker", "koekjes", "chips", "pastasaus", "mais",
   "augurk", "olijven", "babyvoeding",
   "melk", "yoghurt", "kwark", "kaas", "mozzarella", "feta", "boter", "eieren", "vla", "karnemelk", "roomkaas",

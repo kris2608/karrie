@@ -11,7 +11,7 @@ import {
   skipItem,
   sortByCategory,
 } from "../domain/shopQueue";
-import { declineKey, pickMissions } from "../domain/discovery";
+import { assignBonuses, declineKey } from "../domain/discovery";
 import { SCORING } from "../domain/scoring";
 import { rememberCompleted } from "../domain/feedback";
 import { nextSticker } from "../domain/stickers";
@@ -123,6 +123,9 @@ export type Action =
   | { type: "mission-accept" }
   | { type: "mission-skip" }
   | { type: "mission-done"; keep: "original" | "alternative" }
+  | { type: "play-skip" }
+  | { type: "play-done" }
+  | { type: "play-activate" }
   | { type: "new-draft" }
   | { type: "start-sample" }
   | { type: "add-product"; product: Product }
@@ -510,6 +513,24 @@ export function reducer(state: AppState, action: Action): AppState {
       const declined = action.keep === "original" ? [...new Set([...state.declined, declineKey(current)])].slice(-200) : state.declined;
       return { ...collected(state, items), declined };
     }
+    case "play-skip":
+    case "play-done":
+    case "play-activate": {
+      if (!state.adventure) return state;
+      const current = activeItem(state.adventure.items);
+      if (!current?.play || current.play.status === "done" || current.play.status === "skipped") return state;
+      if (action.type === "play-activate" && current.play.status === "active") return state;
+      const status = (action.type === "play-skip" ? "skipped" : action.type === "play-done" ? "done" : "active") as
+        | "skipped"
+        | "done"
+        | "active";
+      const items = state.adventure.items.map((item) =>
+        item.id === current.id ? { ...item, play: { ...item.play!, status } } : item,
+      );
+      // Only "Nu niet" is undoable; activate/done are soft UI progress.
+      const history = action.type === "play-skip" ? withHistory(state, state.adventure) : state.adventure.history;
+      return { ...state, adventure: touch(state.adventure, { items, history }) };
+    }
     case "new-draft": {
       const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
       return { ...state, saved, adventure: blankDraft(state.categoryOrder, state.settings.retailer) };
@@ -711,12 +732,12 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "start-shopping": {
       if (!state.adventure?.items.length || state.adventure.phase === "shopping") return state;
-      const reset = state.adventure.items.map(({ stars: _stars, scan: _scan, mission: _mission, ...item }) => ({ ...item, status: "pending" as const }));
-      const offered = new Set(pickMissions(reset, state.settings.smartDiscovery, state.declined));
-      const items = sortByCategory(
-        reset.map((item) => (offered.has(item.id) ? { ...item, mission: { status: "offered" as const } } : item)),
-        state.adventure.categoryOrder,
-      );
+      const reset = state.adventure.items.map(({ stars: _stars, scan: _scan, mission: _mission, play: _play, ...item }) => ({
+        ...item,
+        status: "pending" as const,
+      }));
+      const withBonuses = assignBonuses(reset, state.settings.smartDiscovery, state.declined, state.adventure.id);
+      const items = sortByCategory(withBonuses, state.adventure.categoryOrder);
       const adventure = touch(state.adventure, { items, phase: "shopping", history: [] });
       return { ...state, adventure, saved: upsertSaved(state.saved, adventure) };
     }

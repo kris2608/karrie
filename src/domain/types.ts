@@ -168,6 +168,10 @@ export type MissionState = {
   swappedFrom?: AdventureItem;
 };
 
+/** Offline shop mini-game under Bonusmissies; never overloads MissionState. */
+export type PlayKind = "guess" | "color" | "drag";
+export type PlayOffer = { kind: PlayKind; status: "offered" | "active" | "done" | "skipped"; distractorId?: string; colorLabel?: string };
+
 export type AdventureItem = PackInfo & {
   id: string;
   productId: string;
@@ -179,6 +183,8 @@ export type AdventureItem = PackInfo & {
   stars?: number;
   scan?: ScanResult;
   mission?: MissionState;
+  /** Offline mini-game offer; assigned with healthier missions under smartDiscovery. */
+  play?: PlayOffer;
 };
 
 export type HistoryEntry = {
