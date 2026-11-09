@@ -20,6 +20,7 @@ import { categoryIcon } from "../domain/categoryIcon";
 import { customName, customProductId, nameTaken, singularKey, suggestion } from "../domain/customProduct";
 import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, NamePhoto, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
 import { isRetailer, type RetailerId } from "../domain/retailers";
+import { toImportSavedItems, type SharedListV1 } from "../domain/shareList";
 import { productById, products } from "../data/catalog";
 import {
   createAdventure,
@@ -164,6 +165,8 @@ export type Action =
   | { type: "forget-saved"; id: string }
   | { type: "restore-saved"; list: SavedList; index: number }
   | { type: "clear-saved" }
+  /** Import a shared list: `open` replaces the current draft; `save-only` keeps the active adventure. */
+  | { type: "import-shared-list"; list: SharedListV1; mode: "open" | "save-only" }
   | { type: "feedback-asked" };
 
 function touch(adventure: Adventure, patch: Partial<Adventure>): Adventure {
@@ -723,6 +726,31 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "clear-saved":
       return { ...state, saved: [], adventure: forget(state.adventure, state.saved.map((list) => list.id)) };
+    case "import-shared-list": {
+      const items = toImportSavedItems(action.list);
+      if (!items.length) return state;
+      const name = action.list.name?.trim().slice(0, 40) || DEFAULT_LIST_NAME;
+      const retailer = isRetailer(action.list.retailer) ? action.list.retailer : undefined;
+      const entry: SavedList = {
+        id: crypto.randomUUID(),
+        name,
+        ...(retailer && { retailer }),
+        items,
+        favorite: false,
+        updatedAt: Date.now(),
+      };
+      if (action.mode === "save-only") {
+        return { ...state, saved: [entry, ...state.saved].slice(0, 40) };
+      }
+      const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
+      const adventure = createAdventure(name, [], state.categoryOrder, "draft");
+      const sorted = sortByCategory(items.map(itemFromSaved), state.categoryOrder);
+      return {
+        ...state,
+        saved: [entry, ...saved.filter((list) => list.id !== entry.id)].slice(0, 40),
+        adventure: withRetailer({ ...adventure, id: entry.id, items: sorted }, retailer),
+      };
+    }
     case "feedback-asked":
       return state.feedbackAsked ? state : { ...state, feedbackAsked: true };
     default:

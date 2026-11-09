@@ -1,0 +1,121 @@
+import { useState } from "react";
+import { ItemArt } from "../../components/ItemArt";
+import { PressButton } from "../../components/ui/PressButton";
+import { Sheet } from "../../components/ui/Sheet";
+import { retailerName } from "../../domain/retailers";
+import { toImportSavedItems, type SharedListV1 } from "../../domain/shareList";
+import type { Adventure } from "../../domain/types";
+
+export type ImportSharedListSheetProps = {
+  list: SharedListV1 | null;
+  adventure: Adventure | null;
+  onClose: () => void;
+  onImport: (mode: "open" | "save-only") => void;
+};
+
+function hasUnfinished(adventure: Adventure | null): boolean {
+  return Boolean(adventure && adventure.items.length > 0 && (adventure.phase === "draft" || adventure.phase === "shopping"));
+}
+
+/** Preview a `#list=` payload and confirm before writing anything local. */
+export function ImportSharedListSheet({ list, adventure, onClose, onImport }: ImportSharedListSheetProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const unfinished = hasUnfinished(adventure);
+  const items = list ? toImportSavedItems(list) : [];
+  const title = list?.name?.trim() || "Gedeeld lijstje";
+  const store = list?.retailer ? retailerName(list.retailer) : null;
+
+  function requestOpen() {
+    if (unfinished) {
+      setConfirmOpen(true);
+      return;
+    }
+    onImport("open");
+  }
+
+  return (
+    <>
+      <Sheet open={Boolean(list)} onClose={onClose} label="Gedeeld lijstje">
+        {list && (
+          <div className="share-import" data-testid="import-shared-list">
+            <h2>Dit lijstje openen?</h2>
+            <p className="share-note">
+              {title}
+              {store ? ` · ${store}` : ""} · {items.length} {items.length === 1 ? "product" : "producten"}
+            </p>
+            <ul className="share-import-items" aria-label="Producten in dit lijstje">
+              {items.slice(0, 12).map((item, index) => (
+                <li key={`${item.productId}-${index}`}>
+                  <ItemArt item={item} />
+                  <span>
+                    <strong>{item.name}</strong>
+                    {item.quantity > 1 ? <small>×{item.quantity}</small> : null}
+                  </span>
+                </li>
+              ))}
+              {items.length > 12 && <li className="share-import-more">+{items.length - 12} meer</li>}
+            </ul>
+            {unfinished ? (
+              <div className="sheet-actions share-import-actions">
+                <PressButton type="button" variant="quiet" data-testid="import-save-only" onClick={() => onImport("save-only")}>
+                  Bewaar als nieuw lijstje
+                </PressButton>
+                <PressButton type="button" variant="primary" data-testid="import-use-now" onClick={requestOpen}>
+                  Gebruik dit lijstje nu
+                </PressButton>
+              </div>
+            ) : (
+              <div className="sheet-actions">
+                <PressButton type="button" variant="quiet" onClick={onClose}>
+                  Annuleer
+                </PressButton>
+                <PressButton type="button" variant="primary" data-testid="import-confirm" onClick={() => onImport("open")}>
+                  Open lijstje
+                </PressButton>
+              </div>
+            )}
+          </div>
+        )}
+      </Sheet>
+
+      <Sheet open={confirmOpen} onClose={() => setConfirmOpen(false)} label="Huidig lijstje bewaren">
+        <div className="share-import">
+          <h2>Je huidige lijstje bewaren?</h2>
+          <p className="share-note">Je openstaande lijstje wordt eerst bewaard, daarna openen we het gedeelde lijstje.</p>
+          <div className="sheet-actions">
+            <PressButton type="button" variant="quiet" onClick={() => setConfirmOpen(false)}>
+              Annuleer
+            </PressButton>
+            <PressButton
+              type="button"
+              variant="primary"
+              data-testid="import-interrupt-confirm"
+              onClick={() => {
+                setConfirmOpen(false);
+                onImport("open");
+              }}
+            >
+              Doorgaan
+            </PressButton>
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+export function ImportSharedListErrorSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} label="Lijstje kan niet worden geopend">
+      <div className="share-import" data-testid="import-shared-error">
+        <h2>Dit lijstje kan niet worden geopend</h2>
+        <p className="share-note">De link is ongeldig of te oud voor deze versie van Karrie.</p>
+        <div className="sheet-actions">
+          <PressButton type="button" variant="primary" wide data-testid="import-error-home" onClick={onClose}>
+            Ga naar Karrie
+          </PressButton>
+        </div>
+      </div>
+    </Sheet>
+  );
+}

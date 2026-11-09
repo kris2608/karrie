@@ -5,6 +5,7 @@ import { AddScreen } from "./features/add/AddScreen";
 import { CompleteScreen } from "./features/complete/CompleteScreen";
 import { HomeScreen } from "./features/home/HomeScreen";
 import { ReviewScreen } from "./features/review/ReviewScreen";
+import { SharedListBoot } from "./features/share/SharedListBoot";
 import { ShopScreen } from "./features/shop/ShopScreen";
 import { AdventureProvider } from "./state/AdventureContext";
 
@@ -22,6 +23,7 @@ export function App() {
       <MotionConfig reducedMotion="user">
         <AdventureProvider>
           <ScrollReset />
+          <SharedListBoot />
           <div className="app">
             <Routes>
               <Route path="/" element={<HomeScreen />} />

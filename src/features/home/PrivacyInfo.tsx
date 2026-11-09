@@ -12,6 +12,14 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
         <p>Je boodschappenlijstjes, voortgang, Mijn producten en de foto's die je bewaart, staan op je eigen apparaat. Er is geen account.</p>
       </section>
       <section>
+        <h3>Lijstje delen</h3>
+        <p>
+          Als je een lijstje deelt, zet Karrie gekozen velden (zoals namen, aantallen en optioneel merk of streepjescode) in de link zelf. Dat is geen
+          versleuteling: iedereen met de volledige link kan het lijstje openen. Karrie bewaart gedeelde lijstjes niet op de server. Wie de link opent,
+          krijgt een eigen lokale kopie. Ouderfoto&apos;s en herkenningsgegevens gaan niet mee.
+        </p>
+      </section>
+      <section>
         <h3>Producten herkennen</h3>
         <p>
           Tik je op de ontspanknop, dan gaat die foto via de server van Karrie naar OpenAI om het product te herkennen. Het live camerabeeld en het

@@ -24,6 +24,7 @@ import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
 import { shareKarrie } from "../../domain/share";
 import { trackEvent } from "../../services/analytics";
+import { ShareListSheet } from "../share/ShareListSheet";
 import { AboutKarrie } from "./AboutKarrie";
 import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
@@ -44,30 +45,47 @@ const linkLabels: Record<Exclude<ParentView, "settings">, string> = {
   privacy: "Privacy en gegevens",
 };
 
-function ListCard({ list, label: fallback, onOpen, onForget }: { list: SavedList; label: string; onOpen: () => void; onForget: () => void }) {
+function ListCard({
+  list,
+  label: fallback,
+  onOpen,
+  onForget,
+  onShare,
+}: {
+  list: SavedList;
+  label: string;
+  onOpen: () => void;
+  onForget: () => void;
+  onShare: () => void;
+}) {
   const { pressing, handlers } = useLongPress(onForget);
   const label = listName(list) ?? fallback;
   const detail = [`${list.items.length} producten`, list.store].filter(Boolean).join(" · ");
   return (
-    <motion.button
-      type="button"
-      className={pressing ? "list-card is-pressing" : "list-card"}
-      aria-label={`${label}, ${detail}. Lang drukken om te wissen`}
-      data-testid="list-card"
-      whileTap={{ scale: 0.96 }}
-      onClick={onOpen}
-      {...handlers}
-    >
-      <span className="list-card-art">
-        {list.items.slice(0, 3).map((item, index) => (
-          <ItemArt key={`${item.productId}-${index}`} item={item} />
-        ))}
-      </span>
-      <span className="list-card-text">
-        <strong>{label}</strong>
-        <small>{detail}</small>
-      </span>
-    </motion.button>
+    <div className="list-card-row">
+      <motion.button
+        type="button"
+        className={pressing ? "list-card is-pressing" : "list-card"}
+        aria-label={`${label}, ${detail}. Lang drukken om te wissen`}
+        data-testid="list-card"
+        whileTap={{ scale: 0.96 }}
+        onClick={onOpen}
+        {...handlers}
+      >
+        <span className="list-card-art">
+          {list.items.slice(0, 3).map((item, index) => (
+            <ItemArt key={`${item.productId}-${index}`} item={item} />
+          ))}
+        </span>
+        <span className="list-card-text">
+          <strong>{label}</strong>
+          <small>{detail}</small>
+        </span>
+      </motion.button>
+      <button type="button" className="list-card-share" data-testid="share-list-card" aria-label={`Deel ${label}`} onClick={onShare}>
+        Deel
+      </button>
+    </div>
   );
 }
 
@@ -78,6 +96,7 @@ export function HomeScreen() {
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [shareList, setShareList] = useState<SavedList | null>(null);
   const [stickersOpen, setStickersOpen] = useState(false);
   const preview = stickerPreview(stickers);
   const previewRef = useRef<HTMLButtonElement>(null);
@@ -230,7 +249,13 @@ export function HomeScreen() {
           <ul>
             {shelf.map(({ list, label }) => (
               <li key={list.id}>
-                <ListCard list={list} label={label} onOpen={() => openList(list)} onForget={() => forgetList(list)} />
+                <ListCard
+                  list={list}
+                  label={label}
+                  onOpen={() => openList(list)}
+                  onForget={() => forgetList(list)}
+                  onShare={() => setShareList(list)}
+                />
               </li>
             ))}
           </ul>
@@ -430,6 +455,8 @@ export function HomeScreen() {
           </>
         )}
       </Sheet>
+
+      <ShareListSheet open={Boolean(shareList)} source={shareList} onClose={() => setShareList(null)} />
     </main>
   );
 }

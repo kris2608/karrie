@@ -171,6 +171,51 @@ it("bewaart een lijstje met een naam en supermarkt en neemt die mee bij openen",
   expect(listName(state.saved[0])).toBeUndefined();
 });
 
+it("importeert een gedeeld lijstje als nieuw avontuur met verse ids", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  let state = reducer(initialState, { type: "add-product", product: banaan });
+  const previousId = state.adventure!.id;
+  const shared = {
+    version: 1 as const,
+    name: "Van oma",
+    retailer: "lidl" as const,
+    items: [
+      { name: "Melk", quantity: 2, category: "dairy" as const, productId: "melk" },
+      { name: "Cashewnoten", quantity: 1, category: "produce" as const, kind: "custom_generic" as const, productId: "custom:cashewnoten" },
+    ],
+  };
+  state = reducer(state, { type: "import-shared-list", list: shared, mode: "open" });
+  expect(state.adventure?.id).not.toBe(previousId);
+  expect(state.adventure).toMatchObject({ name: "Van oma", retailer: "lidl", phase: "draft" });
+  expect(state.adventure?.items.map((item) => [item.name, item.quantity, item.status])).toEqual([
+    ["Cashewnoten", 1, "pending"],
+    ["Melk", 2, "pending"],
+  ]);
+  expect(state.adventure?.items.every((item) => item.id && !("photoId" in item && item.photoId))).toBe(true);
+  expect(state.saved.some((list) => list.id === previousId)).toBe(true);
+  expect(state.saved[0]?.name).toBe("Van oma");
+  expect(state.settings.retailer).not.toBe("lidl");
+});
+
+it("bewaart een gedeeld lijstje zonder het actieve avontuur te overschrijven", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  let state = reducer(initialState, { type: "add-product", product: banaan });
+  const currentId = state.adventure!.id;
+  state = reducer(state, {
+    type: "import-shared-list",
+    list: {
+      version: 1,
+      name: "Buurvrouw",
+      items: [{ name: "Brood", quantity: 1, category: "bakery", productId: "brood" }],
+    },
+    mode: "save-only",
+  });
+  expect(state.adventure?.id).toBe(currentId);
+  expect(state.adventure?.items.map((item) => item.productId)).toEqual(["banaan"]);
+  expect(state.saved[0]).toMatchObject({ name: "Buurvrouw", favorite: false });
+  expect(state.saved[0].items[0]).toMatchObject({ name: "Brood", imageKind: "generic" });
+});
+
 it("maakt van een geplakte lijst een avontuur en bewaart een favoriet", () => {
   const lines = recognizeList("banaan\n2 pakken yoghurt").flatMap((line) =>
     line.product ? [{ product: line.product, quantity: line.quantity }] : [],

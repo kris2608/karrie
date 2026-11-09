@@ -17,6 +17,7 @@ import { softSpring } from "../../motion/variants";
 import { trackEvent } from "../../services/analytics";
 import { useAdventure } from "../../state/AdventureContext";
 import { SaveListSheet } from "../review/SaveListSheet";
+import { ShareListSheet } from "../share/ShareListSheet";
 
 const CHEST_AT = 0.5;
 /** After the sticker has appeared, so the child's celebration is never interrupted. */
@@ -30,6 +31,7 @@ export function CompleteScreen() {
   const bonus = adventure ? stars - foundCount(adventure.items) : 0;
   const [shown, setShown] = useState(reduced ? stars : 0);
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [inviteReady, setInviteReady] = useState(reduced);
   const fired = useRef(false);
   const invite = wantsFeedbackInvite(completedAdventures, feedbackAsked);
@@ -166,6 +168,9 @@ export function CompleteScreen() {
         <PressButton variant="secondary" wide data-testid="save-list" disabled={favorite} onClick={() => setSaving(true)}>
           {favorite ? "Bewaard" : "Bewaar lijstje"}
         </PressButton>
+        <PressButton variant="quiet" wide data-testid="share-list-complete" onClick={() => setSharing(true)}>
+          Deel lijstje
+        </PressButton>
         <button type="button" className="text-button" onClick={() => navigate("/")}>
           Naar het begin
         </button>
@@ -179,6 +184,7 @@ export function CompleteScreen() {
           setSaving(false);
         }}
       />
+      <ShareListSheet open={sharing} source={adventure} onClose={() => setSharing(false)} />
     </main>
   );
 }

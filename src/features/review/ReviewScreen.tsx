@@ -23,6 +23,7 @@ import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
+import { ShareListSheet } from "../share/ShareListSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
 
@@ -42,6 +43,7 @@ export function ReviewScreen() {
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
@@ -193,6 +195,11 @@ export function ReviewScreen() {
           Lijstje leegmaken
         </button>
       )}
+      {hasOpen && (
+        <button type="button" className="text-button share-list-entry" data-testid="share-list-review" onClick={() => setSharing(true)}>
+          Deel lijstje
+        </button>
+      )}
       <div className="dock dock-fixed">
         {adventure.phase === "draft" && (
           <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={() => setSaving(true)}>
@@ -221,6 +228,7 @@ export function ReviewScreen() {
       />
       <OfferSheet open={offerOpen} onClose={() => setOfferOpen(null)} />
       <SaveListSheet open={saving} adventure={adventure} onClose={() => setSaving(false)} onSave={saveForLater} />
+      <ShareListSheet open={sharing} source={adventure} onClose={() => setSharing(false)} />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <Toast notice={notice} onDismiss={dismiss} />
     </main>
