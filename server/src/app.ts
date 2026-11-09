@@ -168,6 +168,14 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+/** Hide secret share tokens in ordinary request logs. */
+export function sanitizeLogPath(pathname: string): string {
+  if (pathname.startsWith("/api/lists/share/") && pathname.length > "/api/lists/share/".length) {
+    return "/api/lists/share/:id";
+  }
+  return pathname;
+}
+
 export function clientIp(req: IncomingMessage): string {
   const forwarded = req.headers["x-forwarded-for"];
   const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim();
@@ -195,7 +203,7 @@ export function createHandler(deps: AppDeps) {
     const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
     const allowed = origin !== undefined && deps.allowedOrigins.includes(origin);
     const url = new URL(req.url ?? "/", "http://localhost");
-    const entry: Record<string, unknown> = { id, method: req.method, path: url.pathname };
+    const entry: Record<string, unknown> = { id, method: req.method, path: sanitizeLogPath(url.pathname) };
 
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -685,6 +693,7 @@ export function createHandler(deps: AppDeps) {
         deps.sharedLists.limits.record({ ok: false, latencyMs: now() - started });
         if (result.code === "unavailable") return send(503, { status: "error", code: "unavailable" });
         if (result.code === "empty") return send(422, { status: "error", code: "empty" });
+        if (result.code === "too-many") return send(422, { status: "error", code: "too-many" });
         return send(422, { status: "error", code: "invalid" });
       }
       deps.sharedLists.limits.record({ ok: true, latencyMs: now() - started });
@@ -694,7 +703,6 @@ export function createHandler(deps: AppDeps) {
         id: result.id,
         url: `${originBase}/l/${result.id}`,
         expiresAt: result.expiresAt,
-        reused: result.reused,
       });
     }
 

@@ -33,8 +33,8 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
         <h3>Karrie verbeteren</h3>
         <p>
           Met Umami tellen we anoniem hoe de app wordt gebruikt, bijvoorbeeld welk scherm opent, of iemand terugkomt, hoe een product is toegevoegd
-          en of herkennen of delen lukte. Umami zet geen cookies. We sturen geen namen, productfoto's of de inhoud van je boodschappenlijstjes naar
-          Umami.
+          en of herkennen of delen lukte. Umami zet geen cookies. We sturen geen namen, productfoto&apos;s of de inhoud van je boodschappenlijstjes
+          naar Umami. Bij een deellink telt Umami alleen het pad /l, zonder de geheime code.
         </p>
         <p>
           Via <a href={feedbackUrl("settings")} target="_blank" rel="noopener noreferrer">Geef feedback</a> kun je vrijwillig iets doorgeven. Wat je

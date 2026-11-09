@@ -70,6 +70,16 @@ describe("shareListClient", () => {
     });
     await expect(empty.create(list)).resolves.toEqual({ status: "error", code: "empty" });
 
+    const tooMany = createShareListClient({
+      origin: "https://api.example",
+      fetch: vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({ status: "error", code: "too-many" }),
+      }) as typeof fetch,
+    });
+    await expect(tooMany.create(list)).resolves.toEqual({ status: "error", code: "too-many" });
+
     vi.useFakeTimers();
     const fetchFn = vi.fn().mockRejectedValue(new Error("offline"));
     const network = createShareListClient({ origin: "https://api.example", fetch: fetchFn as typeof fetch });

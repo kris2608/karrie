@@ -2,7 +2,7 @@ import type { SharedListV1 } from "../../domain/shareList";
 
 export type ShareCreateResult =
   | { status: "ok"; id: string; url: string; expiresAt: string }
-  | { status: "error"; code: "empty" | "invalid" | "unavailable" | "rate-limited" | "network" };
+  | { status: "error"; code: "empty" | "invalid" | "too-many" | "unavailable" | "rate-limited" | "network" };
 
 export type ShareFetchResult =
   | { status: "ok"; list: SharedListV1 }
@@ -38,6 +38,7 @@ export function createShareListClient(deps: Deps) {
       const body = (await readJson(response)) as { status?: string; code?: string; id?: string; url?: string; expiresAt?: string } | null;
       if (response.status === 429) return { status: "error", code: "rate-limited" };
       if (response.status === 422 && body?.code === "empty") return { status: "error", code: "empty" };
+      if (response.status === 422 && body?.code === "too-many") return { status: "error", code: "too-many" };
       if (response.status === 422) return { status: "error", code: "invalid" };
       if (!response.ok || body?.status !== "ok" || !body.id || !body.url || !body.expiresAt) {
         return { status: "error", code: "unavailable" };

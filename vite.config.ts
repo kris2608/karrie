@@ -11,6 +11,12 @@ const appBuild = (process.env.RENDER_GIT_COMMIT ?? process.env.VITE_GIT_COMMIT ?
 /** Only the production site counts; the tracker ignores localhost and previews. The old address stays for apps installed from it. */
 const UMAMI_DOMAINS = "karrie.eu,www.karrie.eu,karrieapp.onrender.com";
 
+/**
+ * Umami before-send: rewrite /l/{token} pageviews to /l so share secrets never leave the device.
+ * Must stay a single-line IIFE assignable to window before the tracker script loads.
+ */
+const UMAMI_BEFORE_SEND = `window.karrieUmamiBeforeSend=function(t,p){if(!p||typeof p!=="object")return!1;if(typeof p.url==="string"){try{var u=new URL(p.url,location.origin);if(/^\\/l\\/[A-Za-z0-9_-]{16,64}\\/?$/.test(u.pathname))p.url="/l"}catch(e){p.url=p.url.replace(/\\/l\\/[A-Za-z0-9_-]{16,64}\\/?/g,"/l")}}return p};`;
+
 /** Adds the Umami Cloud tracker to production builds only, when both public values are set. */
 function umami(): Plugin {
   let tag: string | null = null;
@@ -21,7 +27,10 @@ function umami(): Plugin {
       const env = loadEnv(config.mode, config.envDir || process.cwd(), "UMAMI_");
       const src = (process.env.UMAMI_SCRIPT_URL ?? env.UMAMI_SCRIPT_URL ?? "").trim();
       const id = (process.env.UMAMI_WEBSITE_ID ?? env.UMAMI_WEBSITE_ID ?? "").trim();
-      tag = /^https:\/\/[^\s"<>]+$/.test(src) && /^[0-9a-f-]{36}$/i.test(id) ? `<script defer src="${src}" data-website-id="${id}" data-domains="${UMAMI_DOMAINS}" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true"></script>` : null;
+      tag =
+        /^https:\/\/[^\s"<>]+$/.test(src) && /^[0-9a-f-]{36}$/i.test(id)
+          ? `<script>${UMAMI_BEFORE_SEND}</script>\n    <script defer src="${src}" data-website-id="${id}" data-domains="${UMAMI_DOMAINS}" data-exclude-search="true" data-exclude-hash="true" data-do-not-track="true" data-before-send="karrieUmamiBeforeSend"></script>`
+          : null;
       if (!tag && (src || id)) config.logger.warn("Umami: UMAMI_SCRIPT_URL or UMAMI_WEBSITE_ID looks wrong; no tracker added.");
     },
     transformIndexHtml(html) {

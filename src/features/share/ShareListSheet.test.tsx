@@ -83,4 +83,25 @@ describe("ShareListSheet", () => {
     await waitFor(() => expect(screen.getByTestId("share-list-error")).toBeTruthy());
     expect(screen.getByTestId("share-list-error").textContent).toMatch(/lukt nu niet/i);
   });
+
+  it("shows a clear Dutch message when the list is too large to share", async () => {
+    const huge: Adventure = {
+      ...adventure,
+      items: Array.from({ length: 101 }, (_, index) => ({
+        id: `i${index}`,
+        productId: "melk",
+        name: `Product ${index}`,
+        icon: "milk",
+        category: "dairy",
+        quantity: 1,
+        status: "pending",
+      })),
+    };
+    render(<ShareListSheet open source={huge} onClose={() => undefined} />);
+    await waitFor(() => expect(screen.getByTestId("share-list-error")).toBeTruthy());
+    expect(screen.getByTestId("share-list-error").textContent).toBe(
+      "Dit lijstje bevat te veel producten om te delen. Verwijder een paar producten en probeer het opnieuw.",
+    );
+    expect(create).not.toHaveBeenCalled();
+  });
 });

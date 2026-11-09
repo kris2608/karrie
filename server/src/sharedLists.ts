@@ -4,7 +4,8 @@ import { PRODUCT_CATEGORIES, type ProductCategory } from "./offers/match.js";
 import { isRetailer, type RetailerId } from "./offers/prijsprofeet.js";
 
 export const SHARED_LIST_TTL_MS = 48 * 60 * 60 * 1000;
-export const SHARED_LIST_MAX_ITEMS = 40;
+/** Keep in sync with client SHARE_LIST_MAX_ITEMS. */
+export const SHARED_LIST_MAX_ITEMS = 100;
 export const SHARED_LIST_MAX_NAME = 40;
 export const SHARED_LIST_MAX_PACKAGE = 24;
 export const SHARED_LIST_ID_BYTES = 12; // 16 base64url chars
@@ -30,15 +31,18 @@ export type SharedListPayload = {
 
 export type SharedListStats = {
   created: number;
-  reused: number;
   hits: number;
   expired: number;
   missing: number;
   purged: number;
 };
 
+export type SharedListCreateResult =
+  | { ok: true; id: string; expiresAt: string }
+  | { ok: false; code: "empty" | "invalid" | "too-many" | "unavailable" };
+
 export type SharedListStore = {
-  create: (raw: unknown) => Promise<{ ok: true; id: string; expiresAt: string; reused: boolean } | { ok: false; code: "empty" | "invalid" | "unavailable" }>;
+  create: (raw: unknown) => Promise<SharedListCreateResult>;
   get: (id: string) => Promise<{ ok: true; list: SharedListPayload } | { ok: false; code: "missing" | "expired" | "invalid" | "unavailable" }>;
   purgeExpired: () => Promise<number>;
   stats: () => SharedListStats;
@@ -62,19 +66,32 @@ function isId(value: string): boolean {
   return /^[A-Za-z0-9_-]{16,64}$/.test(value);
 }
 
+export type SanitizeResult =
+  | { ok: true; list: SharedListPayload }
+  | { ok: false; code: "empty" | "invalid" | "too-many" };
+
 /** Accept the client SharedListV1 shape and drop anything outside the allowlist. */
 export function sanitizeSharedList(raw: unknown): SharedListPayload | null {
-  if (!raw || typeof raw !== "object") return null;
+  const result = sanitizeSharedListResult(raw);
+  return result.ok ? result.list : null;
+}
+
+export function sanitizeSharedListResult(raw: unknown): SanitizeResult {
+  if (!raw || typeof raw !== "object") return { ok: false, code: "invalid" };
   const row = raw as Record<string, unknown>;
-  if (row.version !== 1 && row.version !== undefined) return null;
-  if (!Array.isArray(row.items) || row.items.length === 0 || row.items.length > SHARED_LIST_MAX_ITEMS) return null;
+  if (row.version !== 1 && row.version !== undefined) return { ok: false, code: "invalid" };
+  if (!Array.isArray(row.items)) return { ok: false, code: "invalid" };
+  if (row.items.length === 0) return { ok: false, code: "empty" };
+  if (row.items.length > SHARED_LIST_MAX_ITEMS) return { ok: false, code: "too-many" };
   const items: SharedListItem[] = [];
   for (const entry of row.items) {
-    if (!entry || typeof entry !== "object") return null;
+    if (!entry || typeof entry !== "object") return { ok: false, code: "invalid" };
     const item = entry as Record<string, unknown>;
     const name = typeof item.name === "string" ? clip(item.name, SHARED_LIST_MAX_NAME) : "";
     const quantity = typeof item.quantity === "number" ? Math.trunc(item.quantity) : NaN;
-    if (!name || !isCategory(item.category) || !Number.isFinite(quantity) || quantity < 1 || quantity > 24) return null;
+    if (!name || !isCategory(item.category) || !Number.isFinite(quantity) || quantity < 1 || quantity > 24) {
+      return { ok: false, code: "invalid" };
+    }
     const shared: SharedListItem = { name, quantity, category: item.category };
     if (typeof item.productId === "string" && item.productId.trim()) shared.productId = item.productId.trim().slice(0, 80);
     if (typeof item.brand === "string" && clip(item.brand, SHARED_LIST_MAX_NAME)) shared.brand = clip(item.brand, SHARED_LIST_MAX_NAME);
@@ -88,14 +105,17 @@ export function sanitizeSharedList(raw: unknown): SharedListPayload | null {
     }
     items.push(shared);
   }
-  if (!items.length) return null;
+  if (!items.length) return { ok: false, code: "empty" };
   const name = typeof row.name === "string" ? clip(row.name, SHARED_LIST_MAX_NAME) : "";
   const retailer = isRetailer(row.retailer) ? row.retailer : undefined;
   return {
-    version: 1,
-    ...(name && { name }),
-    ...(retailer && { retailer }),
-    items,
+    ok: true,
+    list: {
+      version: 1,
+      ...(name && { name }),
+      ...(retailer && { retailer }),
+      items,
+    },
   };
 }
 
@@ -104,7 +124,7 @@ export function contentHashOf(list: SharedListPayload): string {
 }
 
 export function createSharedListStore(pool: PoolLike, now: () => number = Date.now): SharedListStore {
-  const totals: SharedListStats = { created: 0, reused: 0, hits: 0, expired: 0, missing: 0, purged: 0 };
+  const totals: SharedListStats = { created: 0, hits: 0, expired: 0, missing: 0, purged: 0 };
 
   async function query(text: string, values?: unknown[]): Promise<Rows> {
     return pool.query(text, values);
@@ -112,32 +132,23 @@ export function createSharedListStore(pool: PoolLike, now: () => number = Date.n
 
   return {
     async create(raw) {
-      const list = sanitizeSharedList(raw);
-      if (!list) return { ok: false, code: "invalid" };
-      if (!list.items.length) return { ok: false, code: "empty" };
+      const sanitized = sanitizeSharedListResult(raw);
+      if (!sanitized.ok) return { ok: false, code: sanitized.code };
+      const list = sanitized.list;
       const hash = contentHashOf(list);
-      const expiresAt = new Date(now() + SHARED_LIST_TTL_MS);
+      const createdAt = new Date(now());
+      const expiresAt = new Date(createdAt.getTime() + SHARED_LIST_TTL_MS);
       try {
-        const existing = await query(
-          `SELECT id FROM shared_lists WHERE content_hash = $1 AND expires_at > $2 ORDER BY expires_at DESC LIMIT 1`,
-          [hash, new Date(now()).toISOString()],
-        );
-        if (existing.rows[0]?.id && typeof existing.rows[0].id === "string") {
-          const id = existing.rows[0].id;
-          await query(`UPDATE shared_lists SET expires_at = $2 WHERE id = $1`, [id, expiresAt.toISOString()]);
-          totals.reused += 1;
-          return { ok: true, id, expiresAt: expiresAt.toISOString(), reused: true };
-        }
         const id = newId();
         await query(`INSERT INTO shared_lists (id, content_hash, payload, created_at, expires_at) VALUES ($1, $2, $3::jsonb, $4, $5)`, [
           id,
           hash,
           JSON.stringify(list),
-          new Date(now()).toISOString(),
+          createdAt.toISOString(),
           expiresAt.toISOString(),
         ]);
         totals.created += 1;
-        return { ok: true, id, expiresAt: expiresAt.toISOString(), reused: false };
+        return { ok: true, id, expiresAt: expiresAt.toISOString() };
       } catch {
         return { ok: false, code: "unavailable" };
       }
@@ -190,7 +201,7 @@ export function createSharedListStore(pool: PoolLike, now: () => number = Date.n
 
 /** No-op store when Postgres is off: create/get always unavailable. */
 export function disabledSharedListStore(): SharedListStore {
-  const totals: SharedListStats = { created: 0, reused: 0, hits: 0, expired: 0, missing: 0, purged: 0 };
+  const totals: SharedListStats = { created: 0, hits: 0, expired: 0, missing: 0, purged: 0 };
   return {
     async create() {
       return { ok: false, code: "unavailable" };

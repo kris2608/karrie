@@ -485,9 +485,9 @@ Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.i
 
 **Instellen.** Zet `UMAMI_SCRIPT_URL` (bijvoorbeeld `https://cloud.umami.is/script.js`) en `UMAMI_WEBSITE_ID` bij de statische site **`karrieapp`** (Environment), niet alleen bij `karrie-api`. Kies daarna **Manual Deploy → Clear build cache & deploy**: de waarden worden tijdens het bouwen in `index.html` gezet. Ontbreekt er één, dan bouwt de site gewoon zonder statistieken. Beide waarden zijn openbaar; er is geen Umami-sleutel nodig.
 
-**Waar het niet telt.** `npm run dev` krijgt het script nooit. Een gebouwde versie telt alleen op `karrie.eu`, `www.karrie.eu` en het oude `karrieapp.onrender.com` (`data-domains`), dus `vite preview` op localhost stuurt niets. Wie in de browser *Do Not Track* aan heeft, wordt niet geteld. Zoekparameters en `#` worden niet meegestuurd.
+**Waar het niet telt.** `npm run dev` krijgt het script nooit. Een gebouwde versie telt alleen op `karrie.eu`, `www.karrie.eu` en het oude `karrieapp.onrender.com` (`data-domains`), dus `vite preview` op localhost stuurt niets. Wie in de browser *Do Not Track* aan heeft, wordt niet geteld. Zoekparameters en `#` worden niet meegestuurd. Deellinks (`/l/{id}`) worden vóór verzenden herschreven naar `/l`, zodat de geheime code niet in Umami belandt (`data-before-send` in `vite.config.ts`).
 
-**Paginaweergaven** komen automatisch: Umami ziet ook het wisselen van scherm binnen de app (`/`, `/toevoegen`, `/controleren`, `/winkel`, `/klaar`).
+**Paginaweergaven** komen automatisch: Umami ziet ook het wisselen van scherm binnen de app (`/`, `/toevoegen`, `/controleren`, `/winkel`, `/klaar`, en `/l` voor deellinks).
 
 **Gebeurtenissen.** Alleen vaste namen, vaste waarden en aantallen:
 
@@ -510,7 +510,10 @@ Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.i
 | `saved_list_reopened` | ouder opent een bewaard lijstje opnieuw | geen |
 | `scanner_opened` | camera voor streepjescode/foto gaat open | geen |
 | `scanner_result` | één uitkomst per herkenningspoging | `method`: barcode of photo; `outcome`: success, not_found, error of offline |
-| `share_completed` | delen lukte (systeemblad of kopiëren; annuleren telt niet) | `method`: native of copied |
+| `share_completed` | delen van de Karrie-site lukte (systeemblad of kopiëren; annuleren telt niet) | `method`: native of copied |
+| `shopping_list_share_opened` | deellink-sheet voor een lijstje opent | geen |
+| `shopping_list_shared` | deellink gedeeld of gekopieerd | `method`: native of copied |
+| `shared_list_imported` | ontvanger bevestigt import van een deellink | `item_count`; `entry`: link |
 | `feedback_opened` | Tally-formulier geopend (geen bewijs van verzenden) | `source`: settings of completed |
 | `sticker_book_opened` | stickerboek bewust geopend | geen |
 

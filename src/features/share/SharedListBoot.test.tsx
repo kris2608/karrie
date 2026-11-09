@@ -75,5 +75,40 @@ describe("SharedListBoot", () => {
     await waitFor(() => expect(screen.getByTestId("import-shared-error")).toBeTruthy());
     expect(screen.getByText(/Dit boodschappenlijstje is verlopen/)).toBeTruthy();
     expect(screen.getByText(/opnieuw te delen/)).toBeTruthy();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("keeps product counts and quantities from the shared snapshot", async () => {
+    fetchList.mockResolvedValue({
+      status: "ok",
+      list: {
+        version: 1,
+        name: "Gedeeld",
+        items: [
+          { name: "Melk", quantity: 3, category: "dairy", productId: "melk" },
+          { name: "Brood", quantity: 2, category: "bakery", productId: "brood" },
+        ],
+      },
+    });
+    render(
+      <MemoryRouter initialEntries={["/l/abcdefghijklmnop"]}>
+        <SharedListBoot />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("import-shared-list")).toBeTruthy());
+    expect(screen.getByTestId("import-shared-list").textContent).toMatch(/2 producten/);
+    fireEvent.click(screen.getByTestId("import-confirm"));
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "import-shared-list",
+        mode: "open",
+        list: expect.objectContaining({
+          items: [
+            expect.objectContaining({ name: "Melk", quantity: 3 }),
+            expect.objectContaining({ name: "Brood", quantity: 2 }),
+          ],
+        }),
+      }),
+    );
   });
 });

@@ -31,14 +31,22 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
       return;
     }
     trackEvent({ name: "shopping_list_share_opened" });
-    const shared = source ? toSharedList(source) : null;
-    if (!shared) {
-      setEncoded({ status: "error", message: "Dit lijstje is leeg of kan niet worden gedeeld." });
+    const shared = source ? toSharedList(source) : { status: "error" as const, code: "empty" as const };
+    if (shared.status !== "ok") {
+      setEncoded({
+        status: "error",
+        message:
+          shared.code === "too-many"
+            ? "Dit lijstje bevat te veel producten om te delen. Verwijder een paar producten en probeer het opnieuw."
+            : shared.code === "invalid"
+              ? "Dit lijstje kan zo niet worden gedeeld. Verwijder vreemde producten en probeer opnieuw."
+              : "Dit lijstje is leeg of kan niet worden gedeeld.",
+      });
       return;
     }
     let cancel = false;
     setEncoded({ status: "loading" });
-    void shareListClient.create(shared).then((result) => {
+    void shareListClient.create(shared.list).then((result) => {
       if (cancel) return;
       if (result.status !== "ok") {
         const message =
@@ -46,9 +54,11 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
             ? "Je hebt te vaak gedeeld. Probeer het zo weer."
             : result.code === "empty"
               ? "Dit lijstje is leeg of kan niet worden gedeeld."
-              : result.code === "invalid"
-                ? "Dit lijstje kan zo niet worden gedeeld. Verwijder vreemde producten en probeer opnieuw."
-                : "Deellink maken lukt nu niet. Controleer je internet en probeer het zo opnieuw.";
+              : result.code === "too-many"
+                ? "Dit lijstje bevat te veel producten om te delen. Verwijder een paar producten en probeer het opnieuw."
+                : result.code === "invalid"
+                  ? "Dit lijstje kan zo niet worden gedeeld. Verwijder vreemde producten en probeer opnieuw."
+                  : "Deellink maken lukt nu niet. Controleer je internet en probeer het zo opnieuw.";
         setEncoded({ status: "error", message });
         return;
       }

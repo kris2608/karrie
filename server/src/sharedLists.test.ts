@@ -2,10 +2,17 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { newDb } from "pg-mem";
 import { afterEach, describe, expect, it } from "vitest";
-import { createHandler } from "./app.js";
+import { createHandler, sanitizeLogPath } from "./app.js";
 import type { PoolLike } from "./candidatesPg.js";
 import { createLimits } from "./limits.js";
-import { contentHashOf, createSharedListStore, sanitizeSharedList, SHARED_LIST_TTL_MS } from "./sharedLists.js";
+import {
+  contentHashOf,
+  createSharedListStore,
+  sanitizeSharedList,
+  sanitizeSharedListResult,
+  SHARED_LIST_MAX_ITEMS,
+  SHARED_LIST_TTL_MS,
+} from "./sharedLists.js";
 
 const TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS shared_lists (
@@ -31,40 +38,64 @@ function memoryPool() {
   return { db, pool };
 }
 
+function manyItems(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    name: `Product ${index}`,
+    quantity: 1,
+    category: "dairy" as const,
+  }));
+}
+
 describe("sanitizeSharedList", () => {
-  it("accepts SharedListV1 and rejects empty or oversized payloads", () => {
+  it("accepts SharedListV1 and rejects empty, invalid or oversized payloads", () => {
     expect(sanitizeSharedList(sample)).toMatchObject({ version: 1, name: "Week", items: [{ name: "Melk", quantity: 2 }] });
-    expect(sanitizeSharedList({ version: 1, items: [] })).toBeNull();
-    expect(sanitizeSharedList({ version: 2, items: sample.items })).toBeNull();
-    expect(sanitizeSharedList({ version: 1, items: [{ name: "x", quantity: 1, category: "nope" }] })).toBeNull();
+    expect(sanitizeSharedListResult({ version: 1, items: [] })).toEqual({ ok: false, code: "empty" });
+    expect(sanitizeSharedListResult({ version: 2, items: sample.items })).toEqual({ ok: false, code: "invalid" });
+    expect(sanitizeSharedListResult({ version: 1, items: [{ name: "x", quantity: 1, category: "nope" }] })).toEqual({
+      ok: false,
+      code: "invalid",
+    });
+    expect(sanitizeSharedListResult({ version: 1, items: manyItems(SHARED_LIST_MAX_ITEMS) }).ok).toBe(true);
+    expect(sanitizeSharedListResult({ version: 1, items: manyItems(SHARED_LIST_MAX_ITEMS + 1) })).toEqual({
+      ok: false,
+      code: "too-many",
+    });
   });
 });
 
 describe("sharedLists store", () => {
-  it("creates, reuses by content hash, gets, expires and purges", async () => {
+  it("creates a fresh immutable 48h link every time and expires independently", async () => {
     const { pool } = memoryPool();
     await pool.query(TABLE_SQL);
     let now = Date.UTC(2026, 10, 9, 12);
     const store = createSharedListStore(pool, () => now);
 
-    const created = await store.create(sample);
-    expect(created.ok).toBe(true);
-    if (!created.ok) return;
-    expect(created.reused).toBe(false);
-    expect(created.id.length).toBeGreaterThanOrEqual(16);
+    const first = await store.create(sample);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.id.length).toBeGreaterThanOrEqual(16);
+    const firstExpiry = Date.parse(first.expiresAt);
+    expect(firstExpiry).toBe(now + SHARED_LIST_TTL_MS);
 
-    const reused = await store.create(sample);
-    expect(reused).toEqual({ ok: true, id: created.id, expiresAt: expect.any(String), reused: true });
+    now += 60 * 60 * 1000;
+    const second = await store.create(sample);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.id).not.toBe(first.id);
+    expect(Date.parse(second.expiresAt)).toBe(now + SHARED_LIST_TTL_MS);
 
-    const got = await store.get(created.id);
-    expect(got).toEqual({ ok: true, list: sanitizeSharedList(sample) });
+    expect(await store.get(first.id)).toEqual({ ok: true, list: sanitizeSharedList(sample) });
     expect(contentHashOf(sanitizeSharedList(sample)!)).toHaveLength(64);
 
-    now += SHARED_LIST_TTL_MS + 1;
-    expect(await store.get(created.id)).toEqual({ ok: false, code: "expired" });
-    expect(await store.purgeExpired()).toBe(1);
-    expect(await store.get(created.id)).toEqual({ ok: false, code: "missing" });
-    expect(store.stats()).toMatchObject({ created: 1, reused: 1, hits: 1, expired: 1, purged: 1 });
+    now = firstExpiry;
+    expect(await store.get(first.id)).toEqual({ ok: false, code: "expired" });
+    expect(await store.get(second.id)).toEqual({ ok: true, list: sanitizeSharedList(sample) });
+
+    now = Date.parse(second.expiresAt) + 1;
+    expect(await store.get(second.id)).toEqual({ ok: false, code: "expired" });
+    expect(await store.purgeExpired()).toBe(2);
+    expect(await store.get(first.id)).toEqual({ ok: false, code: "missing" });
+    expect(store.stats()).toMatchObject({ created: 2, hits: 2, expired: 2, purged: 2 });
   });
 
   it("returns unavailable when postgres queries fail", async () => {
@@ -79,6 +110,14 @@ describe("sharedLists store", () => {
   });
 });
 
+describe("sanitizeLogPath", () => {
+  it("masks share tokens and leaves other routes alone", () => {
+    expect(sanitizeLogPath("/api/lists/share/abcdefghijklmnop")).toBe("/api/lists/share/:id");
+    expect(sanitizeLogPath("/api/lists/share")).toBe("/api/lists/share");
+    expect(sanitizeLogPath("/api/health")).toBe("/api/health");
+  });
+});
+
 describe("POST/GET /api/lists/share", () => {
   let server: Server | undefined;
   afterEach(async () => {
@@ -86,7 +125,7 @@ describe("POST/GET /api/lists/share", () => {
     server = undefined;
   });
 
-  async function start(perIpPerHour = 10) {
+  async function start(perIpPerHour = 10, logs: Record<string, unknown>[] = []) {
     const { pool } = memoryPool();
     await pool.query(TABLE_SQL);
     const store = createSharedListStore(pool);
@@ -118,7 +157,7 @@ describe("POST/GET /api/lists/share", () => {
         }),
         publicOrigin: "https://www.karrie.eu",
       },
-      log: () => undefined,
+      log: (entry) => logs.push(entry),
     });
     server = createServer((req, res) => void handler(req, res));
     await new Promise<void>((resolve) => server!.listen(0, resolve));
@@ -126,6 +165,7 @@ describe("POST/GET /api/lists/share", () => {
     const base = `http://127.0.0.1:${port}`;
     return {
       base,
+      logs,
       post: (body: unknown, ip = "10.0.0.1") =>
         fetch(`${base}/api/lists/share`, {
           method: "POST",
@@ -150,6 +190,7 @@ describe("POST/GET /api/lists/share", () => {
       url: expect.stringMatching(/^https:\/\/www\.karrie\.eu\/l\//),
       expiresAt: expect.any(String),
     });
+    expect(body.reused).toBeUndefined();
     const fetched = await get(body.id);
     expect(fetched.status).toBe(200);
     expect(await fetched.json()).toMatchObject({ status: "ok", list: { name: "Week", items: [{ name: "Melk" }] } });
@@ -157,6 +198,21 @@ describe("POST/GET /api/lists/share", () => {
     const health = await fetch(`${base}/api/health`);
     const healthBody = await health.json();
     expect(healthBody.sharedLists).toMatchObject({ enabled: true, outcomes: { created: 1, hits: 1 } });
+  });
+
+  it("logs share GETs without the token and rejects oversized lists", async () => {
+    const logs: Record<string, unknown>[] = [];
+    const { post, get } = await start(10, logs);
+    const created = await post(sample);
+    const body = await created.json();
+    await get(body.id);
+    await get("zzzzzzzzzzzzzzzz");
+    expect(logs.filter((entry) => entry.method === "GET").every((entry) => entry.path === "/api/lists/share/:id")).toBe(true);
+    expect(JSON.stringify(logs)).not.toContain(body.id);
+
+    const oversized = await post({ version: 1, items: manyItems(SHARED_LIST_MAX_ITEMS + 1) }, "10.0.0.9");
+    expect(oversized.status).toBe(422);
+    expect(await oversized.json()).toEqual({ status: "error", code: "too-many" });
   });
 
   it("rate-limits create and rejects invalid payloads", async () => {

@@ -27,6 +27,9 @@ services:
       - path: /l/*
         name: X-Robots-Tag
         value: noindex, nofollow
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
     envVars:
       - key: NODE_VERSION
         value: "22"
