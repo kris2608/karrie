@@ -42,10 +42,6 @@ const BARCODE_TEXT: Record<Exclude<BarcodeStatus, null>, string> = {
 
 type CameraStatus = "opening" | "live" | "capturing" | CameraProblem;
 
-function finePointer() {
-  return typeof window !== "undefined" && window.matchMedia?.("(pointer: fine)").matches;
-}
-
 export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanBarcodes, barcodeStatus, added, onBarcode, onManual, onCapture, onGallery, onClose }: PhotoCameraProps) {
   const reduced = useReducedMotion() ?? false;
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -174,25 +170,30 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
       </div>
 
       {!problem && (
-        <motion.button
-          type="button"
-          className="shutter"
-          aria-label={localOnly ? "Maak foto" : "Maak foto en herken product"}
-          data-testid="shutter"
-          disabled={status !== "live" || busy}
-          whileTap={reduced ? undefined : { scale: 0.9 }}
-          onClick={() => void shoot()}
-        >
-          <span />
-        </motion.button>
+        <div className="shutter-row">
+          <span className="shutter-spacer" aria-hidden="true" />
+          <motion.button
+            type="button"
+            className="shutter"
+            aria-label={localOnly ? "Maak foto" : "Maak foto en herken product"}
+            data-testid="shutter"
+            disabled={status !== "live" || busy}
+            whileTap={reduced ? undefined : { scale: 0.9 }}
+            onClick={() => void shoot()}
+          >
+            <span />
+          </motion.button>
+          <button type="button" className="gallery-button" aria-label="Kies uit galerij" data-testid="camera-gallery" disabled={busy} onClick={onGallery}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2.2" />
+              <circle cx="8.5" cy="10" r="1.6" fill="currentColor" />
+              <path d="M4.5 16.5l4.2-4.2a1.5 1.5 0 0 1 2.1 0L14 15.5l1.7-1.7a1.5 1.5 0 0 1 2.1 0l1.7 1.7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       )}
 
       <p className="camera-note">{localOnly ? "De foto blijft alleen op dit apparaat." : "Een foto gaat naar OpenAI. Zet er geen mensen op."}</p>
-      {!problem && finePointer() && (
-        <button type="button" className="text-button scanner-type" data-testid="camera-gallery" disabled={busy} onClick={onGallery}>
-          Kies uit galerij
-        </button>
-      )}
 
       <Karrie mood={busy ? "happy" : "searching"} beat={attempt} className="scanner-karrie" />
     </motion.div>

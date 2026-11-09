@@ -142,7 +142,17 @@ export function ReviewScreen() {
 
   return (
     <main className="screen screen-review">
-      <TopBar title={named ?? "Klopt het lijstje?"} to="/toevoegen" />
+      <TopBar
+        title={named ?? "Klopt het lijstje?"}
+        to="/toevoegen"
+        action={
+          <Link to="/toevoegen" className="round-button" aria-label="Producten toevoegen" data-testid="add-products">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 6v12M6 12h12" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+            </svg>
+          </Link>
+        }
+      />
       {adventure.store && (
         <p className="list-name" data-testid="list-store">
           {adventure.store}
