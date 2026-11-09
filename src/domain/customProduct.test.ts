@@ -120,10 +120,16 @@ describe("nameTaken", () => {
     expect(nameTaken("humus", names)).toBe(true);
   });
 
-  it("leaves room for similar names, aliases and typos", () => {
+  it("leaves room for similar names, aliases and typos at the nameTaken layer", () => {
     expect(nameTaken("appelsap", names)).toBe(false);
     expect(nameTaken("cola", names)).toBe(false);
     expect(nameTaken("hummus", names)).toBe(false);
     expect(nameTaken("", names)).toBe(false);
+  });
+});
+
+describe("suggestion covers aliases for search pinning", () => {
+  it("maps cola to Frisdrank without needing nameTaken", () => {
+    expect(suggestion("cola", [])).toMatchObject({ kind: "catalog", product: { id: "frisdrank" }, close: false });
   });
 });

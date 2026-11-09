@@ -2,7 +2,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../../domain/categories";
-import { customName, customProductId, nameTaken, suggestion } from "../../domain/customProduct";
+import { customAddLabel, orderedCatalogResults, pinnedCatalogGeneric } from "../../domain/addSearch";
+import { customProductId } from "../../domain/customProduct";
 import { normalize } from "../../domain/matchProduct";
 import { matchesMine, mineKey } from "../../domain/mine";
 import type { AdventureItem, CategoryId, Product, SavedItem } from "../../domain/types";
@@ -75,17 +76,20 @@ type GridTileProps = {
   mine?: boolean;
   /** Only reliable offers show on a tile; doubtful ones stay on the parent's list screen. */
   offer?: RetailerId;
+  /** Short Dutch line under the name (e.g. generic “merk maakt niet uit”). */
+  subtitle?: string;
 };
 
-function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo, mine = false, offer }: GridTileProps) {
+function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo, mine = false, offer, subtitle }: GridTileProps) {
   const { pressing, handlers } = useLongPress(onRemove, quantity === 0 && !mine);
   const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : ""].filter(Boolean).join(" ");
   const deal = offer && quantity ? `, in de aanbieding bij ${retailerName(offer)}` : "";
+  const genericHint = subtitle ? `, ${subtitle}` : "";
   const label = mine
     ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}. Lang drukken om te vergeten`
     : quantity
-      ? `${name}, ${quantity} op de lijst${deal}. Lang drukken om te verwijderen`
-      : name;
+      ? `${name}${genericHint}, ${quantity} op de lijst${deal}. Lang drukken om te verwijderen`
+      : `${name}${genericHint}`;
   const corner = infoCorner(quantity);
   return (
     <div className="product-card-shell">
@@ -110,6 +114,7 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo,
           {art}
         </motion.span>
         <span className="card-name">{name}</span>
+        {subtitle ? <span className="card-sub">{subtitle}</span> : null}
         {offer && quantity > 0 && <OfferTag shown="deal" retailer={offer} className="card-offer" compact />}
         <AnimatePresence>
           {quantity > 0 && (
@@ -209,14 +214,17 @@ export function AddScreen() {
   const extras = [...onList.entries()]
     .filter(([tile, { item }]) => !productById(tile) && !mineKeys.has(tile) && (!needle || normalize(item.name).includes(needle)))
     .map(([, entry]) => entry);
-  /** Search results with the closest catalog product first, also when only a typo or the plural matched. */
-  const known = useMemo(() => (needle ? suggestion(query, mine) : null), [needle, query, mine]);
-  const close = known?.kind === "catalog" ? known.product : null;
-  const results = close ? [close, ...visible.filter((product) => product.id !== close.id)] : visible;
-  const nothing = visible.length === 0 && extras.length === 0 && mineVisible.length === 0;
-  /** Offered next to similar products too (Appelsap beside Sinaasappelsap), unless one already has this very name. */
-  const taken = needle && nameTaken(query, [...products.map((product) => product.name), ...mine.map((entry) => entry.name), ...extras.map(({ item }) => item.name)]);
-  const custom = needle && !taken ? customName(query) : null;
+  /** Exact/alias catalog generic first; typo matches still pin but do not suppress Voeg toe. */
+  const pinned = useMemo(() => (needle ? pinnedCatalogGeneric(query, mine) : null), [needle, query, mine]);
+  const results = useMemo(() => (needle ? orderedCatalogResults(query, mine) : visible), [needle, query, mine, visible]);
+  const nothing = (needle ? results : visible).length === 0 && extras.length === 0 && mineVisible.length === 0;
+  const custom = needle
+    ? customAddLabel(
+        query,
+        mine,
+        [...products.map((product) => product.name), ...mine.map((entry) => entry.name), ...extras.map(({ item }) => item.name)],
+      )
+    : null;
 
   useEffect(() => {
     if (needle) return;
@@ -462,6 +470,7 @@ export function AddScreen() {
   const productTile = (product: Product) => {
     const entry = onList.get(product.id);
     const offer = offerOn(entry?.item);
+    const generic = Boolean(needle && pinned && product.id === pinned.id);
     return (
       <GridTile
         key={product.id}
@@ -473,6 +482,7 @@ export function AddScreen() {
         onAdd={() => addProduct(product)}
         onRemove={() => removeProduct(product.id)}
         offer={offer}
+        subtitle={generic ? "merk maakt niet uit" : undefined}
       />
     );
   };
@@ -583,7 +593,7 @@ export function AddScreen() {
         ))
       )}
       {deals > 0 && <Attribution className="add-attribution" />}
-      {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
+      {nothing && !pinned && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
       {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er meteen een foto of plaatje bij.</p>}
       {(count > 0 || mineVisible.length > 0) && (
         <p className="add-hint">
