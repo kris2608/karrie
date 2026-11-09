@@ -496,12 +496,31 @@ Karrie telt anoniem hoe de app gebruikt wordt, met [Umami Cloud](https://umami.i
 | `adventure_completed` | het laatste product gevonden | `item_count`, `completed_missions` |
 | `bonus_mission_completed` | de ouder bevestigt een bonusmissie | `choice`: alternative of original |
 | `offer_opened` | de ouder tikt op een aanbiedingslabel in **Controleren** of in de **winkel** en het venster gaat open | `retailer`: jumbo, ah, lidl; `match_type`: exact of likely |
+| `app_first_open` | eerste keer dat dit browserprofiel Karrie opent (na deploy van deze meting) | geen |
+| `new_adventure_clicked` | tik op **Nieuw avontuur** op het beginscherm | geen |
+| `onboarding_opened` / `onboarding_finished` | intro “Hoe werkt Karrie?” openen / afsluiten | `action`: start, skip of dismiss |
+| `first_list_created` | eerste echte lijst krijgt zijn eerste product (één keer per installatie) | geen |
+| `first_adventure_started` / `first_adventure_completed` | eerste start / eerste afronding (één keer per installatie) | geen |
+| `app_returned` | bestaand profiel opent Karrie op een andere lokale kalenderdag | `days_since_last_open`: 1, 2-7, 8-30 of 31+ |
+| `shopping_list_saved` | lijstje succesvol bewaard | `action`: new of updated |
+| `saved_list_reopened` | ouder opent een bewaard lijstje opnieuw | geen |
+| `scanner_opened` | camera voor streepjescode/foto gaat open | geen |
+| `scanner_result` | één uitkomst per herkenningspoging | `method`: barcode of photo; `outcome`: success, not_found, error of offline |
+| `share_completed` | delen lukte (systeemblad of kopiëren; annuleren telt niet) | `method`: native of copied |
+| `feedback_opened` | Tally-formulier geopend (geen bewijs van verzenden) | `source`: settings of completed |
+| `sticker_book_opened` | stickerboek bewust geopend | geen |
 
-Wat niet telt: een bewaard lijstje openen, terug naar een lopend avontuur, **Ongedaan maken**, een streepjescode die de camera steeds opnieuw ziet (één keer per cameragebruik), een mislukte herkenning, een missie die alleen getoond of overgeslagen wordt, en het eindscherm opnieuw openen. Na **Terug** en opnieuw **Gevonden!** telt de voltooiing niet nog eens zolang de app open blijft.
+**Eerste-gebruik funnel (Umami Goals/Funnel):** `app_first_open` → `new_adventure_clicked` → `first_list_created` → `first_adventure_started` → `first_adventure_completed`.
 
-**Controleren in Umami Cloud.** Open Websites → Karrie. **Realtime** toont binnen enkele seconden een bezoek aan `karrie.eu` en elke gebeurtenis. Onder **Events** staan de gebeurtenissen met hun aantallen; klik op een naam voor de verdeling van `method`, `source` of `choice`. In de browser (DevTools → Network, filter `api/send`) zie je per verzoek precies wat er wordt verstuurd.
+**Retentie en hergebruik:** `app_returned`, `shopping_list_saved`, `saved_list_reopened`. Vergelijk `first_adventure_started` met alle `adventure_started`, en `first_list_created` met `shopping_list_created`.
 
-Faalt Umami (geblokkeerd, offline, traag), dan merkt Karrie daar niets van: er wordt niets opnieuw geprobeerd of bewaard.
+Umami **visitors** is niet hetzelfde als unieke mensen over de hele levensduur. `app_first_open` en `app_returned` zijn benaderingen per browserprofiel/apparaat, pas vanaf de dag van deze deploy; eerdere geschiedenis wordt niet teruggezet. Bestaande installaties worden niet als nieuw geteld.
+
+Wat niet telt: hydrateren, **Ongedaan maken**, opnieuw openen van het eindscherm, elke camerabeeld-frame, geannuleerd delen, en een missie die alleen getoond of overgeslagen wordt. Na **Terug** en opnieuw **Gevonden!** telt de voltooiing niet nog eens zolang de app open blijft (sessie-`once`).
+
+**Controleren in Umami Cloud.** Open Websites → Karrie. **Realtime** toont binnen enkele seconden een bezoek aan `karrie.eu` en elke gebeurtenis. Onder **Events** staan de gebeurtenissen met hun aantallen; klik op een naam voor de verdeling van `method`, `source` of `choice`. In de browser (DevTools → Network, filter `api/send`) zie je per verzoek precies wat er wordt verstuurd. Geen wijziging nodig aan Render-env-vars behalve de bestaande Umami-sleutels.
+
+Faalt Umami (geblokkeerd, offline, traag), dan merkt Karrie daar niets van: er wordt geen wachtrij aangelegd; een gemiste first-open kan bij een later bezoek alsnog gaan als de tracker er is.
 
 ## Over Karrie en privacy
 

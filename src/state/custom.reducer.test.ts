@@ -133,6 +133,7 @@ describe("custom generic products", () => {
     const events = analyticsEvents(action, before, after);
     expect(events.map((entry) => entry.event)).toEqual([
       { name: "shopping_list_created" },
+      { name: "first_list_created" },
       { name: "product_added", data: { method: "custom", category: "pantry" } },
     ]);
     expect(JSON.stringify(events)).not.toMatch(/cashew/i);

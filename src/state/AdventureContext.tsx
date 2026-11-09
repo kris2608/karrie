@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { setSoundEnabled } from "../feedback/sound";
 import { trackEvent } from "../services/analytics";
+import { bootstrapAnalytics } from "../services/analyticsMilestones";
 import { catalogSync } from "../services/catalog/sync";
-import { loadPersisted, savePersisted } from "../storage/db";
+import { loadPersisted, savePersisted, type Persisted } from "../storage/db";
 import { preparePhotos } from "../storage/photos";
 import { offerQueries, offers } from "../storage/offers";
 import { references } from "../storage/references";
@@ -10,7 +11,7 @@ import { nameImages, useNameImagesVersion } from "../storage/nameImages";
 import { storeImages, useStoreImagesVersion } from "../storage/storeImages";
 import { wantedReferences, wantedStoreImages } from "../domain/referenceTargets";
 import { Karrie } from "../components/mascot/Karrie";
-import { analyticsEvents } from "./analyticsEvents";
+import { analyticsEvents, commitMilestoneEvents } from "./analyticsEvents";
 import { useCustomEnrichment } from "./customEnrichment";
 import { initialState, reducer, type Action, type AppState } from "./reducer";
 
@@ -41,7 +42,8 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
       events = [];
     }
     rawDispatch(action);
-    for (const { event, once } of events) trackEvent(event, once);
+    const sent = events.map(({ event, once }) => trackEvent(event, once));
+    commitMilestoneEvents(events, sent);
   }, []);
 
   useEffect(() => {
@@ -50,8 +52,10 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
     void storeImages.hydrate();
     void nameImages.hydrate();
     void catalogSync.hydrate();
+    let hydrated: Persisted | null = null;
     Promise.all([loadPersisted(), references.hydrate()])
       .then(async ([data]) => {
+        hydrated = data;
         const minePhotos = data.mine.flatMap((entry) => [entry.photoId, entry.illustrationId].filter((id): id is string => Boolean(id)));
         const photos = preparePhotos(data.adventure, data.saved, [...references.photoIds(), ...minePhotos]).catch(() => undefined);
         await Promise.race([photos, new Promise((resolve) => window.setTimeout(resolve, 1500))]);
@@ -59,7 +63,9 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
         if (!cancel) void catalogSync.sync();
       })
       .finally(() => {
-        if (!cancel) setReady(true);
+        if (cancel) return;
+        setReady(true);
+        if (hydrated) void bootstrapAnalytics(hydrated);
       });
     return () => {
       cancel = true;

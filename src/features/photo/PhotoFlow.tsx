@@ -113,6 +113,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     setBarcodeStatus(null);
     if (!next) vision.warmUp();
     setStep({ kind: "camera" });
+    if (!next) trackEvent({ name: "scanner_opened" }, `scanner-open:${session.current}`);
   }
 
   useImperativeHandle(ref, () => ({
@@ -163,6 +164,18 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     if (source) trackEvent({ name: "product_recognized", data: { method: "barcode", source } }, `${session.current}:${ean}`);
   }
 
+  function countBarcodeResult(ean: string, outcome: BarcodeOutcome) {
+    const outcomeName =
+      outcome.status === "found" || outcome.status === "mine"
+        ? "success"
+        : outcome.status === "none"
+          ? "not_found"
+          : outcome.status === "offline"
+            ? "offline"
+            : "error";
+    trackEvent({ name: "scanner_result", data: { method: "barcode", outcome: outcomeName } }, `scanner-result:barcode:${session.current}:${ean}`);
+  }
+
   /** A confirmed code from the live preview: show the product straight away when it is known, else keep the camera open. */
   function barcode(ean: string) {
     const read = gate.current.read(ean, Date.now());
@@ -172,6 +185,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     setBarcodeStatus("looking");
     void current.outcome.then((outcome) => {
       if (scan.current !== current) return;
+      if (stepKind.current === "camera") countBarcodeResult(ean, outcome);
       if (identified(outcome)) {
         if (stepKind.current === "camera") countBarcode(ean, outcome);
         setStep((now) => (now.kind === "camera" ? { kind: "result", draft: mergeDraft(known(ean, outcome)) } : now));
@@ -195,6 +209,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
       const ean = await decodeStill(fromGallery).catch(() => null);
       if (ean) {
         const outcome = await startLookup(ean).outcome;
+        countBarcodeResult(ean, outcome);
         if (identified(outcome)) {
           countBarcode(ean, outcome);
           playBeep();
@@ -241,12 +256,16 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
       if (result.product.containsPeople) return setStep({ kind: "problem", problem: PEOPLE });
       if (result.product.recognized) {
         trackEvent({ name: "product_recognized", data: { method: "photo", source: "openai" } });
+        trackEvent({ name: "scanner_result", data: { method: "photo", outcome: "success" } }, `scanner-result:photo:${session.current}`);
         playBeep();
+      } else {
+        trackEvent({ name: "scanner_result", data: { method: "photo", outcome: "not_found" } }, `scanner-result:photo:${session.current}`);
       }
       const lookup = scanned ? known(scanned.ean, await scanned.outcome) : {};
       setStep({ kind: "result", draft: mergeDraft({ ...lookup, photo: result.product }) });
       return;
     }
+    trackEvent({ name: "scanner_result", data: { method: "photo", outcome: "error" } }, `scanner-result:photo:${session.current}`);
     setStep({ kind: "problem", problem: problemFor(result) });
   }
 

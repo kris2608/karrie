@@ -1,4 +1,5 @@
 import type { AddMethod, RecognitionSource, Tracked } from "../services/analytics";
+import { getMilestones, markMilestoneSent } from "../services/analyticsMilestones";
 import type { BarcodeOutcome } from "../services/barcode/lookup";
 import type { Action, AppState } from "./reducer";
 
@@ -42,12 +43,20 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
     const known = new Set(previous?.id === next.id ? previous.items.map((item) => item.id) : []);
     const added = next.items.filter((item) => !known.has(item.id));
     const fresh = !previous || previous.id !== next.id || previous.items.length === 0;
-    if (added.length && fresh && next.phase === "draft") events.push({ event: { name: "shopping_list_created" }, once: next.id });
+    if (added.length && fresh && next.phase === "draft") {
+      events.push({ event: { name: "shopping_list_created" }, once: next.id });
+      if (!getMilestones().firstListTracked) {
+        events.push({ event: { name: "first_list_created" }, once: `first-list:${next.id}` });
+      }
+    }
     for (const item of added) events.push({ event: { name: "product_added", data: { method, category: item.category } } });
   }
 
   if (action.type === "start-shopping" && previous?.phase !== "shopping" && next.phase === "shopping") {
     events.push({ event: { name: "adventure_started", data: { item_count: next.items.length } }, once: next.id });
+    if (!getMilestones().firstAdventureStartedTracked) {
+      events.push({ event: { name: "first_adventure_started" }, once: `first-start:${next.id}` });
+    }
   }
 
   if (action.type === "mission-done") {
@@ -58,7 +67,29 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
   if ((action.type === "found" || action.type === "mission-done") && previous?.phase === "shopping" && next.phase === "done") {
     const completed_missions = next.items.filter((item) => item.mission?.status === "done").length;
     events.push({ event: { name: "adventure_completed", data: { item_count: next.items.length, completed_missions } }, once: next.id });
+    if (!getMilestones().firstAdventureCompletedTracked) {
+      events.push({ event: { name: "first_adventure_completed" }, once: `first-done:${next.id}` });
+    }
+  }
+
+  if (action.type === "save-favorite" && next.items.length) {
+    const wasFavorite = before.saved.some((list) => list.id === next.id && list.favorite);
+    events.push({ event: { name: "shopping_list_saved", data: { action: wasFavorite ? "updated" : "new" } }, once: `save:${next.id}:${wasFavorite ? "u" : "n"}` });
+  }
+
+  if (action.type === "open-saved") {
+    events.push({ event: { name: "saved_list_reopened" }, once: `open:${action.id}:${next.id}` });
   }
 
   return events;
+}
+
+/** Flip lifetime first-* flags only for events that were actually sent. */
+export function commitMilestoneEvents(events: Tracked[], sent: boolean[]): void {
+  events.forEach((entry, index) => {
+    if (!sent[index]) return;
+    if (entry.event.name === "first_list_created") markMilestoneSent("firstListTracked");
+    if (entry.event.name === "first_adventure_started") markMilestoneSent("firstAdventureStartedTracked");
+    if (entry.event.name === "first_adventure_completed") markMilestoneSent("firstAdventureCompletedTracked");
+  });
 }
