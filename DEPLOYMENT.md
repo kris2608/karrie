@@ -105,7 +105,7 @@ Het tabblad-icoon (`favicon.svg`) en de app-iconen zijn dezelfde Karrie als op h
 - `https://karrie.eu/privacy.html` toont de privacyverklaring, ook als de app al op het beginscherm staat (niet het beginscherm van Karrie).
 - Zet het toestel daarna in vliegtuigmodus en open het beginscherm-icoon opnieuw. De winkelmodus werkt nog.
 - De eerste keer openen heeft internet nodig, zodat de app en de service worker binnenkomen.
-- Zie je na een nieuwe deploy nog de oude versie? Sluit de app helemaal en open hem opnieuw. De service worker werkt zichzelf bij.
+- Zie je na een nieuwe deploy nog de oude versie? Sluit de app helemaal (niet alleen naar de achtergrond) en open hem opnieuw. De service worker (`autoUpdate`) haalt de nieuwe build op de achtergrond; die wordt actief bij de volgende koude start. Onder **Voor ouders** staat de build (`Versie x.y.z · commit`); zo zie je of je de nieuwe versie hebt. In een gewone browser tab: vernieuwen (of tab sluiten en `karrie.eu` opnieuw openen) volstaat meestal.
 
 ## Foto herkennen (OpenAI)
 

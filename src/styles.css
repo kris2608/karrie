@@ -465,6 +465,13 @@ h1, h2, p { margin: 0; }
 }
 .sheet-card h2 { font-size: var(--text-title); font-weight: 900; }
 .sheet-note { color: var(--ink-soft); font-size: 0.95rem; }
+.app-version {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  text-align: center;
+  opacity: 0.85;
+}
 .sheet-actions { display: flex; gap: var(--space-3); }
 .sheet-actions > * { flex: 1; }
 .sheet-card [tabindex="-1"]:focus { outline: none; }

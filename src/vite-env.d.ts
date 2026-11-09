@@ -6,6 +6,10 @@ interface ImportMetaEnv {
   readonly VITE_API_ORIGIN?: string;
   /** Official Nutri-Score logos are on by default; set to "off" to show the text/pill fallback instead. */
   readonly VITE_NUTRISCORE_LOGOS?: string;
+  /** package.json version, injected at build time. */
+  readonly VITE_APP_VERSION: string;
+  /** Short git commit on Render, or the build date locally. */
+  readonly VITE_APP_BUILD: string;
 }
 
 interface Window {

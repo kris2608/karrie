@@ -13,6 +13,7 @@ import { SoundSwitch } from "../../components/ui/SoundSwitch";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { softSpring } from "../../motion/variants";
+import { appVersionLabel } from "../../domain/appVersion";
 import { retailerName } from "../../domain/retailers";
 import { stickerPreview } from "../../domain/stickers";
 import { RetailerPicker } from "../offers/RetailerPicker";
@@ -402,6 +403,10 @@ export function HomeScreen() {
               </button>
             </nav>
             <p className="sheet-note">Zet Karrie op je beginscherm via Safari (deel-knop) of Chrome (menu). Lang drukken op een lijstje wist het.</p>
+            <p className="sheet-note">Na een update: sluit Karrie helemaal en open hem opnieuw.</p>
+            <p className="app-version" data-testid="app-version">
+              {appVersionLabel()}
+            </p>
             <PressButton variant="secondary" wide onClick={closeParent}>
               Klaar
             </PressButton>

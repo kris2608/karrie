@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
 import { loadEnv, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string };
+/** Prefer Render's commit; local builds fall back to today's date so Settings always shows something. */
+const appBuild = (process.env.RENDER_GIT_COMMIT ?? process.env.VITE_GIT_COMMIT ?? "").trim().slice(0, 7) || new Date().toISOString().slice(0, 10);
 
 /** Only the production site counts; the tracker ignores localhost and previews. The old address stays for apps installed from it. */
 const UMAMI_DOMAINS = "karrie.eu,www.karrie.eu,karrieapp.onrender.com";
@@ -26,6 +31,10 @@ function umami(): Plugin {
 }
 
 export default defineConfig({
+  define: {
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(pkg.version),
+    "import.meta.env.VITE_APP_BUILD": JSON.stringify(appBuild),
+  },
   plugins: [
     react(),
     umami(),
