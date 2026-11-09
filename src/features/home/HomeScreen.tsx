@@ -28,6 +28,7 @@ import { trackEvent } from "../../services/analytics";
 import { ShareIcon } from "../../components/ui/ShareIcon";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { AboutKarrie } from "./AboutKarrie";
+import { ForgetListSheet } from "./ForgetListSheet";
 import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
 import { StickerBook } from "./StickerBook";
@@ -99,6 +100,7 @@ export function HomeScreen() {
   const [parentOpen, setParentOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [shareList, setShareList] = useState<SavedList | null>(null);
+  const [forgetting, setForgetting] = useState<SavedList | null>(null);
   const [stickersOpen, setStickersOpen] = useState(false);
   const preview = stickerPreview(stickers);
   const previewRef = useRef<HTMLButtonElement>(null);
@@ -180,7 +182,13 @@ export function HomeScreen() {
     navigate("/controleren");
   }
 
+  function askForget(list: SavedList) {
+    if (list.favorite) setForgetting(list);
+    else forgetList(list);
+  }
+
   function forgetList(list: SavedList) {
+    setForgetting(null);
     const index = saved.findIndex((entry) => entry.id === list.id);
     dispatch({ type: "forget-saved", id: list.id });
     undo.show("Lijstje gewist", { label: "Ongedaan maken", run: () => dispatch({ type: "restore-saved", list, index }) });
@@ -253,7 +261,7 @@ export function HomeScreen() {
                   list={list}
                   label={label}
                   onOpen={() => openList(list)}
-                  onForget={() => forgetList(list)}
+                  onForget={() => askForget(list)}
                   onShare={() => setShareList(list)}
                 />
               </li>
@@ -457,6 +465,7 @@ export function HomeScreen() {
       </Sheet>
 
       <ShareListSheet open={Boolean(shareList)} source={shareList} onClose={() => setShareList(null)} />
+      <ForgetListSheet list={forgetting} onCancel={() => setForgetting(null)} onConfirm={forgetList} />
     </main>
   );
 }
