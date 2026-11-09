@@ -1285,14 +1285,6 @@ a.settings-link { text-decoration: none; color: inherit; }
 .share-note { margin: 0; color: var(--ink-soft); line-height: 1.45; }
 .share-error { margin: 0; color: var(--coral); font-weight: 800; }
 .share-list-actions { display: grid; gap: var(--space-3); }
-.share-qr {
-  justify-self: center;
-  width: min(100%, 240px);
-  padding: var(--space-3);
-  border-radius: var(--radius-m);
-  background: #fff;
-}
-.share-qr svg { display: block; width: 100%; height: auto; }
 .share-import-items {
   display: grid;
   gap: var(--space-2);

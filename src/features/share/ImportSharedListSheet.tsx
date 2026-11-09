@@ -17,7 +17,7 @@ function hasUnfinished(adventure: Adventure | null): boolean {
   return Boolean(adventure && adventure.items.length > 0 && (adventure.phase === "draft" || adventure.phase === "shopping"));
 }
 
-/** Preview a `#list=` payload and confirm before writing anything local. */
+/** Preview a shared-list snapshot and confirm before writing anything local. */
 export function ImportSharedListSheet({ list, adventure, onClose, onImport }: ImportSharedListSheetProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const unfinished = hasUnfinished(adventure);
@@ -61,7 +61,7 @@ export function ImportSharedListSheet({ list, adventure, onClose, onImport }: Im
                   Bewaar als nieuw lijstje
                 </PressButton>
                 <PressButton type="button" variant="primary" data-testid="import-use-now" onClick={requestOpen}>
-                  Gebruik dit lijstje nu
+                  Gebruik dit lijstje
                 </PressButton>
               </div>
             ) : (
@@ -70,7 +70,7 @@ export function ImportSharedListSheet({ list, adventure, onClose, onImport }: Im
                   Annuleer
                 </PressButton>
                 <PressButton type="button" variant="primary" data-testid="import-confirm" onClick={() => onImport("open")}>
-                  Open lijstje
+                  Gebruik dit lijstje
                 </PressButton>
               </div>
             )}
@@ -104,12 +104,24 @@ export function ImportSharedListSheet({ list, adventure, onClose, onImport }: Im
   );
 }
 
-export function ImportSharedListErrorSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ImportSharedListErrorSheet({
+  open,
+  onClose,
+  expired = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  expired?: boolean;
+}) {
   return (
-    <Sheet open={open} onClose={onClose} label="Lijstje kan niet worden geopend">
+    <Sheet open={open} onClose={onClose} label={expired ? "Lijstje verlopen" : "Lijstje kan niet worden geopend"}>
       <div className="share-import" data-testid="import-shared-error">
-        <h2>Dit lijstje kan niet worden geopend</h2>
-        <p className="share-note">De link is ongeldig of te oud voor deze versie van Karrie.</p>
+        <h2>{expired ? "Dit boodschappenlijstje is verlopen" : "Dit lijstje kan niet worden geopend"}</h2>
+        <p className="share-note">
+          {expired
+            ? "Vraag de afzender om het opnieuw te delen."
+            : "De link is ongeldig of tijdelijk niet bereikbaar."}
+        </p>
         <div className="sheet-actions">
           <PressButton type="button" variant="primary" wide data-testid="import-error-home" onClick={onClose}>
             Ga naar Karrie

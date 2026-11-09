@@ -14,9 +14,8 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
       <section>
         <h3>Lijstje delen</h3>
         <p>
-          Als je een lijstje deelt, zet Karrie gekozen velden (zoals namen, aantallen en optioneel merk of streepjescode) in de link zelf. Dat is geen
-          versleuteling: iedereen met de volledige link kan het lijstje openen. Karrie bewaart gedeelde lijstjes niet op de server. Wie de link opent,
-          krijgt een eigen lokale kopie. Ouderfoto&apos;s en herkenningsgegevens gaan niet mee.
+          Als je een lijstje deelt, bewaart Karrie 48 uur een tijdelijke kopie op de server en geeft je een korte link. Iedereen met die link kan het
+          lijstje openen en krijgt een eigen lokale kopie. Er is geen gezamenlijk bewerken. Ouderfoto&apos;s en herkenningsgegevens gaan niet mee.
         </p>
       </section>
       <section>
@@ -26,7 +25,8 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
           lezen van streepjescodes blijven op je toestel. Voor streepjescodes, voorbeeldfoto's en aanbiedingen stuurt Karrie productgegevens (naam,
           merk of streepjescode) naar externe diensten, zoals Open Food Facts en PrijsProfeet. Voeg je zelf een product toe, dan gaat alleen die
           productnaam naar de server en OpenAI. Gevonden productgegevens kunnen in een gedeelde catalogus op de server landen, zodat andere gezinnen
-          dezelfde streepjescode sneller herkennen. Karrie uploadt geen boodschappenlijstjes, persoonlijke foto's of accounts.
+          dezelfde streepjescode sneller herkennen. Behalve tijdelijke deellinks uploadt Karrie geen boodschappenlijstjes, persoonlijke foto's of
+          accounts.
         </p>
       </section>
       <section>

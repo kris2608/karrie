@@ -27,6 +27,7 @@ export function App() {
           <div className="app">
             <Routes>
               <Route path="/" element={<HomeScreen />} />
+              <Route path="/l/:id" element={<HomeScreen />} />
               <Route path="/toevoegen" element={<AddScreen />} />
               <Route path="/controleren" element={<ReviewScreen />} />
               <Route path="/winkel" element={<ShopScreen />} />

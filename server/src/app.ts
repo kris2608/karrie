@@ -17,6 +17,7 @@ import { PRODUCT_CATEGORIES } from "./offers/match.js";
 import { RETAILERS, type PrijsProfeet } from "./offers/prijsprofeet.js";
 import type { StoreImageLookup, StoreImageResult } from "./storeImage.js";
 import type { RecognizeResult } from "./recognize.js";
+import type { SharedListStore } from "./sharedLists.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
 
 export type ImageDeps = {
@@ -72,6 +73,14 @@ export type ProductDeps = {
   catalogPriorityCount?: number;
 };
 
+export type SharedListDeps = {
+  store: SharedListStore;
+  /** Per-IP limits for creating share snapshots (GET is free). */
+  limits: Limits;
+  /** Public app origin used in returned short links, e.g. https://www.karrie.eu */
+  publicOrigin: string;
+};
+
 export type AppDeps = {
   allowedOrigins: string[];
   requireOrigin: boolean;
@@ -86,6 +95,7 @@ export type AppDeps = {
   nameImages?: NameImageDeps;
   products?: ProductDeps;
   catalog?: Catalog;
+  sharedLists?: SharedListDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
 };
@@ -243,9 +253,14 @@ export function createHandler(deps: AppDeps) {
             }
           : undefined,
         catalog: deps.catalog?.stats(),
+        sharedLists: deps.sharedLists
+          ? { enabled: true, stats: deps.sharedLists.limits.stats(), outcomes: deps.sharedLists.store.stats() }
+          : { enabled: false },
       });
     }
 
+    if (url.pathname === "/api/lists/share" && req.method === "POST") return createSharedList();
+    if (url.pathname.startsWith("/api/lists/share/") && req.method === "GET") return readSharedList();
     if (url.pathname === CATALOG_CHANGES && req.method === "GET") return catalogChanges();
     if (url.pathname === ADMIN || url.pathname.startsWith(`${ADMIN}/`)) return admin();
     if (url.pathname === ADMIN_CATALOG || url.pathname.startsWith(`${ADMIN_CATALOG}/`)) return adminCatalog();
@@ -640,6 +655,58 @@ export function createHandler(deps: AppDeps) {
       const page = await deps.catalog.changesSince(since, limit);
       res.setHeader("Cache-Control", "public, max-age=300");
       return send(200, { status: "ok", products: page.products, next: page.next });
+    }
+
+    async function createSharedList() {
+      if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
+      if (!deps.sharedLists) return send(503, { status: "error", code: "unavailable" });
+      if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) {
+        return send(415, { status: "error", code: "unsupported-type" });
+      }
+      let raw: string;
+      try {
+        raw = await readBody(req);
+      } catch (error) {
+        if (error instanceof BodyTooLarge) return send(413, { status: "error", code: "too-large" });
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      entry.bytes = raw.length;
+      let body: unknown;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      const ip = clientIp(req);
+      const denial = deps.sharedLists.limits.admit(ip);
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const result = await deps.sharedLists.store.create(body);
+      if (!result.ok) {
+        deps.sharedLists.limits.record({ ok: false, latencyMs: now() - started });
+        if (result.code === "unavailable") return send(503, { status: "error", code: "unavailable" });
+        if (result.code === "empty") return send(422, { status: "error", code: "empty" });
+        return send(422, { status: "error", code: "invalid" });
+      }
+      deps.sharedLists.limits.record({ ok: true, latencyMs: now() - started });
+      const originBase = deps.sharedLists.publicOrigin.replace(/\/$/, "");
+      return send(200, {
+        status: "ok",
+        id: result.id,
+        url: `${originBase}/l/${result.id}`,
+        expiresAt: result.expiresAt,
+        reused: result.reused,
+      });
+    }
+
+    async function readSharedList() {
+      if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
+      if (!deps.sharedLists) return send(503, { status: "error", code: "unavailable" });
+      const id = url.pathname.slice("/api/lists/share/".length);
+      const result = await deps.sharedLists.store.get(id);
+      if (result.ok) return send(200, { status: "ok", list: result.list });
+      if (result.code === "expired") return send(410, { status: "error", code: "expired" });
+      if (result.code === "unavailable") return send(503, { status: "error", code: "unavailable" });
+      return send(404, { status: "error", code: "not-found" });
     }
   };
 }

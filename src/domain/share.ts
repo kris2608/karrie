@@ -31,25 +31,7 @@ export async function shareKarrie(deps: ShareDeps): Promise<ShareOutcome> {
   return "copied";
 }
 
-export const SHARE_LIST_TITLE = "Boodschappenlijstje van Karrie";
-export const SHARE_LIST_TEXT =
-  "Hier is een boodschappenlijstje via Karrie. Open de link om het te bekijken. De link bevat de productnamen en aantallen.";
-
-/**
- * Share a shopping-list URL (including `#list=`). Cancel stays `"cancelled"`.
- * Copy fallback copies the full URL with hash. Some apps may strip fragments.
- */
-export async function shareShoppingList(url: string, deps: ShareDeps): Promise<ShareOutcome> {
-  const data: ShareData = { title: SHARE_LIST_TITLE, text: SHARE_LIST_TEXT, url };
-  const can = deps.share && (!deps.canShare || deps.canShare(data));
-  if (can && deps.share) {
-    try {
-      await deps.share(data);
-      return "shared";
-    } catch (error) {
-      if (isAbort(error)) return "cancelled";
-    }
-  }
-  await deps.copy(url);
-  return "copied";
+export function whatsAppShareUrl(listUrl: string): string {
+  const text = `🛒 Ik heb een boodschappenlijstje met Karrie gedeeld!\n\nBekijk het hier: ${listUrl}`;
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }

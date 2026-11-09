@@ -84,13 +84,13 @@
           Deze gegevens gaan niet naar ons. Ze blijven staan tot je ze zelf wist. Foto's die nergens meer gebruikt worden, ruimt Karrie bij het
           opstarten zelf op.
         </p>
-        <h3>Lijstje delen via link of QR-code</h3>
+        <h3>Lijstje delen via een korte link</h3>
         <p>
-          Als je een boodschappenlijstje deelt, zet Karrie een selectie van velden (productnamen, aantallen, afdeling, en optioneel merk,
-          verpakkingsgrootte, catalogus-id of streepjescode) in de link zelf (<code>#list=</code>). Dat is geen versleuteling: iedereen met de
-          volledige link kan het lijstje openen. De QR-code bevat dezelfde link en wordt lokaal op je toestel gemaakt. Karrie bewaart gedeelde
-          lijstjes niet op de server. Wie de link opent, krijgt een eigen lokale kopie, los van jouw lijstje. Ouderfoto's, herkenningsgegevens,
-          voedingswaarden, missies, sterren en voortgang gaan niet mee in de link.
+          Als je een boodschappenlijstje deelt, maakt Karrie een tijdelijke kopie op de server (productnamen, aantallen, afdeling, en optioneel
+          merk, verpakkingsgrootte, catalogus-id of streepjescode) en stuurt je een korte link zoals <code>karrie.eu/l/…</code>. Die kopie blijft
+          <strong>48 uur</strong> bewaard en verdwijnt daarna. Iedereen met de link kan het lijstje openen. Wie de link opent, krijgt een eigen
+          lokale kopie, los van jouw lijstje; er is geen gezamenlijk bewerken. Ouderfoto's, herkenningsgegevens, voedingswaarden, missies, sterren
+          en voortgang gaan niet mee. In de WhatsApp-voorvertoning staan geen producten, alleen de algemene Karrie-tekst.
         </p>
       </section>
 
@@ -117,13 +117,23 @@
         </ul>
         <h3>Streepjescodes, voorbeeldfoto's, aanbiedingen en zelf toegevoegde producten</h3>
         <p>
-          Hiervoor stuurt Karrie alleen productgegevens: de naam, het merk, de soort of de streepjescode van het product. Nooit je lijstje als
-          geheel, de naam van je lijstje, foto's of je locatie. Voeg je zelf een product toe dat Karrie nog niet kent (bijvoorbeeld walnoten), dan
-          gaat alleen die productnaam naar de server, om de juiste naam, afdeling en een tekening te vinden. Is het een merk (bijvoorbeeld
-          Chocomel), dan zoekt de server met die naam een foto bij PrijsProfeet en Open Food Facts, en anders met de voorbeeldfoto-zoekfunctie.
+          Hiervoor stuurt Karrie alleen productgegevens: de naam, het merk, de soort of de streepjescode van het product. Nooit foto's of je
+          locatie. Voeg je zelf een product toe dat Karrie nog niet kent (bijvoorbeeld walnoten), dan gaat alleen die productnaam naar de server, om
+          de juiste naam, afdeling en een tekening te vinden. Is het een merk (bijvoorbeeld Chocomel), dan zoekt de server met die naam een foto bij
+          PrijsProfeet en Open Food Facts, en anders met de voorbeeldfoto-zoekfunctie.
+        </p>
+        <h3>Een lijstje delen</h3>
+        <p>
+          Tik je op delen, dan stuurt Karrie een compacte kopie van dat lijstje (productnamen, aantallen, afdeling, en optioneel merk,
+          verpakking, catalogus-id of streepjescode) naar de server. Die maakt een korte link en bewaart de kopie 48 uur. Daarna wordt die
+          verwijderd. Er gaan geen foto's, voortgang of accounts mee.
         </p>
         <h3>Wat de server bewaart</h3>
         <ul>
+          <li>
+            Gedeelde boodschappenlijstjes als tijdelijke snapshot bij een korte link, maximaal 48 uur. Iedereen met die link kan het lijstje
+            openen.
+          </li>
           <li>De server bewaart geen foto's en schrijft geen beelden of IP-adressen in zijn logboek.</li>
           <li>
             Het logboek bevat alleen technische gegevens: tijdstip, soort vraag, grootte, uitkomst, duur en het verbruik bij OpenAI. Bij

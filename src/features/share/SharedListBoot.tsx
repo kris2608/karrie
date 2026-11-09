@@ -1,50 +1,55 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { clearListHash, decodeSharedList, payloadFromHash, type SharedListV1 } from "../../domain/shareList";
+import { useLocation, useNavigate } from "react-router-dom";
+import { shareIdFromPath, type SharedListV1 } from "../../domain/shareList";
 import { trackEvent } from "../../services/analytics";
+import { shareListClient } from "../../services/shareList/client";
 import { useAdventure } from "../../state/AdventureContext";
 import { ImportSharedListErrorSheet, ImportSharedListSheet } from "./ImportSharedListSheet";
 
 type BootState =
   | { status: "idle" }
-  | { status: "preview"; list: SharedListV1; entry: "link" | "unknown" }
+  | { status: "preview"; list: SharedListV1 }
+  | { status: "expired" }
   | { status: "error" };
 
-/** After hydrate: detect `#list=`, preview, then import without silently overwriting an open adventure. */
+/** After hydrate: detect `/l/{id}`, preview, then import without silently overwriting an open adventure. */
 export function SharedListBoot() {
   const { adventure, dispatch } = useAdventure();
   const navigate = useNavigate();
-  const handled = useRef(false);
+  const location = useLocation();
+  const handled = useRef<string | null>(null);
   const [boot, setBoot] = useState<BootState>({ status: "idle" });
 
   useEffect(() => {
-    if (handled.current) return;
-    const payload = payloadFromHash(window.location.hash);
-    if (!payload) return;
-    handled.current = true;
-    const entry: "link" | "unknown" = window.location.hash.includes("list=") ? "link" : "unknown";
-    void decodeSharedList(payload).then((result) => {
-      if (!result.ok) {
-        setBoot({ status: "error" });
+    const id = shareIdFromPath(location.pathname);
+    if (!id) return;
+    if (handled.current === id) return;
+    handled.current = id;
+    void shareListClient.fetch(id).then((result) => {
+      if (result.status === "ok") {
+        setBoot({ status: "preview", list: result.list });
         return;
       }
-      setBoot({ status: "preview", list: result.list, entry });
+      if (result.code === "expired") {
+        setBoot({ status: "expired" });
+        return;
+      }
+      setBoot({ status: "error" });
     });
-  }, []);
+  }, [location.pathname]);
 
   function dismiss() {
-    clearListHash();
     setBoot({ status: "idle" });
+    if (shareIdFromPath(location.pathname)) navigate("/", { replace: true });
   }
 
   function importList(mode: "open" | "save-only") {
     if (boot.status !== "preview") return;
-    const { list, entry } = boot;
+    const { list } = boot;
     dispatch({ type: "import-shared-list", list, mode });
-    trackEvent({ name: "shared_list_imported", data: { item_count: list.items.length, entry } });
-    clearListHash();
+    trackEvent({ name: "shared_list_imported", data: { item_count: list.items.length, entry: "link" } });
     setBoot({ status: "idle" });
-    if (mode === "open") navigate("/controleren");
+    navigate(mode === "open" ? "/controleren" : "/", { replace: true });
   }
 
   return (
@@ -55,7 +60,11 @@ export function SharedListBoot() {
         onClose={dismiss}
         onImport={importList}
       />
-      <ImportSharedListErrorSheet open={boot.status === "error"} onClose={dismiss} />
+      <ImportSharedListErrorSheet
+        open={boot.status === "error" || boot.status === "expired"}
+        expired={boot.status === "expired"}
+        onClose={dismiss}
+      />
     </>
   );
 }

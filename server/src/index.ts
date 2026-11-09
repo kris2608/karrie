@@ -10,6 +10,7 @@ import { createCatalogStore, disabledCatalog } from "./catalog/repo.js";
 import { seedCatalog } from "./catalog/seed.js";
 import type { Catalog } from "./catalog/types.js";
 import { migrate } from "./db/migrate.js";
+import { createSharedListStore, disabledSharedListStore } from "./sharedLists.js";
 import { createIllustrator } from "./illustration.js";
 import { normalizeProduct } from "./normalize.js";
 import { createImageDiscovery } from "./images.js";
@@ -195,6 +196,21 @@ const illustrator =
     ? createIllustrator(client, { model: env.ILLUSTRATION_MODEL || "gpt-image-1", imageUsd: number("PRICE_ILLUSTRATION", 0.011) })
     : null;
 
+const shareLimits = createLimits({
+  perIpPerHour: number("SHARE_LIMIT_PER_IP_HOUR", 10),
+  perIpPerDay: number("SHARE_LIMIT_PER_IP_DAY", 40),
+  dailyRequests: number("SHARE_LIMIT_DAILY_REQUESTS", 2000),
+  dailyBudgetUsd: 1_000_000,
+  inputUsdPerMTok: 0,
+  cachedInputUsdPerMTok: 0,
+  outputUsdPerMTok: 0,
+});
+const sharedLists = pgPool ? createSharedListStore(pgPool) : disabledSharedListStore();
+if (pgPool) {
+  void sharedLists.purgeExpired().catch(() => undefined);
+  setInterval(() => void sharedLists.purgeExpired().catch(() => undefined), 60 * 60 * 1000).unref?.();
+}
+
 const handler = createHandler({
   allowedOrigins: (env.ALLOWED_ORIGINS ?? "https://karrie.eu,https://www.karrie.eu,https://karrieapp.onrender.com,http://localhost:5173,http://localhost:4173")
     .split(",")
@@ -226,6 +242,11 @@ const handler = createHandler({
     catalogPriorityCount: number("CATALOG_PRIORITY_COUNT", 5),
   },
   catalog,
+  sharedLists: {
+    store: sharedLists,
+    limits: shareLimits,
+    publicOrigin: env.PUBLIC_APP_ORIGIN || "https://www.karrie.eu",
+  },
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 

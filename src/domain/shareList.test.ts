@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  canEncodeForQr,
-  decodeSharedList,
-  encodeSharedList,
-  payloadFromHash,
-  SHARE_LIST_QR_MAX,
-  sharedListUrl,
+  shareIdFromPath,
+  sharedListPageUrl,
   toImportSavedItems,
   toSharedList,
   type SharedListV1,
@@ -86,34 +82,13 @@ describe("toSharedList", () => {
   });
 });
 
-describe("encode and decode", () => {
-  it("round-trips a normal list", async () => {
-    const source = toSharedList({ name: "Zaterdag", retailer: "jumbo", items: [melk, hagelslag, custom] })!;
-    const encoded = await encodeSharedList(source);
-    expect(encoded.ok).toBe(true);
-    if (!encoded.ok) return;
-    expect(encoded.url).toMatch(/^https:\/\/www\.karrie\.eu\/#list=/);
-    expect(encoded.payload.length).toBeGreaterThan(0);
-    expect(typeof canEncodeForQr(encoded.payload)).toBe("boolean");
-    if (encoded.payload.length > SHARE_LIST_QR_MAX) expect(canEncodeForQr(encoded.payload)).toBe(false);
-    const decoded = await decodeSharedList(encoded.url);
-    expect(decoded).toEqual({ ok: true, list: source });
-  });
-
-  it("rejects malformed, unsupported and truncated payloads", async () => {
-    expect(await decodeSharedList("")).toEqual({ ok: false, code: "missing" });
-    expect(await decodeSharedList("#list=nope")).toMatchObject({ ok: false, code: "malformed" });
-    expect(await decodeSharedList("#list=0.e30=")).toMatchObject({ ok: false }); // {}
-    const fakeVersion = btoa(JSON.stringify({ v: 99, i: [{ n: "Melk", q: 1, c: "dairy" }] }))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
-    expect(await decodeSharedList(`#list=0.${fakeVersion}`)).toEqual({ ok: false, code: "unsupported" });
-  });
-
-  it("parses the hash helper", () => {
-    expect(payloadFromHash("#list=0.abc")).toBe("0.abc");
-    expect(payloadFromHash("#other")).toBeNull();
+describe("short link helpers", () => {
+  it("builds /l/{id} URLs and parses path ids", () => {
+    expect(sharedListPageUrl("abcdefghijklmnop")).toBe("https://www.karrie.eu/l/abcdefghijklmnop");
+    expect(shareIdFromPath("/l/abcdefghijklmnop")).toBe("abcdefghijklmnop");
+    expect(shareIdFromPath("/l/abcdefghijklmnop/")).toBe("abcdefghijklmnop");
+    expect(shareIdFromPath("/l/short")).toBeNull();
+    expect(shareIdFromPath("/")).toBeNull();
   });
 });
 
@@ -132,11 +107,5 @@ describe("import mapping", () => {
     expect(items[0]).toMatchObject({ productId: "melk", quantity: 2, imageKind: "generic", imageChoice: "drawing" });
     expect(items[1].ean).toBe("8710496978722");
     expect(items.every((item) => !("photoId" in item && item.photoId))).toBe(true);
-  });
-});
-
-describe("sharedListUrl", () => {
-  it("builds the public fragment URL", () => {
-    expect(sharedListUrl("0.abc")).toBe("https://www.karrie.eu/#list=0.abc");
   });
 });

@@ -30,7 +30,7 @@ export type AnalyticsEvent =
   | { name: "scanner_result"; data: { method: "barcode" | "photo"; outcome: ScannerOutcome } }
   | { name: "share_completed"; data: { method: "native" | "copied" } }
   | { name: "shopping_list_share_opened" }
-  | { name: "shopping_list_shared"; data: { method: "native" | "copied" | "qr" } }
+  | { name: "shopping_list_shared"; data: { method: "whatsapp" | "copied" } }
   | { name: "shared_list_imported"; data: { item_count: number; entry: "link" | "unknown" } }
   | { name: "feedback_opened"; data: { source: FeedbackSource } }
   | { name: "sticker_book_opened" };

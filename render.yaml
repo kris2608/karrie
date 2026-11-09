@@ -24,6 +24,9 @@ services:
       - path: /manifest.webmanifest
         name: Content-Type
         value: application/manifest+json
+      - path: /l/*
+        name: X-Robots-Tag
+        value: noindex, nofollow
     envVars:
       - key: NODE_VERSION
         value: "22"
