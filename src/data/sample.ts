@@ -30,6 +30,7 @@ const PACK_KEYS = [
   "imageChoice",
   "source",
   "nutrition",
+  "ingredients",
   "offAttribution",
   "barcode",
   "fieldSources",
@@ -37,6 +38,7 @@ const PACK_KEYS = [
   "alternative",
   "missionEnabled",
   "kind",
+  "packConflict",
   "canonicalName",
   "aliases",
   "subcategory",
@@ -86,6 +88,7 @@ export type VisionPack = {
   /** The Open Food Facts front photo; a parent photo replaces it. */
   imageUrl?: string;
   nutrition?: Nutrition;
+  ingredients?: string;
   fieldSources?: FieldSources;
   packConflict?: { choices: string[]; raw: string[] };
 };
@@ -103,6 +106,7 @@ export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
     imageSource: photoId ? "parent" : offImage ? "off" : undefined,
     source: vision.barcode ? (vision.barcode.status === "web-page" ? "barcode" : "off") : vision.recognition ? "vision" : "manual",
     nutrition: vision.nutrition,
+    ingredients: vision.ingredients,
     offAttribution: vision.barcode && vision.barcode.status !== "web-page" ? true : undefined,
     barcode: vision.barcode,
     fieldSources: vision.fieldSources,

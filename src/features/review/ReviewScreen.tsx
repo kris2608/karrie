@@ -27,6 +27,7 @@ import { ShareIcon } from "../../components/ui/ShareIcon";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
+import { useHealthierPreflight } from "./useHealthierPreflight";
 
 const NO_ITEMS: AdventureItem[] = [];
 
@@ -39,7 +40,7 @@ function Arrow({ up }: { up?: boolean }) {
 }
 
 export function ReviewScreen() {
-  const { adventure, saved, dispatch } = useAdventure();
+  const { adventure, saved, settings, dispatch } = useAdventure();
   const navigate = useNavigate();
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
@@ -52,6 +53,7 @@ export function ReviewScreen() {
   const retailer = adventure?.phase === "draft" ? adventure.retailer : undefined;
   const { views, deals } = useOfferViews(items, retailer);
   const editingFavorite = Boolean(adventure && saved.some((list) => list.id === adventure.id && list.favorite));
+  useHealthierPreflight(adventure, settings.smartDiscovery, dispatch);
 
   useEffect(() => {
     if ((location.state as { editItem?: string } | null)?.editItem) navigate(".", { replace: true, state: null });

@@ -96,8 +96,14 @@ export type AppDeps = {
   products?: ProductDeps;
   catalog?: Catalog;
   sharedLists?: SharedListDeps;
+  healthier?: HealthierDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
+};
+
+export type HealthierDeps = {
+  assess: (raw: unknown) => Promise<import("./healthier.js").HealthierResult>;
+  limits: Limits;
 };
 
 const ROUTES = [
@@ -110,6 +116,7 @@ const ROUTES = [
   "/api/offers/match",
   "/api/products/normalize",
   "/api/products/illustration",
+  "/api/products/healthier-alternative",
 ];
 const ADMIN = "/api/admin/candidates";
 const ADMIN_CATALOG = "/api/admin/catalog";
@@ -264,6 +271,7 @@ export function createHandler(deps: AppDeps) {
         sharedLists: deps.sharedLists
           ? { enabled: true, stats: deps.sharedLists.limits.stats(), outcomes: deps.sharedLists.store.stats() }
           : { enabled: false },
+        healthier: deps.healthier ? { enabled: true, stats: deps.healthier.limits.stats() } : { enabled: false },
       });
     }
 
@@ -301,6 +309,7 @@ export function createHandler(deps: AppDeps) {
     if (url.pathname === "/api/offers/match") return matchOffer(body);
     if (url.pathname === "/api/products/normalize") return normalizeTyped(body);
     if (url.pathname === "/api/products/illustration") return illustrate(body);
+    if (url.pathname === "/api/products/healthier-alternative") return assessHealthier(body);
 
     const image = checkImage(body);
     if (!image.ok) return send(image.status, { status: "error", code: image.code });
@@ -663,6 +672,26 @@ export function createHandler(deps: AppDeps) {
       const page = await deps.catalog.changesSince(since, limit);
       res.setHeader("Cache-Control", "public, max-age=300");
       return send(200, { status: "ok", products: page.products, next: page.next });
+    }
+
+    async function assessHealthier(body: unknown) {
+      if (!deps.healthier) return send(503, { status: "error", code: "unavailable" });
+      if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
+      const ip = clientIp(req);
+      const denial = deps.healthier.limits.admit(ip);
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const callStarted = now();
+      const result = await deps.healthier.assess(body);
+      const latencyMs = now() - callStarted;
+      deps.healthier.limits.record({ ok: result.ok, latencyMs, usage: result.ok ? result.usage : result.usage });
+      Object.assign(entry, { openaiMs: latencyMs, usage: result.ok ? result.usage : result.usage, cached: result.ok ? result.cached : undefined, code: result.ok ? undefined : result.code });
+      if (!result.ok) {
+        if (result.code === "insufficient-data" || result.code === "invalid") {
+          return send(422, { status: "error", code: result.code });
+        }
+        return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
+      }
+      return send(200, { status: "ok", alternative: result.alternative, cached: result.cached });
     }
 
     async function createSharedList() {

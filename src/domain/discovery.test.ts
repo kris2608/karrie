@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { RecognizedAlternative } from "../services/vision/types";
-import { badgeFor, declineKey, labelCheck, missionOn, parentLine, pickMissions, resolveAssessment, samePurpose } from "./discovery";
+import {
+  badgeFor,
+  declineKey,
+  labelCheck,
+  missionOn,
+  nutritionSupports,
+  parentLine,
+  pickMissions,
+  precheckEvidence,
+  resolveAssessment,
+  samePurpose,
+} from "./discovery";
+import { assembleProductEvidence, isAssessable, isBareGeneric } from "./productEvidence";
 import type { AdventureItem, AlternativeAssessment } from "./types";
 
 const SWEET_PEANUT: RecognizedAlternative = {
@@ -122,5 +134,54 @@ describe("missions", () => {
     expect(badgeFor({ ...possible("label"), alternativeType: "volkorenbrood", criteria: ["wholegrain"] })).toBe("grain");
     expect(badgeFor({ ...possible("label"), alternativeType: "yoghurt zonder suiker" })).toBe("no-sugar");
     expect(badgeFor({ ...possible("label"), alternativeType: "ongezouten nootjes", criteria: ["unsalted"] })).toBe("no-salt");
+  });
+});
+
+describe("realistic healthier scenarios", () => {
+  it("allows peanut butter / yoghurt / bread / nuts / cereal when ingredients support the claim", () => {
+    expect(resolveAssessment(SWEET_PEANUT, "pindakaas", LABEL)?.status).toBe("possible");
+    expect(
+      resolveAssessment(
+        { ...SWEET_PEANUT, criteria: ["no-added-sugar"], alternativeType: "yoghurt zonder suiker", targetType: "yoghurt" },
+        "yoghurt",
+        "Magere yoghurt, suiker, aroma",
+      )?.status,
+    ).toBe("possible");
+    expect(
+      resolveAssessment(
+        { ...SWEET_PEANUT, criteria: ["wholegrain"], alternativeType: "volkorenbrood", targetType: "brood" },
+        "brood",
+        "Tarwebloem, water, gist",
+      )?.status,
+    ).toBe("possible");
+    expect(labelCheck(["unsalted"], "label", "Pinda's, zout")).toEqual({ criteria: ["unsalted"], evidence: "label" });
+    expect(labelCheck(["unsalted"], "label", "Pinda's")).toEqual({ criteria: [], evidence: "inferred" });
+  });
+
+  it("does not invent missions for bare melk or empty evidence", () => {
+    expect(isBareGeneric({ id: "1", productId: "melk", name: "Melk", icon: "melk", category: "dairy", quantity: 1, status: "pending" })).toBe(true);
+    expect(precheckEvidence(assembleProductEvidence({ id: "1", productId: "melk", name: "Melk", icon: "melk", category: "dairy", quantity: 1, status: "pending" }))).toBe(
+      "insufficient-data",
+    );
+    expect(isAssessable(assembleProductEvidence({ id: "1", name: "X", icon: "melk", category: "dairy", quantity: 1, status: "pending" }))).toBe(false);
+  });
+
+  it("uses nutrition only when comparable and never Nutri-Score alone", () => {
+    expect(nutritionSupports("more-fibre", { fiber100g: 1 })).toBe(true);
+    expect(nutritionSupports("more-fibre", { fiber100g: 8 })).toBe(false);
+    expect(nutritionSupports("less-sugar", { sugars100g: 12 })).toBeNull();
+    expect(nutritionSupports("less-sugar", { sugars100g: 12 }, "suiker, graan")).toBe(true);
+    expect(
+      resolveAssessment(
+        { ...SWEET_PEANUT, criteria: ["more-fibre"], alternativeType: "muesli met meer vezels", targetType: "muesli", evidence: "inferred" },
+        "muesli",
+        undefined,
+        { source: "barcode", nutrition: { fiber100g: 1 } },
+      )?.status,
+    ).toBe("possible");
+  });
+
+  it("returns none when the product already matches the desired criteria", () => {
+    expect(resolveAssessment(SWEET_PEANUT, "pindakaas", "100% pinda's")?.status).toBe("none");
   });
 });

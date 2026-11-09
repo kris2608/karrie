@@ -18,7 +18,19 @@ import { nextSticker } from "../domain/stickers";
 import { MINE_LIMIT, mineKey, remember as rememberMine } from "../domain/mine";
 import { categoryIcon } from "../domain/categoryIcon";
 import { customName, customProductId, nameTaken, singularKey, suggestion } from "../domain/customProduct";
-import type { Adventure, AdventureItem, CategoryId, ImageChoice, MissionState, NamePhoto, PackInfo, Product, SavedItem, SavedList } from "../domain/types";
+import type {
+  Adventure,
+  AdventureItem,
+  AlternativeAssessment,
+  CategoryId,
+  ImageChoice,
+  MissionState,
+  NamePhoto,
+  PackInfo,
+  Product,
+  SavedItem,
+  SavedList,
+} from "../domain/types";
 import { isRetailer, type RetailerId } from "../domain/retailers";
 import { toImportSavedItems, type SharedListV1 } from "../domain/shareList";
 import { productById, products } from "../data/catalog";
@@ -106,6 +118,8 @@ export type Action =
   | { type: "forget-mine"; key: string }
   | { type: "restore-mine"; entry: SavedItem; index: number }
   | { type: "set-mission"; itemId: string; enabled: boolean }
+  /** Attach a healthier-alternative assessment prepared before shopping. */
+  | { type: "set-alternative"; itemId: string; alternative: AlternativeAssessment }
   | { type: "mission-accept" }
   | { type: "mission-skip" }
   | { type: "mission-done"; keep: "original" | "alternative" }
@@ -457,6 +471,10 @@ export function reducer(state: AppState, action: Action): AppState {
       const declined = action.enabled ? state.declined.filter((entry) => entry !== key) : [...new Set([...state.declined, key])].slice(-200);
       const next = updateItem(state, action.itemId, (entry) => ({ ...entry, missionEnabled: action.enabled }));
       return { ...next, declined };
+    }
+    case "set-alternative": {
+      if (state.adventure?.phase !== "draft") return state;
+      return updateItem(state, action.itemId, (item) => ({ ...item, alternative: action.alternative }));
     }
     case "mission-accept":
     case "mission-skip": {

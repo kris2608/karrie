@@ -85,9 +85,12 @@ export type AlternativeAssessment = {
   reason?: string;
   parentExplanation?: string;
   childPrompt?: string;
-  source: "photo";
+  /** photo = vision call; barcode = OFF GTIN facts; facts = shop/brand page facts. */
+  source: "photo" | "barcode" | "facts";
   model?: string;
   assessedAt: number;
+  /** Hash of the evidence used; skips re-assessment when unchanged. */
+  evidenceVersion?: string;
 };
 
 export type Nutrition = {
@@ -114,6 +117,8 @@ export type PackInfo = {
   imageChoice?: ImageChoice;
   source?: ItemSource;
   nutrition?: Nutrition;
+  /** Ingredient list from a trusted source (OFF / page / photo); never invent. */
+  ingredients?: string;
   offAttribution?: boolean;
   barcode?: BarcodeInfo;
   /** Unresolved pack-size disagreement between sources; cleared when the parent confirms. */

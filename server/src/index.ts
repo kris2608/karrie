@@ -11,6 +11,7 @@ import { seedCatalog } from "./catalog/seed.js";
 import type { Catalog } from "./catalog/types.js";
 import { migrate } from "./db/migrate.js";
 import { createSharedListStore, disabledSharedListStore } from "./sharedLists.js";
+import { createHealthierAssessor, createHealthierCache } from "./healthier.js";
 import { createIllustrator } from "./illustration.js";
 import { normalizeProduct } from "./normalize.js";
 import { createImageDiscovery } from "./images.js";
@@ -205,6 +206,15 @@ const shareLimits = createLimits({
   cachedInputUsdPerMTok: 0,
   outputUsdPerMTok: 0,
 });
+const healthierLimits = createLimits({
+  perIpPerHour: number("HEALTHIER_LIMIT_PER_IP_HOUR", 20),
+  perIpPerDay: number("HEALTHIER_LIMIT_PER_IP_DAY", 60),
+  dailyRequests: number("HEALTHIER_LIMIT_DAILY_REQUESTS", 800),
+  dailyBudgetUsd: number("HEALTHIER_DAILY_BUDGET_USD", 1),
+  inputUsdPerMTok: number("PRICE_INPUT_PER_MTOK", 0.75),
+  cachedInputUsdPerMTok: number("PRICE_CACHED_INPUT_PER_MTOK", 0.075),
+  outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
+});
 const sharedLists = pgPool ? createSharedListStore(pgPool) : disabledSharedListStore();
 if (pgPool) {
   void sharedLists.purgeExpired().catch(() => undefined);
@@ -247,6 +257,16 @@ const handler = createHandler({
     limits: shareLimits,
     publicOrigin: env.PUBLIC_APP_ORIGIN || "https://www.karrie.eu",
   },
+  healthier: client
+    ? {
+        assess: createHealthierAssessor({
+          client,
+          model: env.OPENAI_PRODUCT_MODEL || config.model,
+          cache: createHealthierCache(pgPool),
+        }).assess,
+        limits: healthierLimits,
+      }
+    : undefined,
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 

@@ -1,10 +1,12 @@
 import { productById } from "../data/catalog";
 import type { RecognizedAlternative } from "../services/vision/types";
 import { normalize } from "./matchProduct";
-import type { AdventureItem, AlternativeAssessment, Criterion, Evidence, PackInfo } from "./types";
+import type { ProductEvidence } from "./productEvidence";
+import type { AdventureItem, AlternativeAssessment, Criterion, Evidence, Nutrition, PackInfo } from "./types";
 
 export const CRITERIA: readonly Criterion[] = ["no-added-sugar", "no-added-salt", "unsalted", "wholegrain", "less-sugar", "more-fibre", "less-saturated-fat"];
 export const MAX_MISSIONS = 3;
+export const HEALTHIER_RULES_VERSION = "2026-11-09";
 
 /**
  * Swaps to a different catalog type that keep the shopping purpose. Anything
@@ -58,6 +60,45 @@ export function labelCheck(criteria: Criterion[], evidence: Evidence, ingredient
   return { criteria: kept, evidence: evidence === "label" && !backed ? "inferred" : evidence };
 }
 
+/**
+ * Nutrition can support fibre / sat-fat / less-sugar only with comparable per-100 values.
+ * Never uses Nutri-Score alone. Total sugars without ingredient cues do not prove added sugar.
+ */
+export function nutritionSupports(criterion: Criterion, nutrition: Nutrition | undefined, ingredients?: string): boolean | null {
+  if (!nutrition) return null;
+  switch (criterion) {
+    case "more-fibre":
+      return nutrition.fiber100g !== undefined ? nutrition.fiber100g < 3 : null;
+    case "less-saturated-fat":
+      return nutrition.saturatedFat100g !== undefined ? nutrition.saturatedFat100g > 5 : null;
+    case "less-sugar":
+      if (nutrition.sugars100g === undefined) return null;
+      if (ingredients && labelShows("less-sugar", ingredients) === true) return nutrition.sugars100g > 5;
+      return null;
+    default:
+      return null;
+  }
+}
+
+export function criteriaWithNutrition(
+  criteria: Criterion[],
+  evidence: Evidence,
+  ingredients: string | undefined,
+  nutrition: Nutrition | undefined,
+): { criteria: Criterion[]; evidence: Evidence } {
+  const labeled = labelCheck(criteria, evidence, ingredients);
+  if (!nutrition) return labeled;
+  const kept = labeled.criteria.filter((criterion) => {
+    const shown = nutritionSupports(criterion, nutrition, ingredients);
+    return shown !== false;
+  });
+  const backedByNutrition = labeled.criteria.some((criterion) => nutritionSupports(criterion, nutrition, ingredients) === true);
+  return {
+    criteria: kept,
+    evidence: labeled.evidence === "inferred" && backedByNutrition && !ingredients ? "inferred" : labeled.evidence,
+  };
+}
+
 function sentence(text: string) {
   const trimmed = text.trim().replace(/[.!]+$/, "");
   return trimmed ? `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}.` : "";
@@ -74,22 +115,47 @@ export function parentLine(explanation: string | undefined, evidence: Evidence):
   return `${qualified} Kijk even op het etiket.`;
 }
 
+export type ResolveOptions = {
+  source?: AlternativeAssessment["source"];
+  nutrition?: Nutrition;
+  evidenceVersion?: string;
+  model?: string;
+  now?: number;
+};
+
 /** Applies the local guards to the model's suggestion. Undefined when there is nothing to keep. */
 export function resolveAssessment(
   alternative: RecognizedAlternative | undefined,
   ownType: string | undefined,
   ingredients?: string,
-  model?: string,
-  now = Date.now(),
+  modelOrOptions?: string | ResolveOptions,
+  nowArg = Date.now(),
 ): AlternativeAssessment | undefined {
   if (!alternative) return undefined;
-  const base = { source: "photo" as const, model, assessedAt: now, reason: alternative.reason ?? undefined };
-  const none = (status: AlternativeAssessment["status"]): AlternativeAssessment => ({ ...base, status, evidence: alternative.evidence, criteria: [] });
+  const options: ResolveOptions =
+    typeof modelOrOptions === "string" || modelOrOptions === undefined
+      ? { source: "photo", model: modelOrOptions, now: nowArg }
+      : modelOrOptions;
+  const source = options.source ?? "photo";
+  const now = options.now ?? Date.now();
+  const base = {
+    source,
+    model: options.model,
+    assessedAt: now,
+    reason: alternative.reason ?? undefined,
+    ...(options.evidenceVersion && { evidenceVersion: options.evidenceVersion }),
+  };
+  const none = (status: AlternativeAssessment["status"]): AlternativeAssessment => ({
+    ...base,
+    status,
+    evidence: alternative.evidence,
+    criteria: [],
+  });
   if (alternative.status !== "possible") return none(alternative.status);
   const target = alternative.targetType ? productById(alternative.targetType) : undefined;
   if (!ownType || !target || !samePurpose(ownType, target.id)) return none("none");
   const known = alternative.criteria.filter((criterion) => CRITERIA.includes(criterion));
-  const checked = labelCheck(known, alternative.evidence, ingredients);
+  const checked = criteriaWithNutrition(known, alternative.evidence, ingredients, options.nutrition);
   if (!checked.criteria.length) return none("none");
   if (checked.evidence === "none") return none("insufficient-data");
   return {
@@ -102,6 +168,13 @@ export function resolveAssessment(
     parentExplanation: parentLine(alternative.parentExplanation ?? undefined, checked.evidence),
     childPrompt: alternative.childPrompt ?? `Kun jij ${(alternative.alternativeType ?? target.name).toLowerCase()} vinden?`,
   };
+}
+
+/** Rules-first gate before calling the model: weak or empty evidence → insufficient-data. */
+export function precheckEvidence(evidence: ProductEvidence): "ok" | "insufficient-data" {
+  if (evidence.matchConfidence === "weak") return "insufficient-data";
+  if (!evidence.ingredients && !evidence.nutrition) return "insufficient-data";
+  return "ok";
 }
 
 export function hasSuggestion(pack: PackInfo): boolean {

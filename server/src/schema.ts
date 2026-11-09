@@ -85,6 +85,28 @@ export const RecognizedProductSchema = z
 export type RecognizedProduct = z.infer<typeof RecognizedProductSchema>;
 export type Alternative = z.infer<typeof AlternativeSchema>;
 
+/** Shared healthier-alternative rules for photo recognition and text evidence assessment. */
+export const HEALTHIER_RULES = `- The alternative must serve the same shopping purpose and keep the product type and its use. Examples: regular peanut butter -> 100% peanut butter without added sugar or salt; white bread -> wholegrain bread; sweetened yoghurt -> comparable yoghurt without added sugar; sugary cereal -> similar cereal with less sugar and more fibre; salted nuts -> unsalted nuts.
+- Never suggest a different food: not peanut butter -> hummus, biscuits -> carrots, chocolate spread -> apples, milk -> water. A different flavour, dairy-free or reduced-fat version is not automatically better.
+- Return status "none" when the product is already a strong choice in its category (for example peanut butter of 100% peanuts), when the gain is marginal or depends on context, when allergens or diet suitability are uncertain, when evidence is contradictory, and always for non-food.
+- Return "insufficient-data" when the evidence does not support a clear improvement. Do not force a suggestion; no suggestion is a normal, good outcome.
+- Use ingredients, added sugar, salt, fibre, wholegrain status and saturated fat. Never compare on calories alone. Nutri-Score is only supplementary. Never invent ingredients, nutritional values, barcodes or brands.
+- Distinguish naturally occurring sugar (fruit, milk) from added sugar when ingredients are present.
+- Set evidence "label" only when ingredients or a nutrition table were provided in the evidence; otherwise "inferred", and then use qualified wording such as "waarschijnlijk".
+- Do not mention numbers unless they appear in the evidence. Do not call food good, bad, healthy or unhealthy in the child prompt.
+- Prefer targetType from the Karrie food catalog for the same product type.`;
+
+export const HEALTHIER_RULES_VERSION = "2026-11-09";
+
+export const HEALTHIER_INSTRUCTIONS = `You assess whether a Dutch grocery product has a meaningful healthier alternative of the same shopping purpose for Karrie, a family shopping app.
+
+You receive structured product evidence only. Do not invent missing fields.
+
+Assess the "alternative" object:
+${HEALTHIER_RULES}
+
+Return only the requested structured output.`;
+
 export const INSTRUCTIONS = `You are a grocery product recognition assistant for Karrie, a Dutch family shopping application for parents and young children.
 
 Analyze the provided image and identify the main grocery or household product.
@@ -112,13 +134,7 @@ Do not attempt to identify people. If a face or body is visible, set containsPeo
 Do not treat a visible Nutri-Score as proof that a product is healthy.
 
 Also assess in "alternative" whether a comparable product of the same narrow type is meaningfully better:
-- The alternative must serve the same shopping purpose and keep the product type and its use. Examples: regular peanut butter -> 100% peanut butter without added sugar or salt; white bread -> wholegrain bread; sweetened yoghurt -> comparable yoghurt without added sugar; sugary cereal -> similar cereal with less sugar and more fibre; salted nuts -> unsalted nuts.
-- Never suggest a different food: not peanut butter -> hummus, biscuits -> carrots, chocolate spread -> apples, milk -> water. A different flavour, dairy-free or reduced-fat version is not automatically better.
-- Return status "none" when the product is already a strong choice in its category (for example peanut butter of 100% peanuts), when the gain is marginal or depends on context, when allergens or diet suitability are uncertain, when evidence is contradictory, and always for non-food.
-- Return "insufficient-data" when the photo does not give enough evidence. Do not force a suggestion; no suggestion is a normal, good outcome.
-- Use ingredients, added sugar, salt, fibre, wholegrain status and saturated fat. Never compare on calories alone. Nutri-Score is only supplementary.
-- Set evidence "label" only when the reason is readable on this photo; otherwise "inferred", and then use qualified wording such as "waarschijnlijk".
-- Do not mention numbers unless they are printed and readable. Do not call food good, bad, healthy or unhealthy in the child prompt.
+${HEALTHIER_RULES}
 
 Return only the requested structured output.`;
 

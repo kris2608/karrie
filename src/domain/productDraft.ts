@@ -142,6 +142,10 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     "pantry";
   const offImage = mine?.imageSource === "off" ? mine.imageUrl : found?.imageUrl;
   const nutrition = mine?.nutrition ?? nutritionOf(barcode);
+  const ingredients =
+    mine?.ingredients ??
+    (barcode?.source.kind === "off" ? barcode.product.ingredients?.trim().slice(0, 600) || undefined : undefined) ??
+    vision?.pack.recognition?.ingredientsSeen;
   const kept = (name: FieldName) => {
     const field = fields[name];
     return field && field.source !== "guess" ? field.value : undefined;
@@ -168,6 +172,7 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     barcode: barcodeInfo,
     imageUrl: offImage,
     nutrition,
+    ...(ingredients && { ingredients }),
     fieldSources,
     ...(packConflict && { packConflict }),
   };
