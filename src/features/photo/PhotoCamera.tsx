@@ -4,8 +4,9 @@ import { Karrie } from "../../components/mascot/Karrie";
 import { PressButton } from "../../components/ui/PressButton";
 import { buzz } from "../../feedback/haptics";
 import { spring } from "../../motion/variants";
+import { BarcodeHighlight } from "./BarcodeHighlight";
 import { capturePhoto, type ProcessedPhoto } from "./imageProcessing";
-import { useBarcode } from "./useBarcode";
+import { useBarcode, type BarcodeSighting } from "./useBarcode";
 import { useCamera, type CameraProblem } from "./useCamera";
 
 /** looking: a code was read and is being looked up; unknown: nobody knows it; failed: the lookup did not work. */
@@ -48,8 +49,10 @@ function finePointer() {
 export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanBarcodes, barcodeStatus, added, onBarcode, onManual, onCapture, onGallery, onClose }: PhotoCameraProps) {
   const reduced = useReducedMotion() ?? false;
   const videoRef = useRef<HTMLVideoElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<CameraStatus>("opening");
   const [attempt, setAttempt] = useState(0);
+  const [sighting, setSighting] = useState<BarcodeSighting | null>(null);
   const problem = status === "denied" || status === "unavailable";
 
   const track = useCamera({
@@ -61,7 +64,7 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
   });
 
   const scanning = scanBarcodes && status === "live" && !busy;
-  useBarcode({ videoRef, active: scanning, session: attempt, onDetect: onBarcode });
+  useBarcode({ videoRef, active: scanning, session: attempt, onDetect: onBarcode, onSighting: setSighting });
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -110,19 +113,15 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
         </button>
       </header>
 
-      <div className="scanner-frame camera-frame">
+      <div className="scanner-frame camera-frame" ref={frameRef}>
         {problem ? (
           <CameraHelp denied={status === "denied"} onRetry={retry} onGallery={onGallery} />
         ) : (
           <>
             <video ref={videoRef} className="scanner-video" playsInline muted autoPlay aria-hidden="true" />
             {preview && busy && <img className="camera-still" src={preview} alt="" />}
-            <span className="scanner-corners" aria-hidden="true" />
-            {scanning && (
-              <span className={barcodeStatus === "looking" ? "camera-band is-found" : "camera-band"} aria-hidden="true" data-testid="camera-scanline">
-                <i />
-              </span>
-            )}
+            <span className={sighting || barcodeStatus === "looking" ? "scanner-corners is-detecting" : "scanner-corners"} aria-hidden="true" />
+            {scanning && <BarcodeHighlight frameRef={frameRef} sighting={sighting} confirmed={barcodeStatus === "looking"} />}
           </>
         )}
         {busy && (
@@ -155,9 +154,12 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
           </motion.p>
         )}
         {!problem && !busy && !(scanBarcodes && barcodeStatus) && !added && (
-          <p className="scanner-hint" data-testid="camera-hint">
-            {hint ?? (scanBarcodes ? "Scan streepjescode of maak foto" : "Zet één product in het kader")}
-          </p>
+          <div className="scanner-hint-block">
+            <p className="scanner-hint" data-testid="camera-hint">
+              {hint ?? (scanBarcodes ? "Scan streepjescode of maak foto" : "Zet één product in het kader")}
+            </p>
+            {scanBarcodes && !hint && <p className="scanner-subhint">Rechtop of liggend werkt allebei</p>}
+          </div>
         )}
         {!problem && !busy && scanBarcodes && barcodeStatus && (
           <p className="camera-barcode" data-testid="camera-barcode">
