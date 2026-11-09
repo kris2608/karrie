@@ -79,7 +79,7 @@ type GridTileProps = {
 
 function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo, mine = false, offer }: GridTileProps) {
   const { pressing, handlers } = useLongPress(onRemove, quantity === 0 && !mine);
-  const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : "", mine ? "is-mine" : ""].filter(Boolean).join(" ");
+  const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : ""].filter(Boolean).join(" ");
   const deal = offer && quantity ? `, in de aanbieding bij ${retailerName(offer)}` : "";
   const label = mine
     ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}. Lang drukken om te vergeten`
@@ -110,13 +110,6 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo,
           {art}
         </motion.span>
         <span className="card-name">{name}</span>
-        {mine && (
-          <span className="card-mine" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="currentColor" />
-            </svg>
-          </span>
-        )}
         {offer && quantity > 0 && <OfferTag shown="deal" retailer={offer} className="card-offer" compact />}
         <AnimatePresence>
           {quantity > 0 && (
@@ -593,7 +586,7 @@ export function AddScreen() {
       {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
       {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er meteen een foto of plaatje bij.</p>}
       {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
-      {mineVisible.length > 0 && <p className="add-hint">Producten met een hartje onthoudt Karrie van eerder. Lang drukken vergeet ze.</p>}
+      {mineVisible.length > 0 && <p className="add-hint">Producten die je zelf hebt toegevoegd onthoudt Karrie. Lang drukken vergeet ze.</p>}
 
       <div className="dock dock-fixed">
         <PressButton variant="quiet" data-testid="paste" onClick={() => setPasteOpen(true)}>
