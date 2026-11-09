@@ -22,6 +22,7 @@ import { listName } from "../../state/reducer";
 import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
 import { shareKarrie } from "../../domain/share";
+import { trackEvent } from "../../services/analytics";
 import { AboutKarrie } from "./AboutKarrie";
 import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
@@ -114,12 +115,24 @@ export function HomeScreen() {
     navigate("/toevoegen");
   }
 
-  function continueFromIntro() {
+  function clickNewAdventure() {
+    trackEvent({ name: "new_adventure_clicked" });
+    if (needsIntro(state)) {
+      trackEvent({ name: "onboarding_opened" }, "onboarding-open");
+      setIntroOpen(true);
+      return;
+    }
+    startAdventure();
+  }
+
+  function finishIntro(action: "start" | "skip") {
+    trackEvent({ name: "onboarding_finished", data: { action } }, "onboarding-finished");
     dispatch({ type: "intro-seen" });
     startAdventure();
   }
 
   function dismissIntro() {
+    trackEvent({ name: "onboarding_finished", data: { action: "dismiss" } }, "onboarding-finished");
     dispatch({ type: "intro-seen" });
     setIntroOpen(false);
     newRef.current?.focus();
@@ -194,7 +207,7 @@ export function HomeScreen() {
           wide
           data-testid="new-adventure"
           ref={newRef}
-          onClick={() => (needsIntro(state) ? setIntroOpen(true) : startAdventure())}
+          onClick={clickNewAdventure}
         >
           Nieuw avontuur
         </PressButton>
@@ -231,7 +244,10 @@ export function HomeScreen() {
           aria-label={`Mijn stickers: ${preview.count}. Open het stickerboek`}
           data-testid="sticker-preview"
           whileTap={{ scale: 0.97 }}
-          onClick={() => setStickersOpen(true)}
+          onClick={() => {
+            trackEvent({ name: "sticker_book_opened" });
+            setStickersOpen(true);
+          }}
         >
           <span className="sticker-preview-head" aria-hidden="true">
             <strong>Mijn stickers</strong>
@@ -270,7 +286,7 @@ export function HomeScreen() {
       <Toast notice={undo.notice} onDismiss={undo.dismiss} />
 
       <Sheet open={introOpen} onClose={dismissIntro} label="Hoe werkt Karrie?">
-        <HowKarrieWorks headingRef={introHeadingRef} onStart={continueFromIntro} onSkip={continueFromIntro} />
+        <HowKarrieWorks headingRef={introHeadingRef} onStart={() => finishIntro("start")} onSkip={() => finishIntro("skip")} />
       </Sheet>
 
       <Sheet open={stickersOpen} onClose={closeStickers} label="Stickerboek">
@@ -336,7 +352,14 @@ export function HomeScreen() {
                   </svg>
                 </button>
               ))}
-              <a className="settings-link" href={feedbackUrl("settings")} target="_blank" rel="noopener noreferrer" data-testid="open-feedback">
+              <a
+                className="settings-link"
+                href={feedbackUrl("settings")}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="open-feedback"
+                onClick={() => trackEvent({ name: "feedback_opened", data: { source: "settings" } })}
+              >
                 💬 Geef feedback
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M14 5h5v5M19 5l-9 9M10 5H5v14h14v-5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -352,6 +375,8 @@ export function HomeScreen() {
                     canShare: navigator.canShare?.bind(navigator),
                     copy: (text) => navigator.clipboard.writeText(text),
                   }).then((outcome) => {
+                    if (outcome === "cancelled") return;
+                    trackEvent({ name: "share_completed", data: { method: outcome === "shared" ? "native" : "copied" } });
                     if (outcome === "copied") undo.show("Link gekopieerd!");
                   });
                 }}

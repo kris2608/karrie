@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { products } from "../data/catalog";
 import type { AlternativeAssessment } from "../domain/types";
 import { resetTracking, trackEvent, type Tracked } from "../services/analytics";
+import { resetMilestonesMemory, type AnalyticsMilestones } from "../services/analyticsMilestones";
 import type { BarcodeOutcome } from "../services/barcode/lookup";
-import { analyticsEvents, barcodeSource } from "./analyticsEvents";
+import { analyticsEvents, barcodeSource, commitMilestoneEvents } from "./analyticsEvents";
 import { initialState, reducer, type Action, type AppState } from "./reducer";
+import * as milestones from "../services/analyticsMilestones";
 
 const [first, second] = products;
 const later = products.find((product) => product.category === "household")!;
@@ -50,7 +52,30 @@ const pindakaas: Action = {
   via: "barcode",
 };
 
+function seedMilestones(patch: Partial<AnalyticsMilestones> = {}) {
+  resetMilestonesMemory();
+  const value: AnalyticsMilestones = {
+    version: 1,
+    initialized: true,
+    firstOpenTracked: true,
+    firstListTracked: true,
+    firstAdventureStartedTracked: true,
+    firstAdventureCompletedTracked: true,
+    ...patch,
+  };
+  vi.spyOn(milestones, "getMilestones").mockReturnValue(value);
+  vi.spyOn(milestones, "markMilestoneSent").mockImplementation(() => undefined);
+}
+
 describe("analytics events", () => {
+  beforeEach(() => {
+    seedMilestones();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetMilestonesMemory();
+  });
+
   it("counts a new list once, at its first product, and each new line as an added product", () => {
     const { events } = play([
       { type: "add-product", product: first },
@@ -60,6 +85,13 @@ describe("analytics events", () => {
     expect(names(events)).toEqual(["shopping_list_created", "product_added", "product_added"]);
     expect(events[1].event).toEqual({ name: "product_added", data: { method: "catalog", category: first.category } });
     expect(events[0].once).toBeTruthy();
+  });
+
+  it("emits first_list_created once beside shopping_list_created", () => {
+    seedMilestones({ firstListTracked: false });
+    const { events } = play([{ type: "add-product", product: first }, { type: "add-product", product: second }]);
+    expect(names(events).filter((name) => name === "first_list_created")).toHaveLength(1);
+    expect(names(events).filter((name) => name === "shopping_list_created")).toHaveLength(1);
   });
 
   it("counts pasting ten products as one new list with ten added products", () => {
@@ -75,7 +107,8 @@ describe("analytics events", () => {
     const saved = play([{ type: "add-product", product: first }, { type: "save-favorite", name: "Zaterdag" }, { type: "new-draft" }]).state;
     const id = saved.saved[0].id;
     const { events } = play([{ type: "open-saved", id }, { type: "add-product", product: second }], saved);
-    expect(names(events)).toEqual(["product_added"]);
+    expect(names(events)).toEqual(["saved_list_reopened", "product_added"]);
+    expect(names(events)).not.toContain("shopping_list_created");
   });
 
   it("does not count undoing a removal, or a recognised product without a name", () => {
@@ -105,12 +138,32 @@ describe("analytics events", () => {
     expect(run(start.state, { type: "start-shopping" }).events).toEqual([]);
   });
 
+  it("emits first adventure start and complete at most once per profile flags", () => {
+    seedMilestones({ firstAdventureStartedTracked: false, firstAdventureCompletedTracked: false });
+    const listed = play([{ type: "add-product", product: first }, { type: "add-product", product: second }]).state;
+    const start = run(listed, { type: "start-shopping" });
+    expect(names(start.events)).toEqual(["adventure_started", "first_adventure_started"]);
+    const finish = play([{ type: "found" }, { type: "found" }], start.state);
+    expect(names(finish.events)).toContain("first_adventure_completed");
+    const sent = finish.events.map(() => true);
+    commitMilestoneEvents(finish.events, sent);
+  });
+
   it("completes once, even after undo and found again", () => {
     const shopping = play([{ type: "add-product", product: first }, { type: "add-product", product: second }, { type: "start-shopping" }]).state;
     const finish = play([{ type: "found" }, { type: "found" }], shopping);
     expect(finish.events).toEqual([{ event: { name: "adventure_completed", data: { item_count: 2, completed_missions: 0 } }, once: shopping.adventure!.id }]);
     const again = play([{ type: "undo" }, { type: "found" }], finish.state);
     expect(again.events[0].once).toBe(finish.events[0].once);
+  });
+
+  it("counts saving and reopening a list without product secrets", () => {
+    const listed = play([{ type: "add-product", product: first }]).state;
+    const saved = run(listed, { type: "save-favorite", name: "Zaterdag" });
+    expect(saved.events).toEqual([{ event: { name: "shopping_list_saved", data: { action: "new" } }, once: expect.stringContaining("save:") }]);
+    const id = saved.state.saved[0].id;
+    const opened = run(saved.state, { type: "open-saved", id });
+    expect(names(opened.events)).toEqual(["saved_list_reopened"]);
   });
 
   it("counts a finished bonus mission with the choice, not when it is shown, accepted or skipped", () => {
@@ -192,11 +245,14 @@ describe("events sent to a mocked Umami", () => {
     for (const { event, once } of events) trackEvent(event, once);
     expect(track.mock.calls.map(([name]) => name)).toEqual([
       "shopping_list_created",
+      "first_list_created",
       "product_added",
       "product_added",
       "product_added",
       "adventure_started",
+      "first_adventure_started",
       "adventure_completed",
+      "first_adventure_completed",
     ]);
     expect(state.adventure!.phase).toBe("done");
   });

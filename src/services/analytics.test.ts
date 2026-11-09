@@ -12,22 +12,22 @@ describe("trackEvent", () => {
     vi.unstubAllGlobals();
   });
 
-  it("sends the name and data to Umami", () => {
-    trackEvent({ name: "adventure_started", data: { item_count: 3 } });
-    trackEvent({ name: "shopping_list_created" });
+  it("sends the name and data to Umami and reports success", () => {
+    expect(trackEvent({ name: "adventure_started", data: { item_count: 3 } })).toBe(true);
+    expect(trackEvent({ name: "shopping_list_created" })).toBe(true);
     expect(track.mock.calls).toEqual([["adventure_started", { item_count: 3 }], ["shopping_list_created"]]);
   });
 
   it("sends an event with a once-key only once per session", () => {
-    trackEvent({ name: "adventure_completed", data: { item_count: 2, completed_missions: 0 } }, "a1");
-    trackEvent({ name: "adventure_completed", data: { item_count: 2, completed_missions: 0 } }, "a1");
-    trackEvent({ name: "adventure_started", data: { item_count: 2 } }, "a1");
+    expect(trackEvent({ name: "adventure_completed", data: { item_count: 2, completed_missions: 0 } }, "a1")).toBe(true);
+    expect(trackEvent({ name: "adventure_completed", data: { item_count: 2, completed_missions: 0 } }, "a1")).toBe(true);
+    expect(trackEvent({ name: "adventure_started", data: { item_count: 2 } }, "a1")).toBe(true);
     expect(track).toHaveBeenCalledTimes(2);
   });
 
   it("does nothing without Umami, and survives a tracker that throws or rejects", async () => {
     vi.stubGlobal("window", {});
-    expect(() => trackEvent({ name: "shopping_list_created" })).not.toThrow();
+    expect(trackEvent({ name: "shopping_list_created" })).toBe(false);
     vi.stubGlobal("window", {
       umami: {
         track: () => {
@@ -35,14 +35,14 @@ describe("trackEvent", () => {
         },
       },
     });
-    expect(() => trackEvent({ name: "shopping_list_created" })).not.toThrow();
+    expect(trackEvent({ name: "shopping_list_created" })).toBe(false);
     vi.stubGlobal("window", { umami: { track: () => Promise.reject(new Error("offline")) } });
-    expect(() => trackEvent({ name: "shopping_list_created" })).not.toThrow();
+    expect(trackEvent({ name: "shopping_list_created" })).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("does nothing outside a browser", () => {
     vi.unstubAllGlobals();
-    expect(() => trackEvent({ name: "shopping_list_created" })).not.toThrow();
+    expect(trackEvent({ name: "shopping_list_created" })).toBe(false);
   });
 });

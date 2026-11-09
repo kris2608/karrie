@@ -14,6 +14,7 @@ import { stickerLabel } from "../../domain/stickers";
 import { buzz } from "../../feedback/haptics";
 import { playFanfare } from "../../feedback/sound";
 import { softSpring } from "../../motion/variants";
+import { trackEvent } from "../../services/analytics";
 import { useAdventure } from "../../state/AdventureContext";
 import { SaveListSheet } from "../review/SaveListSheet";
 
@@ -130,7 +131,17 @@ export function CompleteScreen() {
           <strong>Wat vonden jullie van Karrie? 💛</strong>
           <p>Met jouw feedback maken we boodschappen doen nóg leuker!</p>
           <div className="feedback-invite-actions">
-            <a className="pbtn pbtn-secondary pbtn-m pbtn-wide" href={feedbackUrl("completed")} target="_blank" rel="noopener noreferrer" data-testid="feedback-open" onClick={askFeedback}>
+            <a
+              className="pbtn pbtn-secondary pbtn-m pbtn-wide"
+              href={feedbackUrl("completed")}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="feedback-open"
+              onClick={() => {
+                trackEvent({ name: "feedback_opened", data: { source: "completed" } });
+                askFeedback();
+              }}
+            >
               Geef feedback
             </a>
             <PressButton variant="quiet" wide data-testid="feedback-later" onClick={askFeedback}>
