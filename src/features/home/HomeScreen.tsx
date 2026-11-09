@@ -24,6 +24,7 @@ import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
 import { shareKarrie } from "../../domain/share";
 import { trackEvent } from "../../services/analytics";
+import { ShareIcon } from "../../components/ui/ShareIcon";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { AboutKarrie } from "./AboutKarrie";
 import { HowKarrieWorks } from "./HowKarrieWorks";
@@ -62,10 +63,10 @@ function ListCard({
   const label = listName(list) ?? fallback;
   const detail = [`${list.items.length} producten`, list.store].filter(Boolean).join(" · ");
   return (
-    <div className="list-card-row">
+    <div className={pressing ? "list-card is-pressing" : "list-card"}>
       <motion.button
         type="button"
-        className={pressing ? "list-card is-pressing" : "list-card"}
+        className="list-card-main"
         aria-label={`${label}, ${detail}. Lang drukken om te wissen`}
         data-testid="list-card"
         whileTap={{ scale: 0.96 }}
@@ -83,7 +84,7 @@ function ListCard({
         </span>
       </motion.button>
       <button type="button" className="list-card-share" data-testid="share-list-card" aria-label={`Deel ${label}`} onClick={onShare}>
-        Deel
+        <ShareIcon />
       </button>
     </div>
   );

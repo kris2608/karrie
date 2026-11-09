@@ -300,38 +300,49 @@ h1, h2, p { margin: 0; }
 .home-shelf ul::-webkit-scrollbar { display: none; }
 .home-shelf li { flex: none; scroll-snap-align: start; }
 .home-shelf li:only-child { margin: 0 auto; }
-.list-card-row {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-2);
-}
-.list-card-row .list-card { flex: 1; min-width: 0; }
-.list-card-share {
-  flex: none;
-  align-self: center;
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-m);
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
 .list-card {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  align-items: stretch;
+  gap: var(--space-1);
   min-height: 64px;
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--radius-m);
   text-align: left;
   background: var(--card);
   box-shadow: var(--shadow-card);
+}
+.list-card-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
 }
+.list-card-share {
+  display: grid;
+  place-items: center;
+  flex: none;
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.list-card-share svg { width: 22px; height: 22px; }
 .list-card-art { display: flex; }
 .list-card-art .product-art { width: 36px; filter: none; }
 .list-card-art .product-art + .product-art { margin-left: -12px; }
@@ -452,8 +463,8 @@ h1, h2, p { margin: 0; }
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   width: min(480px, 100%);
-  max-height: 88vh;
-  max-height: 88dvh;
+  max-height: min(88vh, 100%);
+  max-height: min(88dvh, 100%);
   overflow: hidden;
   padding:
     0
@@ -488,9 +499,12 @@ h1, h2, p { margin: 0; }
 .sheet-body {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
   min-height: 0;
+  overflow-x: clip;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .sheet-card h2 { font-size: var(--text-title); font-weight: 900; }
 .sheet-note { color: var(--ink-soft); font-size: 0.95rem; }
@@ -1218,9 +1232,31 @@ a.settings-link { text-decoration: none; color: inherit; }
 .row-actions .round-danger { grid-row: 1 / span 2; }
 .list-name { margin: calc(var(--space-2) * -1) 0 var(--space-3); padding-left: 60px; color: var(--ink-mute); font-weight: 800; }
 .save-list { display: grid; gap: var(--space-4); }
-.share-list-entry { display: block; margin: var(--space-2) auto var(--space-4); }
 .share-list,
 .share-import { display: grid; gap: var(--space-4); }
+.offer-bar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.offer-bar-row .retailer-picker { flex: 1; min-width: 0; }
+.review-share-only { justify-content: flex-end; margin-bottom: var(--space-3); }
+.share-icon-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.share-icon-button svg { width: 22px; height: 22px; }
 .share-note { margin: 0; color: var(--ink-soft); line-height: 1.45; }
 .share-error { margin: 0; color: var(--coral); font-weight: 800; }
 .share-list-actions { display: grid; gap: var(--space-3); }
@@ -1868,8 +1904,23 @@ a.settings-link { text-decoration: none; color: inherit; }
   background: var(--card);
   flex: none;
 }
+.picture-source {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .picture-source a { color: inherit; }
-.picture-candidates { display: flex; gap: var(--space-2); overflow-x: auto; padding: 2px; }
+.picture-variants { min-width: 0; max-width: 100%; }
+.picture-candidates {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 2px;
+  -webkit-overflow-scrolling: touch;
+}
 .picture-candidate {
   flex: none;
   width: 72px;

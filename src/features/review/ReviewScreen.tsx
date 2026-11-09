@@ -23,6 +23,7 @@ import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
+import { ShareIcon } from "../../components/ui/ShareIcon";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
@@ -138,7 +139,14 @@ export function ReviewScreen() {
       )}
       {adventure.phase === "draft" && (
         <section className="offer-bar" aria-label="Aanbiedingen">
-          <RetailerPicker value={adventure.retailer} onChange={(retailer) => dispatch({ type: "set-retailer", retailer })} />
+          <div className="offer-bar-row">
+            <RetailerPicker value={adventure.retailer} onChange={(retailer) => dispatch({ type: "set-retailer", retailer })} />
+            {hasOpen && (
+              <button type="button" className="share-icon-button" data-testid="share-list-review" aria-label="Deel lijstje" onClick={() => setSharing(true)}>
+                <ShareIcon />
+              </button>
+            )}
+          </div>
           {adventure.retailer && deals > 0 && (
             <p className="offer-summary" data-testid="offer-summary">
               <TagIcon />
@@ -147,6 +155,13 @@ export function ReviewScreen() {
           )}
           {adventure.retailer && views.size > 0 && <Attribution />}
         </section>
+      )}
+      {adventure.phase !== "draft" && hasOpen && (
+        <div className="offer-bar-row review-share-only">
+          <button type="button" className="share-icon-button" data-testid="share-list-review" aria-label="Deel lijstje" onClick={() => setSharing(true)}>
+            <ShareIcon />
+          </button>
+        </div>
       )}
       {groups.length === 0 && (
         <p className="empty">
@@ -193,11 +208,6 @@ export function ReviewScreen() {
       {adventure.phase === "draft" && hasOpen && (
         <button type="button" className="text-button clear-list" data-testid="clear-list" onClick={clearList}>
           Lijstje leegmaken
-        </button>
-      )}
-      {hasOpen && (
-        <button type="button" className="text-button share-list-entry" data-testid="share-list-review" onClick={() => setSharing(true)}>
-          Deel lijstje
         </button>
       )}
       <div className="dock dock-fixed">

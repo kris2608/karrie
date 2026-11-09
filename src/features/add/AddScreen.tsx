@@ -585,8 +585,15 @@ export function AddScreen() {
       {deals > 0 && <Attribution className="add-attribution" />}
       {nothing && !close && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
       {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er meteen een foto of plaatje bij.</p>}
-      {count > 0 && <p className="add-hint">Lang drukken haalt een product van de lijst.</p>}
-      {mineVisible.length > 0 && <p className="add-hint">Producten die je zelf hebt toegevoegd onthoudt Karrie. Lang drukken vergeet ze.</p>}
+      {(count > 0 || mineVisible.length > 0) && (
+        <p className="add-hint">
+          {count > 0 && mineVisible.length > 0
+            ? "Lang drukken haalt een product van de lijst of vergeet iets uit Mijn producten."
+            : count > 0
+              ? "Lang drukken haalt een product van de lijst."
+              : "Producten die je zelf hebt toegevoegd onthoudt Karrie. Lang drukken vergeet ze."}
+        </p>
+      )}
 
       <div className="dock dock-fixed">
         <PressButton variant="quiet" data-testid="paste" onClick={() => setPasteOpen(true)}>

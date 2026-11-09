@@ -139,8 +139,8 @@ describe("cleaning a name answer", () => {
   });
 
   it("credits the source and says it is an example, never Open Food Facts for a retailer photo", () => {
-    expect(namePhotoCredit(AH_PHOTO)).toBe("Foto: Albert Heijn, via PrijsProfeet · een voorbeeld van dit product.");
-    expect(namePhotoCredit(OFF_PHOTO)).toBe("Foto: Open Food Facts (CC BY-SA) · een voorbeeld van dit product.");
+    expect(namePhotoCredit(AH_PHOTO)).toBe("Foto: Albert Heijn, via PrijsProfeet.");
+    expect(namePhotoCredit(OFF_PHOTO)).toBe("Foto: Open Food Facts (CC BY-SA).");
   });
 });
 

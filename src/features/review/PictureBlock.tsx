@@ -41,14 +41,16 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
   const named = useNamePhoto(item);
   const nameKey = wantsNameImage(item) ? nameImageLookupKey(item.name, adventure?.retailer) : undefined;
   const answer = useNameAnswer(nameKey);
-  const others = answer?.classification === "branded" ? [answer.match, ...answer.alternatives].filter((photo): photo is NamePhoto => Boolean(photo)) : [];
+  const others = (
+    answer?.classification === "branded" ? [answer.match, ...answer.alternatives].filter((photo): photo is NamePhoto => Boolean(photo)) : []
+  ).slice(0, 3);
   const retailer = adventure?.retailer;
   const plQuery = retailer && wantsPrivateLabels(item, retailer) ? privateLabelQuery(item) : null;
   const plKey = plQuery && retailer && !wantsNameImage(item) ? privateLabelLookupKey(plQuery, retailer) : undefined;
   const plAnswer = usePrivateLabelAnswer(plKey);
-  const privateLabels = wantsNameImage(item)
-    ? (answer?.privateLabelAlternatives ?? [])
-    : (plAnswer?.privateLabelAlternatives ?? []);
+  const privateLabels = (
+    wantsNameImage(item) ? (answer?.privateLabelAlternatives ?? []) : (plAnswer?.privateLabelAlternatives ?? [])
+  ).slice(0, 3);
   const [preview, setPreview] = useState<NamePhoto | null>(null);
   const wanted = wantsReference(identity, item.imageChoice, offPhoto, Boolean(store || named));
   const entry = useReference(identity);
@@ -237,7 +239,6 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
           <a href={shown.sourcePageUrl} target="_blank" rel="noreferrer noopener">
             Bron
           </a>
-          {shown.matchingStatus === "same-type" && " · een voorbeeld van dit soort product"}
         </small>
       )}
 

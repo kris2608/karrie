@@ -24,7 +24,7 @@ export type NameAnswer = {
 
 export type NameImageOutcome = LookupOutcome<NameAnswer>;
 
-export const NAME_IMAGE_CLIENT_RULES = { timeoutMs: 45_000, alternatives: 6 };
+export const NAME_IMAGE_CLIENT_RULES = { timeoutMs: 45_000, alternatives: 3 };
 
 const OFF_HOST = "images.openfoodfacts.org";
 const LIMIT_CODES = new Set(["rate-limited", "daily-limit", "budget"]);
@@ -96,10 +96,10 @@ export function cleanNameAnswer(value: unknown): NameAnswer | null {
   };
 }
 
-/** "Foto: Albert Heijn, via PrijsProfeet" or "Foto: Open Food Facts (CC BY-SA)", always marked as an example. */
+/** "Foto: Albert Heijn, via PrijsProfeet" or "Foto: Open Food Facts (CC BY-SA)". */
 export function namePhotoCredit(photo: Pick<NamePhoto, "source" | "retailer">): string {
   const from = photo.source === "off" ? "Open Food Facts (CC BY-SA)" : `${photo.retailer ? imageRetailerName(photo.retailer) : "supermarkt"}, via PrijsProfeet`;
-  return `Foto: ${from} · een voorbeeld van dit product.`;
+  return `Foto: ${from}.`;
 }
 
 export type NameImageClientDeps = { fetch: typeof fetch; online: () => boolean; origin: string };
