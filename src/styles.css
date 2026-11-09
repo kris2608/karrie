@@ -636,6 +636,14 @@ a.settings-link { text-decoration: none; color: inherit; }
   font-size: 1.05rem;
   resize: vertical;
 }
+/** Inset ring: sheet overflow would clip the global outline-offset focus style. */
+.sheet textarea:focus,
+.sheet textarea:focus-visible,
+.sheet input:focus,
+.sheet input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px var(--teal);
+}
 .sheet textarea::placeholder,
 .sheet input::placeholder,
 .search input::placeholder {
@@ -648,7 +656,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   color: transparent;
   opacity: 0;
 }
-.paste-example { margin-top: calc(var(--space-2) * -1); }
+.paste-example { margin-top: 0; }
 
 .switch-row {
   display: flex;
