@@ -9,8 +9,8 @@ import type { AdventureItem, CategoryId, PackInfo } from "../../domain/types";
 import { ProductInfo } from "../review/ProductInfo";
 import { OfferTag } from "../offers/OfferTag";
 
-/** Enough pack fields for art, Nutri-Score and facts when the tile has a remembered or listed item. */
-export type PreviewPack = Pick<PackInfo, "brand" | "packageSize" | "source" | "recognition" | "nutrition" | "ean"> & {
+/** Enough pack fields for art, Nutri-Score, barcode and facts when the tile has a remembered or listed item. */
+export type PreviewPack = Pick<PackInfo, "brand" | "packageSize" | "source" | "recognition" | "nutrition" | "ean" | "barcode"> & {
   name: string;
   icon?: string;
   productId?: string;
@@ -31,10 +31,10 @@ export type ProductPreviewSheetProps = {
 };
 
 function sparsePack(pack?: PreviewPack) {
-  return !pack?.brand && !pack?.nutrition && !pack?.recognition && !pack?.packageSize && !pack?.ean;
+  return !pack?.brand && !pack?.nutrition && !pack?.recognition && !pack?.packageSize && !pack?.ean && !pack?.barcode;
 }
 
-/** Read-only look at a catalog / Mijn producten tile; editing stays on Controleren. */
+/** Read-only look at a user-added product; editing stays on Controleren. */
 export function ProductPreviewSheet({ open, name, category, art, pack, mine, offer, quantity, onAdd, onClose }: ProductPreviewSheetProps) {
   const brand = pack ? brandLabel({ name, brand: pack.brand }) : undefined;
   const detail = [brand, pack?.recognition?.variant, pack?.packageSize].filter(Boolean).join(" · ");
@@ -53,6 +53,7 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
         recognition: pack.recognition,
         nutrition: pack.nutrition,
         ean: pack.ean,
+        barcode: pack.barcode,
       } satisfies AdventureItem)
     : null;
 
@@ -67,7 +68,20 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
             <NutriScoreMark grade={pack?.nutrition?.nutriscore} />
             <span>{categoryLabel(category)}</span>
             {mine && <small>Uit Mijn producten</small>}
-            {pack?.ean && <small>EAN {pack.ean}</small>}
+            {pack?.ean && <small data-testid="preview-ean">EAN {pack.ean}</small>}
+            {pack?.barcode?.sourceName && (
+              <small data-testid="preview-source">
+                Via {pack.barcode.sourceName}
+                {pack.barcode.sourceUrl ? (
+                  <>
+                    {" · "}
+                    <a href={pack.barcode.sourceUrl} target="_blank" rel="noreferrer noopener">
+                      Bron
+                    </a>
+                  </>
+                ) : null}
+              </small>
+            )}
             {offer && <OfferTag shown="deal" retailer={offer} />}
             {quantity > 0 && <small>{quantity} op de lijst</small>}
           </div>

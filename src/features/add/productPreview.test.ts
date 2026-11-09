@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AdventureItem, Product, SavedItem } from "../../domain/types";
-import { infoCorner, previewCategory, previewMine, previewName, previewPack, previewQuantity, tileGesture } from "./productPreview";
+import { infoCorner, previewCategory, previewMine, previewName, previewPack, previewQuantity, showsTileInfo, tileGesture } from "./productPreview";
 
 const milk: Product = {
   id: "milk",
@@ -38,6 +38,12 @@ describe("tile gestures", () => {
     expect(tileGesture("info")).toBe("preview");
     expect(tileGesture("long-press")).toBe("remove");
   });
+
+  it("shows info only on user-added tiles", () => {
+    expect(showsTileInfo("catalog")).toBe(false);
+    expect(showsTileInfo("mine")).toBe(true);
+    expect(showsTileInfo("extra")).toBe(true);
+  });
 });
 
 describe("infoCorner", () => {
@@ -63,11 +69,12 @@ describe("preview helpers", () => {
     expect(previewPack(target)).toBe(listed);
   });
 
-  it("shows Mijn producten with remembered pack details", () => {
-    const target = { kind: "mine" as const, entry: mineEntry, quantity: 1 };
+  it("shows Mijn producten with remembered pack details including EAN", () => {
+    const withEan = { ...mineEntry, ean: "8710628130123", barcode: { status: "off-exact" as const, sourceName: "Open Food Facts", sourceUrl: "https://world.openfoodfacts.org/product/8710628130123", at: 1 } };
+    const target = { kind: "mine" as const, entry: withEan, quantity: 1 };
     expect(previewName(target)).toBe("Boterhamworst");
     expect(previewMine(target)).toBe(true);
-    expect(previewPack(target)).toBe(mineEntry);
+    expect(previewPack(target)).toMatchObject({ ean: "8710628130123", barcode: { sourceName: "Open Food Facts" } });
   });
 
   it("keeps extras on their listed item", () => {

@@ -69,7 +69,8 @@ type GridTileProps = {
   pop: { token: number } | null;
   onAdd: () => void;
   onRemove: () => void;
-  onInfo: () => void;
+  /** Only for user-added products (Mijn producten / extras); catalog tiles stay without info. */
+  onInfo?: () => void;
   /** Mijn producten can always be long-pressed: that also forgets them. */
   mine?: boolean;
   /** Only reliable offers show on a tile; doubtful ones stay on the parent's list screen. */
@@ -141,20 +142,22 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo,
           </motion.span>
         )}
       </motion.button>
-      <button
-        type="button"
-        className={`card-info is-${corner}`}
-        data-testid="product-info-btn"
-        data-no-long-press
-        aria-label={`Informatie over ${name}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onInfo();
-        }}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <span aria-hidden="true">i</span>
-      </button>
+      {onInfo && (
+        <button
+          type="button"
+          className={`card-info is-${corner}`}
+          data-testid="product-info-btn"
+          data-no-long-press
+          aria-label={`Informatie over ${name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onInfo();
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <span aria-hidden="true">i</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -476,7 +479,6 @@ export function AddScreen() {
         pop={burst?.id === product.id ? burst : null}
         onAdd={() => addProduct(product)}
         onRemove={() => removeProduct(product.id)}
-        onInfo={() => setPreview({ kind: "catalog", product, listed: entry?.item, quantity: entry?.quantity ?? 0, offer })}
         offer={offer}
       />
     );

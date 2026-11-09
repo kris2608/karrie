@@ -402,8 +402,6 @@ export function HomeScreen() {
                 </svg>
               </button>
             </nav>
-            <p className="sheet-note">Zet Karrie op je beginscherm via Safari (deel-knop) of Chrome (menu). Lang drukken op een lijstje wist het.</p>
-            <p className="sheet-note">Na een update: sluit Karrie helemaal en open hem opnieuw.</p>
             <p className="app-version" data-testid="app-version">
               {appVersionLabel()}
             </p>

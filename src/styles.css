@@ -16,6 +16,12 @@ body {
   overscroll-behavior-y: none;
 }
 button, input, textarea { font: inherit; color: inherit; }
+/** iOS/WebKit keeps placeholders visible while focused and empty; hide them on focus. */
+input:focus::placeholder,
+textarea:focus::placeholder {
+  color: transparent;
+  opacity: 0;
+}
 button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 a { color: var(--teal-shade); }
 :focus-visible { outline: 3px solid var(--teal-shade); outline-offset: 3px; }
@@ -35,12 +41,14 @@ h1, h2, p { margin: 0; }
 .app {
   position: relative;
   width: min(480px, 100%);
+  min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
 }
 .screen {
   position: relative;
   isolation: isolate;
+  min-height: 100vh;
   min-height: 100dvh;
   padding:
     calc(var(--safe-top) + var(--space-3))
@@ -93,6 +101,7 @@ h1, h2, p { margin: 0; }
 }
 
 .splash {
+  min-height: 100vh;
   min-height: 100dvh;
   display: grid;
   place-items: center;
@@ -424,6 +433,7 @@ h1, h2, p { margin: 0; }
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   width: min(480px, 100%);
+  max-height: 88vh;
   max-height: 88dvh;
   overflow: hidden;
   padding:
@@ -631,6 +641,12 @@ a.settings-link { text-decoration: none; color: inherit; }
 .search input::placeholder {
   color: var(--ink-mute);
   opacity: 1;
+}
+.sheet textarea:focus::placeholder,
+.sheet input:focus::placeholder,
+.search input:focus::placeholder {
+  color: transparent;
+  opacity: 0;
 }
 .paste-example { margin-top: calc(var(--space-2) * -1); }
 
@@ -956,15 +972,6 @@ a.settings-link { text-decoration: none; color: inherit; }
 .dock-fixed > .pbtn { flex: 1; white-space: nowrap; }
 .dock-fixed > .pbtn-quiet { flex: none; padding: 0 var(--space-5); }
 .dock-fixed > .pbtn-l { padding: 0 var(--space-5); font-size: 1.2rem; }
-.dock-fixed > .dock-icon-btn {
-  flex: none;
-  width: 56px;
-  min-width: 56px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-}
-.dock-fixed > .dock-icon-btn .dock-icon { width: 24px; height: 24px; }
 .dock-count {
   display: inline-grid;
   place-items: center;
@@ -1089,6 +1096,13 @@ a.settings-link { text-decoration: none; color: inherit; }
 /* Review */
 
 .screen-review { padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + var(--space-8)); }
+.screen-review .clear-list {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-4);
+  color: var(--coral-shade);
+  text-align: center;
+}
 .category-block {
   margin-top: var(--space-4);
   padding: var(--space-3);
@@ -1185,6 +1199,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(auto, 1fr) auto auto auto;
   gap: var(--space-2);
+  min-height: 100vh;
   min-height: 100dvh;
   overflow-x: clip;
   padding-bottom: calc(var(--safe-bottom) + var(--space-4));
@@ -1941,6 +1956,7 @@ a.settings-link { text-decoration: none; color: inherit; }
 .retailer-picker { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .retailer-chip { min-height: 44px; }
 .offer-bar { display: grid; gap: var(--space-2); margin-bottom: var(--space-3); }
+.screen-review .offer-bar { margin-top: var(--space-4); }
 .offer-summary { display: flex; align-items: center; gap: 6px; color: var(--orange-shade); font-weight: 900; }
 .offer-summary svg { width: 20px; height: 20px; flex: none; color: var(--orange); }
 .offer-attribution { color: var(--ink-mute); font-size: 0.8rem; font-weight: 700; }

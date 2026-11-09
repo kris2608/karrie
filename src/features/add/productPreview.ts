@@ -38,6 +38,11 @@ export function previewMine(target: PreviewTarget): boolean {
   return target.kind === "mine";
 }
 
+/** Info preview is only for user-added tiles (Mijn producten / extras), never generic catalog cards. */
+export function showsTileInfo(kind: PreviewTarget["kind"]): boolean {
+  return kind === "mine" || kind === "extra";
+}
+
 /** Tile gestures stay separate: card tap adds, info opens preview, long-press removes. */
 export function tileGesture(kind: "add" | "info" | "long-press"): "add" | "preview" | "remove" {
   if (kind === "add") return "add";

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useDragControls } from "motion/react";
-import type { PointerEvent, ReactNode } from "react";
+import type { FocusEvent, PointerEvent, ReactNode } from "react";
 import { sheetUp } from "../../motion/variants";
 
 const DISMISS_OFFSET = 110;
@@ -11,6 +11,16 @@ type SheetProps = {
   label: string;
   children: ReactNode;
 };
+
+/** Keep focused fields above the iOS keyboard inside a scrollable sheet body. */
+function keepFieldVisible(event: FocusEvent<HTMLDivElement>) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (!target.matches("input, textarea, select")) return;
+  window.setTimeout(() => {
+    target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+  }, 50);
+}
 
 export function Sheet({ open, onClose, label, children }: SheetProps) {
   const dragControls = useDragControls();
@@ -65,7 +75,7 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
             <div className="sheet-handle" onPointerDown={startDismissDrag}>
               <span className="sheet-grip" aria-hidden="true" />
             </div>
-            <div className="sheet-body" onPointerDown={startBodyDrag}>
+            <div className="sheet-body" onPointerDown={startBodyDrag} onFocusCapture={keepFieldVisible}>
               {children}
             </div>
           </motion.div>
