@@ -145,7 +145,9 @@ export function contentHashOf(list: SharedListPayload): string {
 
 /** Drop productIds that are not custom and not present in catalog_products; keep the rest of the row. */
 async function dropUnknownCatalogIds(list: SharedListPayload, query: (text: string, values?: unknown[]) => Promise<Rows>): Promise<SharedListPayload> {
-  const ids = [...new Set(list.items.map((item) => item.productId).filter((id): id is string => Boolean(id) && !id.startsWith("custom:")))];
+  const ids = [
+    ...new Set(list.items.map((item) => item.productId).filter((id): id is string => typeof id === "string" && !id.startsWith("custom:"))),
+  ];
   if (!ids.length) return list;
   let known: Set<string>;
   try {
