@@ -92,8 +92,16 @@ describe("merging barcode, photo and my products", () => {
     const web = mergeDraft({ ean: CALVE, barcode: WEB, photo: PHOTO });
     expect(web.fields.name).toMatchObject({ value: "Calvé Pindakaas", source: "photo" });
     expect(web.fields.packageSize).toMatchObject({ value: "350 g", source: "web" });
-    expect(web.unsure).toBe(true);
+    expect(web.unsure).toBe(false);
     expect(sourcesLine(web, true)).toBe("Gevonden op jumbo.com via de streepjescode. Herkend met OpenAI. Controleer het altijd even zelf.");
+
+    expect(mergeDraft({ ean: CALVE, barcode: WEB })).toMatchObject({ unsure: false, recognized: true });
+    expect(
+      mergeDraft({
+        ean: CALVE,
+        barcode: { ...WEB, status: "off-partial", product: { name: "Pindakaas" }, source: OFF.source },
+      }).unsure,
+    ).toBe(true);
 
     const guess = mergeDraft({ photo: PHOTO });
     expect(guess.fields.packageSize).toMatchObject({ value: "600 g", source: "guess" });

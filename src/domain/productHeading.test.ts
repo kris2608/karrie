@@ -32,6 +32,15 @@ describe("productHeading", () => {
     expect(productHeading({ name: "Appel" }).subtitle).toBeUndefined();
     expect(stripBrandFromName("Côte d'Or BonBonBloc chocoladereep", "Côte d'Or")).toBe("BonBonBloc chocoladereep");
   });
+
+  it("gives Toevoegen mine/extra tiles a product title and Brand · Amount subtitle", () => {
+    const heading = productHeading({
+      name: "Karvan Cévitam Zero multivruchten siroop",
+      brand: "Karvan Cévitam",
+      packageSize: "0,6 l",
+    });
+    expect(heading).toMatchObject({ title: "Zero multivruchten siroop", subtitle: "Karvan Cévitam · 0,6 l" });
+  });
 });
 
 describe("mayRefreshName", () => {

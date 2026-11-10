@@ -178,7 +178,15 @@ export type MissionState = {
 
 /** Offline shop mini-game under Bonusmissies; never overloads MissionState. */
 export type PlayKind = "guess" | "color" | "drag";
-export type PlayOffer = { kind: PlayKind; status: "offered" | "active" | "done" | "skipped"; distractorId?: string; colorLabel?: string };
+export type PlayOffer = {
+  kind: PlayKind;
+  status: "offered" | "active" | "done" | "skipped";
+  /** Catalog product id of a drawing distractor (legacy); prefer distractorItemId for photo guesses. */
+  distractorId?: string;
+  /** Another list item with a real pack photo; required for "Raad het product". */
+  distractorItemId?: string;
+  colorLabel?: string;
+};
 
 export type AdventureItem = PackInfo & {
   id: string;

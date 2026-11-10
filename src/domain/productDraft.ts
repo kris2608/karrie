@@ -162,7 +162,11 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     ...(packConflict && { packConflict }),
   };
 
-  const exact = barcode?.status === "off-exact" || Boolean(mine);
+  // Identity is trusted from OFF exact, a clean PP/web hit (name+brand), or mine — OFF is not required for certainty.
+  const trustedIdentity =
+    Boolean(mine) ||
+    barcode?.status === "off-exact" ||
+    (barcode?.status === "web-page" && Boolean(found?.name && found?.brand));
   const disagree = Boolean(photo?.recognized && differ(photo.brand, mine?.brand ?? found?.brand));
   return {
     name: fields.name?.value ?? match?.name ?? "",
@@ -176,8 +180,8 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     pack,
     ean: pack.ean,
     from: { mine, barcode, photo },
-    unsure: disagree || Boolean(packConflict) || (!exact && (Boolean(barcode) || !photo || needsCheck(photo))),
-    confident: !disagree && !packConflict && (exact || !photo || photo.confidence !== "low"),
+    unsure: disagree || Boolean(packConflict) || (!trustedIdentity && (Boolean(barcode) || !photo || needsCheck(photo))),
+    confident: !disagree && !packConflict && (trustedIdentity || !photo || photo.confidence !== "low"),
     recognized: Boolean(mine || found?.name || photo?.recognized),
     ...(packConflict && { packConflict }),
   };

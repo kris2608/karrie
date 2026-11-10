@@ -4,6 +4,7 @@ import { AttributeBadge } from "../../components/ui/AttributeBadge";
 import { PressButton } from "../../components/ui/PressButton";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { badgeFor } from "../../domain/discovery";
+import { productHeading } from "../../domain/productHeading";
 import { SCORING } from "../../domain/scoring";
 import type { AdventureItem } from "../../domain/types";
 import { productById } from "../../data/catalog";
@@ -17,6 +18,7 @@ type MissionCardProps = {
 };
 
 export function MissionCard({ item, reduced, onGo, onSkip }: MissionCardProps) {
+  const heading = productHeading({ name: item.name, brand: item.brand, packageSize: item.packageSize });
   const assessment = item.alternative;
   const target = assessment?.targetType;
   if (!assessment || !target) return null;
@@ -41,7 +43,7 @@ export function MissionCard({ item, reduced, onGo, onSkip }: MissionCardProps) {
             <span className="mission-art">
               <ItemArt item={item} />
             </span>
-            <figcaption>{item.name}</figcaption>
+            <figcaption>{heading.title}</figcaption>
           </motion.figure>
           <span className="mission-arrow" aria-hidden="true">
             <svg viewBox="0 0 24 24">

@@ -1490,12 +1490,24 @@ a.settings-link { text-decoration: none; color: inherit; }
   min-height: 2.8rem;
   text-align: center;
 }
+.product-title-copy {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+}
 .product-title h1 {
   font-size: clamp(1.9rem, 9vw, 2.6rem);
   font-weight: 900;
   line-height: 1.05;
   overflow-wrap: anywhere;
   hyphens: auto;
+}
+.product-title-sub {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: clamp(0.95rem, 3.8vw, 1.15rem);
+  font-weight: 700;
+  line-height: 1.2;
 }
 .shop-offer { justify-self: center; }
 .qty {

@@ -11,6 +11,7 @@ import { SoundSwitch } from "../../components/ui/SoundSwitch";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { productById } from "../../data/catalog";
 import { playActive } from "../../domain/bonusPlay";
+import { productHeading } from "../../domain/productHeading";
 import { SCORING, starTotal } from "../../domain/scoring";
 import { activeItem, foundCount } from "../../domain/shopQueue";
 import type { AdventureItem } from "../../domain/types";
@@ -74,7 +75,16 @@ export function ShopScreen() {
   const healthierBusy = current?.mission?.status === "active" || current?.mission?.status === "offered";
   const play = !healthierBusy ? playActive(current) : undefined;
   const offered = current?.mission?.status === "offered" && !sequence.locked && !intro ? current.id : null;
-  const showGuess = Boolean(play?.kind === "guess" && play.status === "offered" && current && !sequence.locked && !intro);
+  /** Hide the stage product as soon as a guess is pending so the name does not flash under the card. */
+  const guessPending = Boolean(play?.kind === "guess" && play.status === "offered" && play.distractorItemId && current);
+  const showGuess = Boolean(guessPending && !sequence.locked && !intro);
+  const guessDistractor =
+    showGuess && current && play?.distractorItemId
+      ? adventure?.items.find((entry) => entry.id === play.distractorItemId)
+      : undefined;
+  const heading = current
+    ? productHeading({ name: current.name, brand: current.brand, packageSize: current.packageSize })
+    : undefined;
 
   useEffect(() => {
     if (!offered) return;
@@ -205,7 +215,7 @@ export function ShopScreen() {
                   ? "mission"
                   : searching
                     ? "bonus"
-                    : showGuess
+                    : guessPending
                       ? "guess"
                       : colorPlay
                         ? "color"
@@ -225,7 +235,7 @@ export function ShopScreen() {
                 ? "Ik heb een bonusmissie!"
                 : searching
                   ? "Zoek de bonus!"
-                  : showGuess
+                  : guessPending
                     ? "Tik op het goede plaatje!"
                     : colorPlay
                       ? `Zoek iets ${play?.colorLabel ?? "kleurigs"}!`
@@ -238,13 +248,13 @@ export function ShopScreen() {
 
       <section className="stage">
         <AnimatePresence initial={false} custom={sequence.exitKind}>
-          {current && !showGuess && (
+          {current && !guessPending && (
             <motion.button
               key={current.id}
               type="button"
               className={`stage-product${dragPlay ? " is-drag-play" : ""}`}
               data-testid="product-stage"
-              aria-label={dragPlay ? `Sleep ${current.name} naar Karrie` : `Gevonden: ${current.name}`}
+              aria-label={dragPlay ? `Sleep ${heading?.title ?? current.name} naar Karrie` : `Gevonden: ${heading?.title ?? current.name}`}
               disabled={sequence.locked}
               custom={sequence.enterDelay}
               variants={{ ...productEnter, ...productExit }}
@@ -295,16 +305,20 @@ export function ShopScreen() {
 
       <div className="product-title" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
-          {current && !showGuess && (
-            <motion.h1
+          {current && heading && !guessPending && (
+            <motion.div
               key={current.id}
+              className="product-title-copy"
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1, transition: { ...spring, delay: sequence.enterDelay } }}
               exit={{ y: -8, opacity: 0, transition: { duration: 0.12 } }}
             >
-              {current.quantity > 1 && <span className="qty">{current.quantity}×</span>}
-              {current.name}
-            </motion.h1>
+              <h1>
+                {current.quantity > 1 && <span className="qty">{current.quantity}×</span>}
+                {heading.title}
+              </h1>
+              {heading.subtitle && <p className="product-title-sub">{heading.subtitle}</p>}
+            </motion.div>
           )}
         </AnimatePresence>
         {current && offer?.answer.offer && retailer && (
@@ -316,7 +330,7 @@ export function ShopScreen() {
             onClick={() => {
               const deal = offer.answer.offer;
               if (!deal) return;
-              setOfferOpen({ itemName: current.name, offer: deal, shown: offer.shown });
+              setOfferOpen({ itemName: heading?.title ?? current.name, offer: deal, shown: offer.shown });
               trackEvent({ name: "offer_opened", data: { retailer: analyticsRetailer(retailer), match_type: deal.matchType } });
             }}
           >
@@ -426,10 +440,11 @@ export function ShopScreen() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showGuess && current && (
+        {showGuess && current && guessDistractor && (
           <GuessProductCard
             key={`guess-${current.id}`}
             item={current}
+            distractor={guessDistractor}
             reduced={reduced}
             onCorrect={celebrateGuess}
             onSkip={() => dispatch({ type: "play-skip" })}

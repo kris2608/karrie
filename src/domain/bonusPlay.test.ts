@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { assignBonuses, pickMissions } from "./discovery";
 import { ART } from "../components/art";
-import { colorFor, distractorScore, pickDistractor, pickPlayOffers, seededRandom } from "./bonusPlay";
+import { colorFor, distractorScore, hasGuessPhoto, pickDistractor, pickPhotoDistractor, pickPlayOffers, seededRandom } from "./bonusPlay";
 import type { AdventureItem, AlternativeAssessment } from "./types";
 
 function item(id: string, productId: string, category: AdventureItem["category"], extra: Partial<AdventureItem> = {}): AdventureItem {
   return { id, productId, name: productId, icon: productId, category, quantity: 1, status: "pending", ...extra };
+}
+
+function withPhoto(entry: AdventureItem, imageUrl = "https://images.openfoodfacts.org/x.jpg"): AdventureItem {
+  return { ...entry, imageUrl, imageKind: "photo", imageSource: "off" };
 }
 
 const possible: AlternativeAssessment = {
@@ -69,5 +73,27 @@ describe("bonus play picker", () => {
     expect(distractor).not.toBe("boter");
     expect(distractorScore("boter", distractor!)).toBeGreaterThanOrEqual(60);
     expect(ART[distractor!]?.kind).not.toBe(ART.boter.kind);
+  });
+
+  it("offers Raad het product only when both the target and a peer have pack photos", () => {
+    const drawings = [item("1", "olijven", "pantry"), item("2", "pindakaas", "pantry"), item("3", "banaan", "produce")];
+    const drawingPlays = pickPlayOffers(drawings, [], true, "photo-gate");
+    expect(Object.values(drawingPlays).every((play) => play.kind !== "guess")).toBe(true);
+
+    const photos = [withPhoto(item("1", "olijven", "pantry")), withPhoto(item("2", "pindakaas", "pantry")), item("3", "banaan", "produce")];
+    expect(hasGuessPhoto(photos[0])).toBe(true);
+    expect(pickPhotoDistractor(photos[0], photos, seededRandom("d"))?.id).toBe("2");
+
+    let foundGuess = false;
+    for (let n = 0; n < 40; n += 1) {
+      const plays = pickPlayOffers(photos, [], true, `photo-seed-${n}`);
+      const guess = Object.values(plays).find((play) => play.kind === "guess");
+      if (!guess) continue;
+      foundGuess = true;
+      expect(guess.distractorItemId).toBeTruthy();
+      expect(["1", "2"]).toContain(Object.entries(plays).find(([, play]) => play === guess)?.[0]);
+      break;
+    }
+    expect(foundGuess).toBe(true);
   });
 });

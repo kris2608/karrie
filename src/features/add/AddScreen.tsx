@@ -6,6 +6,7 @@ import { customAddLabel, orderedCatalogResults, pinnedCatalogGeneric } from "../
 import { customProductId } from "../../domain/customProduct";
 import { normalize } from "../../domain/matchProduct";
 import { matchesMine, mineKey } from "../../domain/mine";
+import { productHeading } from "../../domain/productHeading";
 import type { AdventureItem, CategoryId, Product, SavedItem } from "../../domain/types";
 import { artIdOf, productById, products } from "../../data/catalog";
 import { hasPhoto, ItemArt } from "../../components/ItemArt";
@@ -450,10 +451,11 @@ export function AddScreen() {
     const key = mineKey(entry);
     const listed = onList.get(key);
     const offer = offerOn(listed?.item);
+    const heading = productHeading({ name: entry.name, brand: entry.brand, packageSize: entry.packageSize });
     return (
       <GridTile
         key={key}
-        name={entry.name}
+        name={heading.title}
         category={entry.category}
         art={<ItemArt item={listed ? listed.item : entry} />}
         quantity={listed?.quantity ?? 0}
@@ -463,16 +465,18 @@ export function AddScreen() {
         onInfo={() => setPreview({ kind: "mine", entry, listed: listed?.item, quantity: listed?.quantity ?? 0, offer })}
         mine
         offer={offer}
+        subtitle={heading.subtitle}
       />
     );
   };
 
   const extraTile = (entry: OnList) => {
     const offer = offerOn(entry.item);
+    const heading = productHeading({ name: entry.item.name, brand: entry.item.brand, packageSize: entry.item.packageSize });
     return (
       <GridTile
         key={entry.item.id}
-        name={entry.item.name}
+        name={heading.title}
         category={entry.item.category}
         art={<ItemArt item={entry.item} />}
         quantity={entry.quantity}
@@ -481,6 +485,7 @@ export function AddScreen() {
         onRemove={() => removeProduct(tileOf(entry.item))}
         onInfo={() => setPreview({ kind: "extra", item: entry.item, quantity: entry.quantity, offer })}
         offer={offer}
+        subtitle={heading.subtitle}
       />
     );
   };

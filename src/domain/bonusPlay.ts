@@ -1,8 +1,14 @@
 import { ART } from "../components/art";
 import { products } from "../data/catalog";
-import type { AdventureItem, CategoryId, PlayKind, PlayOffer } from "./types";
+import type { AdventureItem, CategoryId, PackInfo, PlayKind, PlayOffer } from "./types";
 
 export type { PlayKind, PlayOffer };
+
+/** Real pack/name photos only — catalog drawings look too alike for "Raad het product". */
+export function hasGuessPhoto(item: Pick<PackInfo, "imageUrl" | "imageKind" | "photoId" | "namePhoto">): boolean {
+  if (item.namePhoto?.imageUrl) return true;
+  return item.imageKind === "photo" && Boolean(item.photoId || item.imageUrl);
+}
 
 /** Unambiguous ART colours only — never invent or ask the model. */
 export const COLOR_HUNT: Readonly<Record<string, string>> = {
@@ -102,11 +108,19 @@ export function pickDistractor(productId: string, category: CategoryId, rand: ()
   return pool[Math.floor(rand() * pool.length)]?.id;
 }
 
-function eligibleKind(item: AdventureItem, kind: PlayKind, rand: () => number): PlayOffer | undefined {
+/** Another open list item with a real photo, so both guess choices are product pictures. */
+export function pickPhotoDistractor(item: AdventureItem, peers: AdventureItem[], rand: () => number): AdventureItem | undefined {
+  const pool = peers.filter((peer) => peer.id !== item.id && peer.status !== "found" && hasGuessPhoto(peer));
+  if (!pool.length) return undefined;
+  return pool[Math.floor(rand() * pool.length)];
+}
+
+function eligibleKind(item: AdventureItem, kind: PlayKind, rand: () => number, peers: AdventureItem[]): PlayOffer | undefined {
   if (kind === "guess") {
-    const distractorId = pickDistractor(item.productId, item.category, rand);
-    if (!distractorId) return undefined;
-    return { kind, status: "offered", distractorId };
+    if (!hasGuessPhoto(item)) return undefined;
+    const distractor = pickPhotoDistractor(item, peers, rand);
+    if (!distractor) return undefined;
+    return { kind, status: "offered", distractorId: distractor.productId, distractorItemId: distractor.id };
   }
   if (kind === "color") {
     const colorLabel = colorFor(item.productId);
@@ -151,7 +165,7 @@ export function pickPlayOffers(
     if (Object.keys(plays).length >= target) break;
     for (let attempt = 0; attempt < PLAY_KINDS.length; attempt += 1) {
       const kind = PLAY_KINDS[(kindIndex + attempt) % PLAY_KINDS.length];
-      const offer = eligibleKind(item, kind, rand);
+      const offer = eligibleKind(item, kind, rand, candidates);
       if (!offer) continue;
       plays[item.id] = offer;
       kindIndex = (kindIndex + attempt + 1) % PLAY_KINDS.length;

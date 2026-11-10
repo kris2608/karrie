@@ -1,5 +1,5 @@
 import { NutriScoreLogo, nutriScoreGrade, nutriScoreLogosEnabled } from "../../components/NutriScoreLogo";
-import type { ProductFacts } from "../../domain/productFacts";
+import { displayFacts, type ProductFacts } from "../../domain/productFacts";
 import type { AdventureItem } from "../../domain/types";
 import { useFacts } from "../../storage/references";
 
@@ -13,13 +13,15 @@ const VALUES: { key: keyof Omit<NonNullable<ProductFacts["per100"]>, "unit">; la
 
 const amount = (value: number) => value.toLocaleString("nl-NL", { maximumFractionDigits: 2 });
 
-/** Parent-only: what the product page says about this pack, with its source. */
+/** Parent-only: shop-page facts when known, else OFF/barcode pack nutrition and ingredients. */
 export function ProductInfo({ item }: { item: AdventureItem }) {
-  const facts = useFacts(item);
+  const pageFacts = useFacts(item);
+  const facts = displayFacts(item, pageFacts);
   if (!facts) return null;
   const rows = VALUES.filter((row) => facts.per100?.[row.key] !== undefined);
   const grade = nutriScoreGrade(facts.nutriScore);
   const logo = grade && nutriScoreLogosEnabled() ? <NutriScoreLogo grade={grade} /> : null;
+  if (!rows.length && !facts.ingredients && !facts.claims && !grade) return null;
 
   return (
     <section className="product-info" data-testid="product-info">
