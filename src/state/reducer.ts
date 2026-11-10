@@ -34,6 +34,7 @@ import type {
   SavedList,
 } from "../domain/types";
 import { sameEan } from "../domain/ean";
+import { mayRefreshName } from "../domain/productHeading";
 import { isRetailer, type RetailerId } from "../domain/retailers";
 import { normalizeSharedImageChoice, SHARED_IMPORT_LIST_NAME, toImportSavedItems, type SharedListV1 } from "../domain/shareList";
 import { productById, products } from "../data/catalog";
@@ -376,16 +377,18 @@ function updateByEan(state: AppState, ean: string, change: <T extends SavedItem 
   };
 }
 
-/** Overwrites central pack facts for an EAN copy; keeps parent photos and gameplay drawing ids. */
+/** Overwrites central pack facts for an EAN copy; keeps parent photos, parent nicknames, and gameplay drawing ids. */
 function refreshEanFields<T extends SavedItem | AdventureItem>(
   item: T,
   action: Extract<Action, { type: "refresh-ean-pack" }>,
 ): T {
   if (!sameEan(item.ean, action.ean)) return item;
   const lockPhoto = Boolean(item.photoId) || item.imageSource === "parent";
+  const refreshName =
+    Boolean(action.name) && mayRefreshName(item, action.name!, action.brand);
   const next: T = {
     ...item,
-    ...(action.name && { name: action.name.trim().slice(0, 40), canonicalName: normalize(action.name) }),
+    ...(refreshName && action.name && { name: action.name.trim().slice(0, 40), canonicalName: normalize(action.name) }),
     ...(action.brand !== undefined && { brand: action.brand || undefined }),
     ...(action.packageSize !== undefined && { packageSize: action.packageSize || undefined }),
     ...(action.barcode && { barcode: action.barcode }),
@@ -734,9 +737,11 @@ export function reducer(state: AppState, action: Action): AppState {
     case "edit-item":
       return updateItem(state, action.itemId, (item) => {
         const custom = item.kind === "custom_generic";
+        const renamed = Boolean(action.name?.trim() && action.name.trim() !== item.name);
         const edited: AdventureItem = {
           ...item,
           name: action.name?.trim().slice(0, 40) || item.name,
+          ...(renamed && { fieldSources: { ...item.fieldSources, name: "parent" as const } }),
           category: action.category ?? item.category,
           icon: action.icon ?? item.icon,
           productId: custom ? item.productId : (action.productId ?? item.productId),

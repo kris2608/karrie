@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { NutriScoreMark } from "../../components/NutriScoreLogo";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
-import { brandLabel } from "../../domain/customProduct";
 import { categoryLabel } from "../../domain/categories";
+import { productHeading } from "../../domain/productHeading";
 import { retailerName, type RetailerId } from "../../domain/retailers";
 import type { AdventureItem, CategoryId, PackInfo } from "../../domain/types";
 import { ProductInfo } from "../review/ProductInfo";
@@ -37,8 +37,12 @@ function sparsePack(pack?: PreviewPack) {
 
 /** Read-only look at a user-added product; editing stays on Controleren. */
 export function ProductPreviewSheet({ open, name, category, art, pack, mine, offer, quantity, onAdd, onClose }: ProductPreviewSheetProps) {
-  const brand = pack ? brandLabel({ name, brand: pack.brand }) : undefined;
-  const detail = [brand, pack?.recognition?.variant, pack?.packageSize].filter(Boolean).join(" · ");
+  const heading = productHeading({
+    name,
+    brand: pack?.brand,
+    packageSize: pack?.packageSize,
+    variant: pack?.recognition?.variant,
+  });
   const nutrition = useOffNutrition(pack?.ean, pack?.nutrition);
   const factsItem = pack
     ? ({
@@ -60,13 +64,13 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
     : null;
 
   return (
-    <Sheet open={open} onClose={onClose} label={`Informatie over ${name}`}>
+    <Sheet open={open} onClose={onClose} label={`Informatie over ${heading.title}`}>
       <div className="product-preview" data-testid="product-preview">
         <div className="item-sheet-head">
           <div className="item-sheet-art product-preview-art">{art}</div>
           <div className="scan-card-text">
-            <h2>{name}</h2>
-            {detail && <span>{detail}</span>}
+            <h2>{heading.title}</h2>
+            {heading.subtitle && <span>{heading.subtitle}</span>}
             <NutriScoreMark grade={nutrition?.nutriscore} />
             <span>{categoryLabel(category)}</span>
             {mine && <small>Uit Mijn producten</small>}

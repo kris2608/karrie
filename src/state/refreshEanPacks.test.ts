@@ -30,24 +30,26 @@ function withEanList(): AppState {
   const item = {
     ...base,
     ean: CALVE,
-    name: "Oude pindakaas",
-    brand: "Oud",
+    name: "Calvé Pindakaas",
+    brand: "Calvé",
     packageSize: "500 g",
     photoId: "parent-1",
     imageSource: "parent" as const,
+    barcode: { status: "off-exact" as const, sourceName: "Open Food Facts", sourceUrl: "https://example", at: 1 },
   };
   const mine = [
     {
-      name: "Oude pindakaas",
+      name: "Calvé Pindakaas",
       ean: CALVE,
       productId: "pindakaas",
       icon: "pindakaas",
       category: "pantry" as const,
       quantity: 1,
-      brand: "Oud",
+      brand: "Calvé",
       packageSize: "500 g",
       photoId: "parent-1",
       imageSource: "parent" as const,
+      barcode: { status: "off-exact" as const, sourceName: "Open Food Facts", sourceUrl: "https://example", at: 1 },
     },
   ];
   const adventure = {
@@ -58,7 +60,7 @@ function withEanList(): AppState {
     {
       id: "saved-1",
       name: "Bewaard",
-      items: [{ ...mine[0], name: "Bewaarde pindakaas" }],
+      items: [{ ...mine[0], name: "Calvé Pindakaas" }],
       favorite: false,
       updatedAt: 1,
     },
@@ -67,14 +69,15 @@ function withEanList(): AppState {
 }
 
 describe("refresh-ean-pack", () => {
-  it("updates adventure, mine and saved by EAN and keeps a parent photo", () => {
+  it("updates adventure, mine and saved by EAN, strips brand from the title, and keeps a parent photo", () => {
     const before = withEanList();
     const action = refreshActionFromAnswer(CALVE, OFF);
     const state = reducer(before, action);
 
+    expect(action.name).toBe("Pindakaas");
     expect(state.adventure!.items[0]).toMatchObject({
       ean: CALVE,
-      name: "Calvé Pindakaas",
+      name: "Pindakaas",
       brand: "Calvé",
       packageSize: "350 g",
       catalogProductId: "b-calve",
@@ -89,18 +92,33 @@ describe("refresh-ean-pack", () => {
     });
     expect(state.adventure!.items[0].imageUrl).toBeUndefined();
     expect(state.mine[0]).toMatchObject({
-      name: "Calvé Pindakaas",
+      name: "Pindakaas",
       brand: "Calvé",
       catalogProductId: "b-calve",
       photoId: "parent-1",
       imageSource: "parent",
     });
     expect(state.saved[0].items[0]).toMatchObject({
-      name: "Calvé Pindakaas",
+      name: "Pindakaas",
       brand: "Calvé",
       packageSize: "350 g",
       photoId: "parent-1",
     });
+  });
+
+  it("keeps a parent nickname while still refreshing brand and size", () => {
+    const before = withEanList();
+    const nicknamed = {
+      ...before,
+      adventure: {
+        ...before.adventure!,
+        items: before.adventure!.items.map((item) => ({ ...item, name: "Onze pindakaas", fieldSources: { name: "parent" as const } })),
+      },
+      mine: before.mine.map((item) => ({ ...item, name: "Onze pindakaas", fieldSources: { name: "parent" as const } })),
+    };
+    const state = reducer(nicknamed, refreshActionFromAnswer(CALVE, OFF));
+    expect(state.adventure!.items[0]).toMatchObject({ name: "Onze pindakaas", brand: "Calvé", packageSize: "350 g" });
+    expect(state.mine[0]).toMatchObject({ name: "Onze pindakaas", brand: "Calvé", packageSize: "350 g" });
   });
 
   it("fills an OFF image only when there is no parent photo and no existing image", () => {

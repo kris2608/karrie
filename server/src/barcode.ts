@@ -7,6 +7,7 @@ import { cleanUrl, get, readLimited, stripHtml, usageOf, type Fetch, type RawRes
 import type { Usage } from "./limits.js";
 import type { ProductCategory } from "./offers/match.js";
 import { imageRetailerName, RETAILER_RANK, type OfferRow } from "./offers/prijsprofeet.js";
+import { cleanProductIdentity } from "./productTitle.js";
 import { categoryOf, resolveCategory } from "./resolveCategory.js";
 import type { StoreImageLookup } from "./storeImage.js";
 
@@ -126,8 +127,10 @@ export function offImage(value: unknown): string | undefined {
 /** What an Open Food Facts record can credibly tell, or null when it has nothing usable or is for another code. */
 export function fromOff(ean: string, raw: OffProduct): { status: "off-exact" | "off-partial"; product: BarcodeProduct } | null {
   if (raw.code && !eanForms(ean).includes(raw.code.replace(/^0+(?=\d{13})/, ""))) return null;
-  const name = text(raw.product_name_nl, 80) ?? text(raw.product_name, 80) ?? text(raw.generic_name_nl, 80) ?? text(raw.generic_name, 80);
+  const rawName = text(raw.product_name_nl, 80) ?? text(raw.product_name, 80) ?? text(raw.generic_name_nl, 80) ?? text(raw.generic_name, 80);
   const brand = text(raw.brands?.split(",")[0], 40);
+  const identity = cleanProductIdentity(rawName, brand);
+  const name = identity.name;
   const imageUrl = offImage(raw.image_front_url);
   if (!name && !imageUrl) return null;
   const facts = raw.nutriments ?? {};
@@ -150,7 +153,7 @@ export function fromOff(ean: string, raw: OffProduct): { status: "off-exact" | "
   const ingredients = text(raw.ingredients_text_nl, 600);
   const product: BarcodeProduct = {
     ...(name && { name }),
-    ...(brand && { brand }),
+    ...(identity.brand && { brand: identity.brand }),
     ...(quantity && { quantity }),
     ...(imageUrl && { imageUrl }),
     ...(categories.length && { categories }),
@@ -158,7 +161,7 @@ export function fromOff(ean: string, raw: OffProduct): { status: "off-exact" | "
     ...(Object.keys(per100).length && { per100 }),
     ...(ingredients && { ingredients }),
   };
-  return { status: name && brand ? "off-exact" : "off-partial", product };
+  return { status: name && identity.brand ? "off-exact" : "off-partial", product };
 }
 
 export function offUrl(ean: string): string {
@@ -180,7 +183,7 @@ export function mergePpWithOff(
       : base.categories?.length
         ? base.categories
         : fill?.categories;
-  const product: BarcodeProduct = {
+  const merged: BarcodeProduct = {
     ...base,
     ...(fill && {
       ...(!base.name && fill.name ? { name: fill.name } : {}),
@@ -193,6 +196,12 @@ export function mergePpWithOff(
       ...(!base.ingredients && fill.ingredients ? { ingredients: fill.ingredients } : {}),
       ...(!base.imageUrl && fill.imageUrl ? { imageUrl: fill.imageUrl } : {}),
     }),
+  };
+  const identity = cleanProductIdentity(merged.name, merged.brand);
+  const product: BarcodeProduct = {
+    ...merged,
+    ...(identity.name ? { name: identity.name } : {}),
+    ...(identity.brand ? { brand: identity.brand } : {}),
   };
   const department = resolveCategory({ tags: product.categories, name: product.name });
   return { ...pp, product, ...(department && { department }), ...(storeImage && { storeImage }) };
@@ -460,9 +469,10 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       name: imageRetailerName(row.retailer),
       url: row.sourceUrl ?? `https://www.prijsprofeet.nl/?q=${ean}`,
     };
+    const identity = cleanProductIdentity(row.productName?.slice(0, 80), row.brand?.slice(0, 40));
     const product: BarcodeProduct = {
-      ...(row.productName && { name: row.productName.slice(0, 80) }),
-      ...(row.brand && { brand: row.brand.slice(0, 40) }),
+      ...(identity.name && { name: identity.name }),
+      ...(identity.brand && { brand: identity.brand }),
       ...(row.quantity && { quantity: row.quantity.slice(0, 40) }),
       ...(row.category && categoryOf(row.category) && { categories: [row.category] }),
     };

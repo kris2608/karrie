@@ -250,7 +250,7 @@ describe("barcode lookup", () => {
         status: "web-page",
         source: { kind: "web", name: "Jumbo" },
         product: {
-          name: "Campina vanillevla",
+          name: "vanillevla",
           brand: "Campina",
           quantity: "1 l",
           nutriScore: "C",
@@ -299,7 +299,7 @@ describe("barcode lookup", () => {
       answer: {
         status: "web-page",
         department: "drinks",
-        product: { name: "Pepsi Regular", brand: "Pepsi", categories: expect.arrayContaining(["frisdrank", "en:sodas"]) },
+        product: { name: "Regular", brand: "Pepsi", categories: expect.arrayContaining(["frisdrank", "en:sodas"]) },
       },
     });
   });
@@ -332,7 +332,7 @@ describe("barcode lookup", () => {
       ok: true,
       answer: {
         status: "web-page",
-        product: { name: "Campina vanillevla", brand: "Campina" },
+        product: { name: "vanillevla", brand: "Campina" },
         source: { kind: "web", name: "Jumbo" },
       },
       failures: ["off:http-503"],
@@ -379,7 +379,7 @@ describe("barcode lookup", () => {
       ok: true,
       answer: {
         status: "web-page",
-        product: { name: "Pampers Sensitive billendoekjes", brand: "Pampers", quantity: "80 stuks" },
+        product: { name: "Sensitive billendoekjes", brand: "Pampers", quantity: "80 stuks" },
         source: { kind: "web", name: "Plus", url: "https://www.plus.nl/product/pampers" },
       },
       failures: ["off:not-found"],

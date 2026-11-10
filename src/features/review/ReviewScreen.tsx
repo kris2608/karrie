@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { categoryLabel } from "../../domain/categories";
-import { brandLabel } from "../../domain/customProduct";
+import { productHeading } from "../../domain/productHeading";
 import type { AdventureItem } from "../../domain/types";
 import { ItemArt } from "../../components/ItemArt";
 import { TopBar } from "../../components/TopBar";
@@ -262,7 +262,7 @@ function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRo
   const { adventure, settings, declined, dispatch } = useAdventure();
   const retailer = adventure?.retailer;
   const { pressing, handlers } = useLongPress(onRemove);
-  const detail = [brandLabel(item), item.packageSize].filter(Boolean).join(" · ");
+  const heading = productHeading({ name: item.name, brand: item.brand, packageSize: item.packageSize });
   const mission = settings.smartDiscovery && missionOn(item, declined);
   return (
     <motion.li
@@ -275,7 +275,7 @@ function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRo
       transition={spring}
       {...handlers}
     >
-      <button type="button" className="item-art-button" aria-label={`Bewerk ${item.name}`} data-testid="edit-item" onClick={onEdit}>
+      <button type="button" className="item-art-button" aria-label={`Bewerk ${heading.title}`} data-testid="edit-item" onClick={onEdit}>
         <ItemArt item={item} />
         {mission && (
           <span className="mission-badge" role="img" aria-label="Bonusmissie" data-testid="mission-badge">
@@ -284,9 +284,9 @@ function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRo
         )}
       </button>
       <div className="item-main">
-        <button type="button" className="item-text-button" aria-label={`Bewerk ${item.name}`} data-testid="edit-item-text" onClick={onEdit}>
-          <strong>{item.name}</strong>
-          {detail && <small className="item-detail">{detail}</small>}
+        <button type="button" className="item-text-button" aria-label={`Bewerk ${heading.title}`} data-testid="edit-item-text" onClick={onEdit}>
+          <strong>{heading.title}</strong>
+          {heading.subtitle && <small className="item-detail">{heading.subtitle}</small>}
         </button>
         {offer && retailer && (
           <button

@@ -55,10 +55,10 @@ describe("catalog migrations and seed", () => {
     const { pool } = memoryPg();
     const client = pool();
     const first = await migrate(client, MIGRATIONS);
-    expect(first.applied).toEqual(["001", "002", "003", "004", "005", "006", "007"]);
+    expect(first.applied).toEqual(["001", "002", "003", "004", "005", "006", "007", "008"]);
     const second = await migrate(client, MIGRATIONS);
     expect(second.applied).toEqual([]);
-    expect(second.skipped).toEqual(["001", "002", "003", "004", "005", "006", "007"]);
+    expect(second.skipped).toEqual(["001", "002", "003", "004", "005", "006", "007", "008"]);
     const seeded = await seedCatalog(client);
     expect(seeded.products).toBe(BOOTSTRAP_PRODUCTS.length);
     await seedCatalog(client);
@@ -487,7 +487,7 @@ describe("name images and admin sync", () => {
     const afterPp = await catalog.byGtin(EAN);
     expect(afterPp?.answer).toMatchObject({
       status: "web-page",
-      product: { name: "Karvan Cévitam Zero multivruchten siroop", brand: "Karvan Cévitam", quantity: "0,6 l", nutriScore: "C" },
+      product: { name: "Zero multivruchten siroop", brand: "Karvan Cévitam", quantity: "0,6 l", nutriScore: "C" },
       source: { kind: "web", name: "Albert Heijn" },
     });
 
@@ -510,7 +510,7 @@ describe("name images and admin sync", () => {
       at: Date.now(),
     });
     const afterOff = await catalog.byGtin(EAN);
-    expect(afterOff?.answer.product?.name).toBe("Karvan Cévitam Zero multivruchten siroop");
+    expect(afterOff?.answer.product?.name).toBe("Zero multivruchten siroop");
     expect(afterOff?.answer.product?.brand).toBe("Karvan Cévitam");
     expect(afterOff?.answer.product?.nutriScore).toBe("B");
     expect(afterOff?.answer.source?.kind).toBe("web");
@@ -565,7 +565,7 @@ describe("name images and admin sync", () => {
     expect(hit?.answer.status === "none" ? undefined : hit?.answer.product?.quantity).toBe("1 l");
     expect(hit?.answer).toMatchObject({
       status: "web-page",
-      product: { name: "Campina Magere yoghurt", brand: "Campina", nutriScore: "C" },
+      product: { name: "Magere yoghurt", brand: "Campina", nutriScore: "C" },
       source: { kind: "web", name: "Jumbo" },
     });
     const still = await pool.query(`SELECT variant_id FROM product_identifiers WHERE gtin = $1`, [CAMPINA]);

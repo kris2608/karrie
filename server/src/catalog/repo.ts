@@ -9,6 +9,7 @@ import { imageRetailerName, RETAILER_RANK, type SourceRetailer } from "../offers
 import { PRODUCT_CATEGORIES } from "../offers/match.js";
 import { formulationWords, words } from "../nameMatch.js";
 import { parseName } from "../productName.js";
+import { cleanProductIdentity } from "../productTitle.js";
 import { resolveCategory } from "../resolveCategory.js";
 import { aliasKey, normalizedKey, packFromQuantity, packKey, sizeMatches } from "./keys.js";
 import { bestPpIdentity, quantityMlOf, summarizePack, type PackEvidence, type PackEvidenceSource } from "./pack.js";
@@ -103,9 +104,10 @@ function parsePer100(value: unknown): BarcodeProduct["per100"] | undefined {
 function rebuildAnswer(row: Record<string, unknown>): BarcodeAnswer {
   const confidence = String(row.confidence) as CatalogConfidence;
   const per100 = parsePer100(row.per100);
+  const identity = cleanProductIdentity(asString(row.name), asString(row.brand));
   const product: BarcodeProduct = {
-    ...(asString(row.name) ? { name: asString(row.name) } : {}),
-    ...(asString(row.brand) ? { brand: asString(row.brand) } : {}),
+    ...(identity.name ? { name: identity.name } : {}),
+    ...(identity.brand ? { brand: identity.brand } : {}),
     ...(asString(row.formulation) ? { variant: asString(row.formulation) } : {}),
     ...(asString(row.variant_label) ? { quantity: asString(row.variant_label) } : {}),
     ...(asString(row.image_url) && row.usage_status !== "unavailable" ? { imageUrl: asString(row.image_url) } : {}),
@@ -279,10 +281,11 @@ export function createCatalogStore(
           else if (pack.conflict) answer.product = { ...answer.product, quantity: undefined };
           const pp = bestPpIdentity(pack.sources);
           if (pp) {
+            const identity = cleanProductIdentity(pp.productName?.slice(0, 80), pp.brand?.slice(0, 40) ?? answer.product.brand);
             answer.product = {
               ...answer.product,
-              ...(pp.productName && { name: pp.productName.slice(0, 80) }),
-              ...(pp.brand && { brand: pp.brand.slice(0, 40) }),
+              ...(identity.name && { name: identity.name }),
+              ...(identity.brand && { brand: identity.brand }),
             };
             answer.status = "web-page";
             const retailer = pp.retailer ?? asString(row.store_retailer);
@@ -453,8 +456,11 @@ export function createCatalogStore(
           tx(async (db) => {
             const offWrite = input.source.kind === "off";
             const existingPp = offWrite ? await bestPpEvidenceForGtin(db, input.ean) : null;
-            const brand = (existingPp?.brand || input.product.brand)?.slice(0, 40);
-            const name = (existingPp?.productName || input.product.name || brand || input.ean).slice(0, 80);
+            const rawBrand = (existingPp?.brand || input.product.brand)?.slice(0, 40);
+            const rawName = (existingPp?.productName || input.product.name || rawBrand || input.ean).slice(0, 80);
+            const identity = cleanProductIdentity(rawName, rawBrand);
+            const brand = identity.brand;
+            const name = (identity.name || brand || input.ean).slice(0, 80);
             const formulation = input.product.variant;
             const pack = packFromQuantity(input.product.quantity);
             const keyPack = packKey(pack);
@@ -477,6 +483,7 @@ export function createCatalogStore(
             if (offWrite && existingPp && linkedRows[0]?.product_id) {
               // Keep the existing catalog row for this GTIN; never let OFF rename it away from PP identity.
               resolvedProductId = String(linkedRows[0].product_id);
+              const ppIdentity = cleanProductIdentity(existingPp.productName?.slice(0, 80), existingPp.brand?.slice(0, 40));
               await db.query(
                 `UPDATE catalog_products SET
                    name = COALESCE($1, name),
@@ -488,7 +495,7 @@ export function createCatalogStore(
                    updated_at = now(),
                    last_seen_at = now()
                  WHERE id = $4`,
-                [existingPp.productName?.slice(0, 80) ?? null, existingPp.brand?.slice(0, 40) ?? null, category, resolvedProductId],
+                [ppIdentity.name ?? null, ppIdentity.brand ?? null, category, resolvedProductId],
               );
             } else {
               const key = normalizedKey([name, formulation].filter(Boolean).join(" "), brand);

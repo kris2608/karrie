@@ -1,4 +1,5 @@
 import { canonicalEan } from "../domain/ean";
+import { stripBrandFromName } from "../domain/productHeading";
 import { nutritionOf } from "../domain/productDraft";
 import type { Adventure, SavedItem } from "../domain/types";
 import { refreshBarcode, type FoundAnswer } from "../services/barcode/lookup";
@@ -33,14 +34,16 @@ export function collectRefreshEans(mine: SavedItem[], adventure: Adventure | nul
 
 export function refreshActionFromAnswer(ean: string, answer: FoundAnswer): Extract<Action, { type: "refresh-ean-pack" }> {
   const product = answer.product;
+  const brand = product.brand?.trim() || undefined;
+  const name = product.name ? stripBrandFromName(product.name, brand) : undefined;
   const nutrition = nutritionOf(answer);
   const ingredients = product.ingredients?.trim().slice(0, 600) || undefined;
   const offish = answer.status === "off-exact" || answer.status === "off-partial";
   return {
     type: "refresh-ean-pack",
     ean,
-    ...(product.name && { name: product.name }),
-    ...(product.brand !== undefined && { brand: product.brand }),
+    ...(name && { name }),
+    ...(brand !== undefined && { brand }),
     ...(product.quantity !== undefined && { packageSize: product.quantity }),
     ...(product.imageUrl && { imageUrl: product.imageUrl }),
     ...(nutrition && { nutrition }),

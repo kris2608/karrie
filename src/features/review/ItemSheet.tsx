@@ -6,9 +6,9 @@ import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
-import { brandLabel } from "../../domain/customProduct";
 import { hasSuggestion, missionOn } from "../../domain/discovery";
 import { privateLabelLookupKey, privateLabelQuery, wantsPrivateLabels } from "../../domain/imageIdentity";
+import { productHeading } from "../../domain/productHeading";
 import { retailerName } from "../../domain/retailers";
 import type { AdventureItem, NamePhoto } from "../../domain/types";
 import { productById } from "../../data/catalog";
@@ -80,8 +80,12 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const [preview, setPreview] = useState<NamePhoto | null>(null);
   const parentPhoto = item.imageSource === "parent" && Boolean(item.photoId);
   const shown = useArt(item).pick;
-  const variant = item.recognition?.variant;
-  const detail = [brandLabel(item), variant, item.packageSize].filter(Boolean).join(" · ");
+  const heading = productHeading({
+    name: item.name,
+    brand: item.brand,
+    packageSize: item.packageSize,
+    variant: item.recognition?.variant,
+  });
   const listRetailer = adventure?.retailer;
   const crossRetailer =
     item.privateLabelRetailer && listRetailer && item.privateLabelRetailer !== listRetailer ? item.privateLabelRetailer : undefined;
@@ -124,8 +128,8 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
       <div className="item-sheet-head">
         <ItemArt item={item} className="item-sheet-art" />
         <div className="scan-card-text">
-          <h2>{item.name}</h2>
-          {detail && <span>{detail}</span>}
+          <h2>{heading.title}</h2>
+          {heading.subtitle && <span>{heading.subtitle}</span>}
           <NutriScoreMark grade={nutrition?.nutriscore} />
           <span>{categoryLabel(item.category)}</span>
           {item.ean && <small>EAN {item.ean}</small>}
