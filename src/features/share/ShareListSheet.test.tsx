@@ -55,7 +55,7 @@ describe("ShareListSheet", () => {
     create.mockResolvedValue({
       status: "ok",
       id: "abcdefghijklmnop",
-      url: "https://www.karrie.eu/l/abcdefghijklmnop",
+      url: "https://www.karrie.eu/s/abcdefghijklmnop",
       expiresAt: "2099-01-01T00:00:00.000Z",
     });
     const share = vi.fn().mockResolvedValue(undefined);
@@ -68,13 +68,19 @@ describe("ShareListSheet", () => {
 
     fireEvent.click(screen.getByTestId("share-list-share"));
     await waitFor(() =>
-      expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://www.karrie.eu/l/abcdefghijklmnop" })),
+      expect(share).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://www.karrie.eu/s/abcdefghijklmnop",
+          title: "Week",
+          text: "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld! Week · Albert Heijn · 1 product",
+        }),
+      ),
     );
     await waitFor(() => expect((screen.getByTestId("share-list-copy") as HTMLButtonElement).disabled).toBe(false));
 
     fireEvent.click(screen.getByTestId("share-list-copy"));
     await waitFor(() => expect(screen.getByText("Link gekopieerd!")).toBeTruthy());
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://www.karrie.eu/l/abcdefghijklmnop");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://www.karrie.eu/s/abcdefghijklmnop");
   });
 
   it("shows an error when the API refuses", async () => {

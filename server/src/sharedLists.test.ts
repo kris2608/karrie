@@ -201,7 +201,7 @@ describe("POST/GET /api/lists/share", () => {
     expect(body).toMatchObject({
       status: "ok",
       id: expect.any(String),
-      url: expect.stringMatching(/^https:\/\/www\.karrie\.eu\/l\//),
+      url: expect.stringMatching(/^https:\/\/www\.karrie\.eu\/s\//),
       expiresAt: expect.any(String),
     });
     expect(body.reused).toBeUndefined();

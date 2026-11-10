@@ -122,14 +122,14 @@ export function toSharedList(source: ShareListSource): ToSharedListResult {
   };
 }
 
-/** Public page URL for a short share id. */
+/** Public share URL (`/s/{id}` → Open Graph preview, then into the app at `/l/{id}`). */
 export function sharedListPageUrl(id: string): string {
-  return `${SHARE_URL}/l/${id}`;
+  return `${SHARE_URL}/s/${id}`;
 }
 
-/** Parse `/l/{id}` from a pathname. */
+/** Parse `/l/{id}` or share-preview `/s/{id}` from a pathname. */
 export function shareIdFromPath(pathname: string): string | null {
-  const match = pathname.match(/^\/l\/([A-Za-z0-9_-]{16,64})\/?$/);
+  const match = pathname.match(/^\/(?:l|s)\/([A-Za-z0-9_-]{16,64})\/?$/);
   return match?.[1] ?? null;
 }
 
@@ -137,15 +137,15 @@ export function shareIdFromPath(pathname: string): string | null {
 export function sanitizeAnalyticsUrl(url: string): string {
   try {
     const parsed = new URL(url, "https://www.karrie.eu");
-    if (/^\/l\/[A-Za-z0-9_-]{16,64}\/?$/.test(parsed.pathname)) {
-      parsed.pathname = "/l";
+    if (/^\/(?:l|s)\/[A-Za-z0-9_-]{16,64}\/?$/.test(parsed.pathname)) {
+      parsed.pathname = parsed.pathname.startsWith("/s/") ? "/s" : "/l";
       parsed.search = "";
       parsed.hash = "";
       return `${parsed.pathname}`;
     }
     return `${parsed.pathname}${parsed.search}${parsed.hash}` || url;
   } catch {
-    return url.replace(/\/l\/[A-Za-z0-9_-]{16,64}\/?/g, "/l");
+    return url.replace(/\/(?:l|s)\/[A-Za-z0-9_-]{16,64}\/?/g, (path) => (path.startsWith("/s/") ? "/s" : "/l"));
   }
 }
 

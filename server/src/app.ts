@@ -18,6 +18,7 @@ import { RETAILERS, type PrijsProfeet } from "./offers/prijsprofeet.js";
 import type { StoreImageLookup, StoreImageResult } from "./storeImage.js";
 import type { RecognizeResult } from "./recognize.js";
 import type { SharedListStore } from "./sharedLists.js";
+import { sharedListPreviewHtml } from "./sharedListPreview.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
 
 export type ImageDeps = {
@@ -180,6 +181,7 @@ export function sanitizeLogPath(pathname: string): string {
   if (pathname.startsWith("/api/lists/share/") && pathname.length > "/api/lists/share/".length) {
     return "/api/lists/share/:id";
   }
+  if (/^\/l\/[A-Za-z0-9_-]{16,64}\/?$/.test(pathname)) return "/l/:id";
   return pathname;
 }
 
@@ -277,6 +279,7 @@ export function createHandler(deps: AppDeps) {
 
     if (url.pathname === "/api/lists/share" && req.method === "POST") return createSharedList();
     if (url.pathname.startsWith("/api/lists/share/") && req.method === "GET") return readSharedList();
+    if (/^\/l\/[A-Za-z0-9_-]{16,64}\/?$/.test(url.pathname) && req.method === "GET") return previewSharedList();
     if (url.pathname === CATALOG_CHANGES && req.method === "GET") return catalogChanges();
     if (url.pathname === ADMIN || url.pathname.startsWith(`${ADMIN}/`)) return admin();
     if (url.pathname === ADMIN_CATALOG || url.pathname.startsWith(`${ADMIN_CATALOG}/`)) return adminCatalog();
@@ -730,7 +733,7 @@ export function createHandler(deps: AppDeps) {
       return send(200, {
         status: "ok",
         id: result.id,
-        url: `${originBase}/l/${result.id}`,
+        url: `${originBase}/s/${result.id}`,
         expiresAt: result.expiresAt,
       });
     }
@@ -744,6 +747,35 @@ export function createHandler(deps: AppDeps) {
       if (result.code === "expired") return send(410, { status: "error", code: "expired" });
       if (result.code === "unavailable") return send(503, { status: "error", code: "unavailable" });
       return send(404, { status: "error", code: "not-found" });
+    }
+
+    /** Open Graph HTML for crawlers; no Origin check (WhatsApp does not send one). */
+    async function previewSharedList() {
+      if (!deps.sharedLists) {
+        res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
+        res.end("unavailable");
+        return;
+      }
+      const id = url.pathname.match(/^\/l\/([A-Za-z0-9_-]{16,64})\/?$/)?.[1];
+      if (!id) {
+        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        res.end("not found");
+        return;
+      }
+      const result = await deps.sharedLists.store.get(id);
+      if (!result.ok) {
+        const status = result.code === "expired" ? 410 : result.code === "unavailable" ? 503 : 404;
+        res.writeHead(status, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+        res.end(result.code);
+        return;
+      }
+      const html = sharedListPreviewHtml(result.list, id, deps.sharedLists.publicOrigin);
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "public, max-age=300",
+        "x-robots-tag": "noindex, nofollow",
+      });
+      res.end(html);
     }
   };
 }

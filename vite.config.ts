@@ -12,10 +12,10 @@ const appBuild = (process.env.RENDER_GIT_COMMIT ?? process.env.VITE_GIT_COMMIT ?
 const UMAMI_DOMAINS = "karrie.eu,www.karrie.eu,karrieapp.onrender.com";
 
 /**
- * Umami before-send: rewrite /l/{token} pageviews to /l so share secrets never leave the device.
+ * Umami before-send: rewrite /l/{token} and /s/{token} pageviews so share secrets never leave the device.
  * Must stay a single-line IIFE assignable to window before the tracker script loads.
  */
-const UMAMI_BEFORE_SEND = `window.karrieUmamiBeforeSend=function(t,p){if(!p||typeof p!=="object")return!1;if(typeof p.url==="string"){try{var u=new URL(p.url,location.origin);if(/^\\/l\\/[A-Za-z0-9_-]{16,64}\\/?$/.test(u.pathname))p.url="/l"}catch(e){p.url=p.url.replace(/\\/l\\/[A-Za-z0-9_-]{16,64}\\/?/g,"/l")}}return p};`;
+const UMAMI_BEFORE_SEND = `window.karrieUmamiBeforeSend=function(t,p){if(!p||typeof p!=="object")return!1;if(typeof p.url==="string"){try{var u=new URL(p.url,location.origin);if(/^\\/(?:l|s)\\/[A-Za-z0-9_-]{16,64}\\/?$/.test(u.pathname))p.url=u.pathname.charAt(1)==="s"?"/s":"/l"}catch(e){p.url=p.url.replace(/\\/(?:l|s)\\/[A-Za-z0-9_-]{16,64}\\/?/g,function(m){return m.charAt(1)==="s"?"/s":"/l"})}}return p};`;
 
 /** Adds the Umami Cloud tracker to production builds only, when both public values are set. */
 function umami(): Plugin {

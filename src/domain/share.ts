@@ -1,9 +1,31 @@
+import { retailerName, type RetailerId } from "./retailers";
+
 /** The public site parents send to friends; never a list or local data. */
 export const SHARE_URL = "https://www.karrie.eu";
 export const SHARE_TITLE = "Karrie";
 export const SHARE_TEXT = "Speur, vind en vink af! Boodschappen doen als een avontuur.";
 export const LIST_SHARE_TITLE = "Boodschappenlijstje";
 export const LIST_SHARE_TEXT = "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld!";
+
+export type ListShareInfo = {
+  name?: string;
+  retailer?: RetailerId;
+  itemCount: number;
+};
+
+/** Title and message for sharing a saved/current list — name, shop and size so multiple links stay distinct. */
+export function listShareCopy(info: ListShareInfo): { title: string; text: string } {
+  const store = info.retailer ? retailerName(info.retailer) : undefined;
+  const count =
+    info.itemCount > 0 ? (info.itemCount === 1 ? "1 product" : `${info.itemCount} producten`) : undefined;
+  const bits = [info.name?.trim() || undefined, store, count].filter((part): part is string => Boolean(part));
+  if (!bits.length) return { title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT };
+  const summary = bits.join(" · ");
+  return {
+    title: info.name?.trim() || store || LIST_SHARE_TITLE,
+    text: `${LIST_SHARE_TEXT} ${summary}`,
+  };
+}
 
 export type ShareOutcome = "shared" | "copied" | "cancelled";
 

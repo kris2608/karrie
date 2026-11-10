@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LIST_SHARE_TEXT, LIST_SHARE_TITLE, SHARE_TEXT, SHARE_TITLE, SHARE_URL, shareKarrie, shareLink } from "./share";
+import { LIST_SHARE_TEXT, LIST_SHARE_TITLE, listShareCopy, SHARE_TEXT, SHARE_TITLE, SHARE_URL, shareKarrie, shareLink } from "./share";
 
 describe("shareKarrie", () => {
   it("opens the system share sheet with only the public site", async () => {
@@ -31,9 +31,23 @@ describe("shareKarrie", () => {
   });
 });
 
+describe("listShareCopy", () => {
+  it("puts list name, retailer and product count in the WhatsApp message", () => {
+    expect(listShareCopy({ name: "Weekend", retailer: "albert_heijn", itemCount: 12 })).toEqual({
+      title: "Weekend",
+      text: "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld! Weekend · Albert Heijn · 12 producten",
+    });
+    expect(listShareCopy({ retailer: "jumbo", itemCount: 1 })).toEqual({
+      title: "Jumbo",
+      text: "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld! Jumbo · 1 product",
+    });
+    expect(listShareCopy({ itemCount: 0 })).toEqual({ title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT });
+  });
+});
+
 describe("shareLink", () => {
   it("shares or copies the given short list URL", async () => {
-    const listUrl = "https://www.karrie.eu/l/abcdefghijklmnop";
+    const listUrl = "https://www.karrie.eu/s/abcdefghijklmnop";
     const data = { title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT, url: listUrl };
     const share = vi.fn().mockResolvedValue(undefined);
     const copy = vi.fn().mockResolvedValue(undefined);

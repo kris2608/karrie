@@ -153,16 +153,17 @@ describe("toSharedList", () => {
 });
 
 describe("short link helpers", () => {
-  it("builds /l/{id} URLs and parses path ids", () => {
-    expect(sharedListPageUrl("abcdefghijklmnop")).toBe("https://www.karrie.eu/l/abcdefghijklmnop");
+  it("builds /s/{id} share URLs and parses /l and /s path ids", () => {
+    expect(sharedListPageUrl("abcdefghijklmnop")).toBe("https://www.karrie.eu/s/abcdefghijklmnop");
     expect(shareIdFromPath("/l/abcdefghijklmnop")).toBe("abcdefghijklmnop");
-    expect(shareIdFromPath("/l/abcdefghijklmnop/")).toBe("abcdefghijklmnop");
+    expect(shareIdFromPath("/s/abcdefghijklmnop/")).toBe("abcdefghijklmnop");
     expect(shareIdFromPath("/l/short")).toBeNull();
     expect(shareIdFromPath("/")).toBeNull();
   });
 
   it("redacts share tokens from analytics URLs", () => {
     expect(sanitizeAnalyticsUrl("/l/abcdefghijklmnop")).toBe("/l");
+    expect(sanitizeAnalyticsUrl("/s/abcdefghijklmnop")).toBe("/s");
     expect(sanitizeAnalyticsUrl("https://www.karrie.eu/l/abcdefghijklmnop?x=1#y")).toBe("/l");
     expect(sanitizeAnalyticsUrl("/toevoegen")).toBe("/toevoegen");
     expect(sanitizeAnalyticsUrl("/controleren?tab=1")).toBe("/controleren?tab=1");

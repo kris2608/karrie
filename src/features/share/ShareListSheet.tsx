@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
-import { LIST_SHARE_TEXT, LIST_SHARE_TITLE, shareLink } from "../../domain/share";
+import { listShareCopy, shareLink } from "../../domain/share";
 import { toSharedList, type ShareListSource } from "../../domain/shareList";
 import { trackEvent } from "../../services/analytics";
 import { shareListClient } from "../../services/shareList/client";
@@ -73,13 +73,18 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
     if (encoded.status !== "ready" || busy) return;
     setBusy(true);
     try {
+      const copy = listShareCopy({
+        name: source?.name,
+        retailer: source?.retailer,
+        itemCount: source?.items.length ?? 0,
+      });
       const outcome = await shareLink(
         {
           share: navigator.share?.bind(navigator),
           canShare: navigator.canShare?.bind(navigator),
           copy: (text) => navigator.clipboard.writeText(text),
         },
-        { title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT, url: encoded.url },
+        { title: copy.title, text: copy.text, url: encoded.url },
       );
       if (outcome === "cancelled") return;
       trackEvent({ name: "shopping_list_shared", data: { method: outcome === "shared" ? "native" : "copied" } });
