@@ -190,25 +190,29 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
               ))}
             </div>
           </fieldset>
-          <DrawingPicker
-            name={name}
-            category={item.category}
-            icon={item.icon}
-            onPick={(id) => dispatch({ type: "edit-item", itemId: item.id, icon: id, productId: productById(id) ? id : undefined })}
-          />
+          {!item.ean && (
+            <DrawingPicker
+              name={name}
+              category={item.category}
+              icon={item.icon}
+              onPick={(id) => dispatch({ type: "edit-item", itemId: item.id, icon: id, productId: productById(id) ? id : undefined })}
+            />
+          )}
         </div>
       ) : (
         <button type="button" className="text-button" data-testid="item-edit-open" onClick={() => setEditing(true)}>
-          Naam, afdeling of tekening aanpassen
+          {item.ean ? "Naam of afdeling aanpassen" : "Naam, afdeling of tekening aanpassen"}
         </button>
       )}
 
       <div className="item-sheet-actions">
-        <PressButton variant="secondary" wide data-testid="photo-pack" onClick={onPhoto}>
-          <CameraIcon />
-          {parentPhoto ? "Nieuwe foto" : "Maak foto"}
-        </PressButton>
-        {hasPhoto(item) && (
+        {!item.ean && (
+          <PressButton variant="secondary" wide data-testid="photo-pack" onClick={onPhoto}>
+            <CameraIcon />
+            {parentPhoto ? "Nieuwe foto" : "Maak foto"}
+          </PressButton>
+        )}
+        {!item.ean && hasPhoto(item) && (
           <PressButton variant="quiet" wide data-testid="restore-generic" onClick={onRestore}>
             Gebruik Karrie-tekening
           </PressButton>

@@ -115,9 +115,7 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
     <Sheet open={open} onClose={onClose} label="Deel dit lijstje">
       <div className="share-list" data-testid="share-list-sheet">
         <h2>Deel dit lijstje</h2>
-        <p className="share-note">
-          We bewaren een kopie van dit lijstje 48 uur op de server. Iedereen met de link kan het openen. Eigen foto&apos;s blijven op dit apparaat; herkenbare winkel- of Open Food Facts-foto&apos;s kunnen bij de ontvanger opnieuw geladen worden. Je voortgang gaat niet mee.
-        </p>
+        <p className="share-note">De link is 48 uur geldig.</p>
 
         {encoded.status === "loading" && <p className="share-note">Link maken…</p>}
         {encoded.status === "error" && (

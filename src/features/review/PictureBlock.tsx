@@ -107,6 +107,8 @@ export function PictureBlock({ item }: { item: AdventureItem }) {
     setPreview(null);
   }
 
+  // EAN matches already have PP/OFF art via automatic priority; no parent picture toggles.
+  if (item.ean) return null;
   if (!identity || (!settings.referenceImages && !entry && !store && !named && !others.length && !privateLabels.length)) return null;
   const chosenName = named?.imageUrl;
 

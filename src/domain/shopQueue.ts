@@ -38,16 +38,6 @@ export function sortByCategory(items: AdventureItem[], order: CategoryId[]): Adv
     .map(({ item }) => item);
 }
 
-export function moveCategory(order: CategoryId[], category: CategoryId, direction: -1 | 1): CategoryId[] {
-  const index = order.indexOf(category);
-  const target = index + direction;
-  if (index < 0 || target < 0 || target >= order.length) return order;
-  const next = order.slice();
-  const [row] = next.splice(index, 1);
-  next.splice(target, 0, row);
-  return next;
-}
-
 export function moveItemWithinCategory(items: AdventureItem[], id: string, direction: -1 | 1): AdventureItem[] {
   const index = items.findIndex((item) => item.id === id);
   if (index < 0) return items;

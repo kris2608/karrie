@@ -450,6 +450,75 @@ describe("name images and admin sync", () => {
     expect(after.products.some((product) => product.id === linked!.productId)).toBe(true);
   });
 
+  it("keeps PP name/brand after a later OFF upsert and write-through from retailer pack", async () => {
+    const EAN = "8710395948659";
+    const { catalog } = await readyCatalog();
+    await catalog.upsertBarcodeRecord({
+      ean: EAN,
+      status: "off-exact",
+      product: {
+        name: "multivruchten zero",
+        brand: "Karvan Cévitam",
+        quantity: "600 ml",
+        nutriScore: "C",
+        per100: { energyKcal: 8, sugars: 0.5 },
+        imageUrl: "https://images.openfoodfacts.org/images/products/871/039/594/8659/front_nl.3.400.jpg",
+      },
+      source: {
+        kind: "off",
+        name: "Open Food Facts",
+        url: `https://world.openfoodfacts.org/product/${EAN}`,
+        dataLicense: "ODbL",
+        imageLicense: "CC BY-SA",
+      },
+      at: Date.now(),
+    });
+    await catalog.recordRetailerPack({
+      ean: EAN,
+      rows: [
+        {
+          retailer: "albert_heijn",
+          quantity: "0,6 l",
+          productName: "Karvan Cévitam Zero multivruchten siroop",
+          brand: "Karvan Cévitam",
+        },
+      ],
+    });
+    const afterPp = await catalog.byGtin(EAN);
+    expect(afterPp?.answer).toMatchObject({
+      status: "web-page",
+      product: { name: "Karvan Cévitam Zero multivruchten siroop", brand: "Karvan Cévitam", quantity: "0,6 l", nutriScore: "C" },
+      source: { kind: "web", name: "Albert Heijn" },
+    });
+
+    await catalog.upsertBarcodeRecord({
+      ean: EAN,
+      status: "off-exact",
+      product: {
+        name: "multivruchten zero",
+        brand: "Karvan Cévitam",
+        quantity: "600 ml",
+        nutriScore: "B",
+        per100: { energyKcal: 8 },
+      },
+      source: {
+        kind: "off",
+        name: "Open Food Facts",
+        url: `https://world.openfoodfacts.org/product/${EAN}`,
+        dataLicense: "ODbL",
+      },
+      at: Date.now(),
+    });
+    const afterOff = await catalog.byGtin(EAN);
+    expect(afterOff?.answer.product?.name).toBe("Karvan Cévitam Zero multivruchten siroop");
+    expect(afterOff?.answer.product?.brand).toBe("Karvan Cévitam");
+    expect(afterOff?.answer.product?.nutriScore).toBe("B");
+    expect(afterOff?.answer.source?.kind).toBe("web");
+    expect(afterOff?.answer.source && "name" in afterOff.answer.source ? afterOff.answer.source.name : undefined).toBe(
+      "Albert Heijn",
+    );
+  });
+
   it("keeps GTIN on the first Campina variant and lets PrijsProfeet win over Open Food Facts", async () => {
     const CAMPINA = "8712800001256";
     const { catalog, pool } = await readyCatalog();
@@ -494,7 +563,11 @@ describe("name images and admin sync", () => {
     expect(hit?.pack.sources.map((entry) => entry.quantityRaw)).toEqual(expect.arrayContaining(["220 ml", "1 l"]));
     expect(hit?.storeImage?.imageUrl).toContain("jumbo.com");
     expect(hit?.answer.status === "none" ? undefined : hit?.answer.product?.quantity).toBe("1 l");
-    expect(hit?.answer.status === "none" ? undefined : hit?.answer.product.nutriScore).toBe("C");
+    expect(hit?.answer).toMatchObject({
+      status: "web-page",
+      product: { name: "Campina Magere yoghurt", brand: "Campina", nutriScore: "C" },
+      source: { kind: "web", name: "Jumbo" },
+    });
     const still = await pool.query(`SELECT variant_id FROM product_identifiers WHERE gtin = $1`, [CAMPINA]);
     expect(String(still.rows[0].variant_id)).toBe(variantId);
   });

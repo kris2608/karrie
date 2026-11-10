@@ -5,12 +5,13 @@ import type { PoolLike, Queryable } from "../candidatesPg.js";
 import type { NameAnswer } from "../nameImage.js";
 import type { NameImage } from "../nameMatch.js";
 import type { ProductCategory } from "../offers/match.js";
+import { imageRetailerName, RETAILER_RANK, type SourceRetailer } from "../offers/prijsprofeet.js";
 import { PRODUCT_CATEGORIES } from "../offers/match.js";
 import { formulationWords, words } from "../nameMatch.js";
 import { parseName } from "../productName.js";
 import { resolveCategory } from "../resolveCategory.js";
 import { aliasKey, normalizedKey, packFromQuantity, packKey, sizeMatches } from "./keys.js";
-import { quantityMlOf, summarizePack, type PackEvidence, type PackEvidenceSource } from "./pack.js";
+import { bestPpIdentity, quantityMlOf, summarizePack, type PackEvidence, type PackEvidenceSource } from "./pack.js";
 import type {
   Catalog,
   CatalogChange,
@@ -254,11 +255,17 @@ export function createCatalogStore(
             store_url: store?.url,
             store_retailer: store?.retailer,
             store_source_url: store?.source_url,
-            source_kind: String(base.confidence) === "web-page" ? "web" : "off",
+            source_kind: String(base.confidence) === "web-page" || store?.retailer ? "web" : "off",
             source_url:
-              asString(base.facts_url) ??
-              (String(base.confidence) === "web-page" ? undefined : `https://world.openfoodfacts.org/product/${base.gtin}`),
-            source_name: String(base.confidence) === "web-page" ? "web" : "Open Food Facts",
+              asString(store?.source_url) ??
+              (String(base.confidence) === "web-page"
+                ? `https://www.prijsprofeet.nl/?q=${base.gtin}`
+                : (asString(base.facts_url) ?? `https://world.openfoodfacts.org/product/${base.gtin}`)),
+            source_name: store?.retailer
+              ? imageRetailerName(String(store.retailer) as SourceRetailer)
+              : String(base.confidence) === "web-page"
+                ? "PrijsProfeet"
+                : "Open Food Facts",
           } as Record<string, unknown>;
         });
         if (!row) return null;
@@ -270,6 +277,21 @@ export function createCatalogStore(
         if (answer.product) {
           if (pack.displayQuantity) answer.product = { ...answer.product, quantity: pack.displayQuantity };
           else if (pack.conflict) answer.product = { ...answer.product, quantity: undefined };
+          const pp = bestPpIdentity(pack.sources);
+          if (pp) {
+            answer.product = {
+              ...answer.product,
+              ...(pp.productName && { name: pp.productName.slice(0, 80) }),
+              ...(pp.brand && { brand: pp.brand.slice(0, 40) }),
+            };
+            answer.status = "web-page";
+            const retailer = pp.retailer ?? asString(row.store_retailer);
+            answer.source = {
+              kind: "web",
+              name: retailer ? imageRetailerName(retailer as SourceRetailer) : "PrijsProfeet",
+              url: asString(row.store_source_url) ?? `https://www.prijsprofeet.nl/?q=${ean}`,
+            };
+          }
         }
         answer.pack = pack;
         const storeImage = asString(row.store_url)
@@ -429,47 +451,77 @@ export function createCatalogStore(
       const writeOnce = async (): Promise<{ productId: string; variantId: string }> =>
         withTimeout(
           tx(async (db) => {
-            const brand = input.product.brand;
-            const name = input.product.name ?? brand ?? input.ean;
+            const offWrite = input.source.kind === "off";
+            const existingPp = offWrite ? await bestPpEvidenceForGtin(db, input.ean) : null;
+            const brand = (existingPp?.brand || input.product.brand)?.slice(0, 40);
+            const name = (existingPp?.productName || input.product.name || brand || input.ean).slice(0, 80);
             const formulation = input.product.variant;
-            const key = normalizedKey([name, formulation].filter(Boolean).join(" "), brand);
-            const productId = productIdFromKey(key, "b");
             const pack = packFromQuantity(input.product.quantity);
             const keyPack = packKey(pack);
             const category =
               input.department ??
-              resolveCategory({ tags: input.product.categories, name: input.product.name }) ??
+              resolveCategory({ tags: input.product.categories, name }) ??
               "pantry";
 
             await ensureCategory(db, category);
-            await db.query(
-              `INSERT INTO catalog_products (
-                 id, normalized_key, name, product_type, brand, formulation, category_id,
-                 illustration_key, aliases, approval_status, is_default_catalog, origin, updated_at, last_seen_at
-               ) VALUES ($1, $2, $3, 'branded', $4, $5, $6, NULL, $7::jsonb, 'approved', false, 'shared', now(), now())
-               ON CONFLICT (normalized_key) DO UPDATE SET
-                 name = EXCLUDED.name,
-                 brand = COALESCE(EXCLUDED.brand, catalog_products.brand),
-                 formulation = COALESCE(EXCLUDED.formulation, catalog_products.formulation),
-                 category_id = CASE
-                   WHEN catalog_products.category_id = 'pantry' AND EXCLUDED.category_id <> 'pantry' THEN EXCLUDED.category_id
-                   ELSE catalog_products.category_id
-                 END,
-                 updated_at = now(),
-                 last_seen_at = now()
-               RETURNING id`,
-              [
-                productId,
-                key,
-                name,
-                brand ?? null,
-                formulation ?? null,
-                category,
-                JSON.stringify([name, brand].filter(Boolean)),
-              ],
+
+            const { rows: linkedRows } = await db.query(
+              `SELECT p.id AS product_id
+               FROM product_identifiers i
+               JOIN product_variants v ON v.id = i.variant_id
+               JOIN catalog_products p ON p.id = v.product_id
+               WHERE i.gtin = $1`,
+              [input.ean],
             );
-            const { rows: productRows } = await db.query(`SELECT id FROM catalog_products WHERE normalized_key = $1`, [key]);
-            const resolvedProductId = String(productRows[0]?.id ?? productId);
+            let resolvedProductId: string;
+            if (offWrite && existingPp && linkedRows[0]?.product_id) {
+              // Keep the existing catalog row for this GTIN; never let OFF rename it away from PP identity.
+              resolvedProductId = String(linkedRows[0].product_id);
+              await db.query(
+                `UPDATE catalog_products SET
+                   name = COALESCE($1, name),
+                   brand = COALESCE($2, brand),
+                   category_id = CASE
+                     WHEN category_id = 'pantry' AND $3::text <> 'pantry' THEN $3
+                     ELSE category_id
+                   END,
+                   updated_at = now(),
+                   last_seen_at = now()
+                 WHERE id = $4`,
+                [existingPp.productName?.slice(0, 80) ?? null, existingPp.brand?.slice(0, 40) ?? null, category, resolvedProductId],
+              );
+            } else {
+              const key = normalizedKey([name, formulation].filter(Boolean).join(" "), brand);
+              const productId = productIdFromKey(key, "b");
+              await db.query(
+                `INSERT INTO catalog_products (
+                   id, normalized_key, name, product_type, brand, formulation, category_id,
+                   illustration_key, aliases, approval_status, is_default_catalog, origin, updated_at, last_seen_at
+                 ) VALUES ($1, $2, $3, 'branded', $4, $5, $6, NULL, $7::jsonb, 'approved', false, 'shared', now(), now())
+                 ON CONFLICT (normalized_key) DO UPDATE SET
+                   name = EXCLUDED.name,
+                   brand = COALESCE(EXCLUDED.brand, catalog_products.brand),
+                   formulation = COALESCE(EXCLUDED.formulation, catalog_products.formulation),
+                   category_id = CASE
+                     WHEN catalog_products.category_id = 'pantry' AND EXCLUDED.category_id <> 'pantry' THEN EXCLUDED.category_id
+                     ELSE catalog_products.category_id
+                   END,
+                   updated_at = now(),
+                   last_seen_at = now()
+                 RETURNING id`,
+                [
+                  productId,
+                  key,
+                  name,
+                  brand ?? null,
+                  formulation ?? null,
+                  category,
+                  JSON.stringify([name, brand].filter(Boolean)),
+                ],
+              );
+              const { rows: productRows } = await db.query(`SELECT id FROM catalog_products WHERE normalized_key = $1`, [key]);
+              resolvedProductId = String(productRows[0]?.id ?? productId);
+            }
             await replaceAliases(db, resolvedProductId, [name, brand].filter((value): value is string => Boolean(value)));
 
             const resolvedVariantId = variantIdOf(resolvedProductId, keyPack);
@@ -847,6 +899,7 @@ export function createCatalogStore(
               });
             }
             await refreshConflictFlag(db, input.ean);
+            await applyPpIdentityToGtin(db, input.ean);
             counters.writes += 1;
             return loadPackSummary(db, input.ean);
           }),
@@ -1169,6 +1222,43 @@ function emptyNameAnswer(): NameAnswer {
     alternatives: [],
     searched: { prijsprofeet: "skipped", off: "skipped" },
   };
+}
+
+async function bestPpEvidenceForGtin(
+  db: Queryable,
+  gtin: string,
+): Promise<{ productName?: string; brand?: string; retailer?: string } | null> {
+  const { rows } = await db.query(
+    `SELECT product_name, brand, retailer FROM product_pack_evidence
+     WHERE gtin = $1 AND source = 'prijsprofeet' AND (product_name IS NOT NULL OR brand IS NOT NULL)`,
+    [gtin],
+  );
+  if (!rows.length) return null;
+  const ranked = [...rows].sort(
+    (a, b) => (RETAILER_RANK[String(a.retailer ?? "")] ?? 99) - (RETAILER_RANK[String(b.retailer ?? "")] ?? 99),
+  );
+  const top = ranked[0];
+  return {
+    ...(asString(top.product_name) && { productName: asString(top.product_name) }),
+    ...(asString(top.brand) && { brand: asString(top.brand) }),
+    ...(asString(top.retailer) && { retailer: asString(top.retailer) }),
+  };
+}
+
+/** Push the best PrijsProfeet name/brand onto the catalog product linked to this GTIN. */
+async function applyPpIdentityToGtin(db: Queryable, gtin: string) {
+  const pp = await bestPpEvidenceForGtin(db, gtin);
+  if (!pp?.productName && !pp?.brand) return;
+  await db.query(
+    `UPDATE catalog_products p SET
+       name = COALESCE($2, p.name),
+       brand = COALESCE($3, p.brand),
+       updated_at = now()
+     FROM product_identifiers i
+     JOIN product_variants v ON v.id = i.variant_id
+     WHERE i.gtin = $1 AND v.product_id = p.id`,
+    [gtin, pp.productName?.slice(0, 80) ?? null, pp.brand?.slice(0, 40) ?? null],
+  );
 }
 
 async function upsertEvidence(

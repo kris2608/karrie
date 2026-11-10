@@ -35,11 +35,11 @@ describe("listShareCopy", () => {
   it("puts list name, retailer and product count in the WhatsApp message", () => {
     expect(listShareCopy({ name: "Weekend", retailer: "albert_heijn", itemCount: 12 })).toEqual({
       title: "Weekend",
-      text: "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld! Weekend · Albert Heijn · 12 producten",
+      text: "🛒 Ik heb een boodschappenlijstje met Karrie gemaakt! Weekend · Albert Heijn · 12 producten",
     });
     expect(listShareCopy({ retailer: "jumbo", itemCount: 1 })).toEqual({
       title: "Jumbo",
-      text: "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld! Jumbo · 1 product",
+      text: "🛒 Ik heb een boodschappenlijstje met Karrie gemaakt! Jumbo · 1 product",
     });
     expect(listShareCopy({ itemCount: 0 })).toEqual({ title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT });
   });

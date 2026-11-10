@@ -6,7 +6,6 @@ import {
   isComplete,
   markFound,
   moveAmongOpen,
-  moveCategory,
   moveItemWithinCategory,
   skipItem,
   sortByCategory,
@@ -137,7 +136,6 @@ export type Action =
   /** Drop every open (non-found) line; found items and list metadata stay. */
   | { type: "clear-open-items" }
   | { type: "move-item"; itemId: string; direction: -1 | 1 }
-  | { type: "move-category"; category: CategoryId; direction: -1 | 1 }
   | { type: "set-category-order"; order: CategoryId[] }
   | { type: "restore-generic"; itemId: string }
   | {
@@ -595,14 +593,6 @@ export function reducer(state: AppState, action: Action): AppState {
           ? moveAmongOpen(state.adventure.items, action.itemId, action.direction)
           : moveItemWithinCategory(state.adventure.items, action.itemId, action.direction);
       return { ...state, adventure: touch(state.adventure, { items }) };
-    }
-    case "move-category": {
-      const categoryOrder = moveCategory(state.adventure?.categoryOrder ?? state.categoryOrder, action.category, action.direction);
-      return {
-        ...state,
-        categoryOrder,
-        adventure: state.adventure ? touch(state.adventure, { categoryOrder }) : null,
-      };
     }
     case "set-category-order":
       return {

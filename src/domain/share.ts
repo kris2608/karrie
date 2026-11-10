@@ -5,7 +5,7 @@ export const SHARE_URL = "https://www.karrie.eu";
 export const SHARE_TITLE = "Karrie";
 export const SHARE_TEXT = "Speur, vind en vink af! Boodschappen doen als een avontuur.";
 export const LIST_SHARE_TITLE = "Boodschappenlijstje";
-export const LIST_SHARE_TEXT = "🛒 Ik heb een boodschappenlijstje met Karrie gedeeld!";
+export const LIST_SHARE_TEXT = "🛒 Ik heb een boodschappenlijstje met Karrie gemaakt!";
 
 export type ListShareInfo = {
   name?: string;

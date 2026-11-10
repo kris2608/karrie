@@ -112,6 +112,14 @@ export function summarizePack(evidence: PackEvidence[], listRetailer?: string): 
   return { sources: withQty, conflict: false, ...(displayQuantity && { displayQuantity }) };
 }
 
+/** Best PrijsProfeet retailer row with a product name or brand (same retailer rank as barcode lookup). */
+export function bestPpIdentity(sources: PackEvidence[]): Pick<PackEvidence, "productName" | "brand" | "retailer"> | undefined {
+  const rows = sources.filter((entry) => entry.source === "prijsprofeet" && (entry.productName || entry.brand));
+  if (!rows.length) return undefined;
+  const row = [...rows].sort((a, b) => (RETAILER_RANK[a.retailer ?? ""] ?? 99) - (RETAILER_RANK[b.retailer ?? ""] ?? 99))[0];
+  return { productName: row.productName, brand: row.brand, retailer: row.retailer };
+}
+
 /** Dutch labels for conflict copy: "220 ml" / "1 liter". */
 export function formatPackChoice(raw: string): string {
   const ml = quantityMlOf(raw);

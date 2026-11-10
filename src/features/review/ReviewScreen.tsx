@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { categoryLabel } from "../../domain/categories";
 import { brandLabel } from "../../domain/customProduct";
-import type { AdventureItem, CategoryId } from "../../domain/types";
+import type { AdventureItem } from "../../domain/types";
 import { ItemArt } from "../../components/ItemArt";
 import { TopBar } from "../../components/TopBar";
 import { PressButton } from "../../components/ui/PressButton";
@@ -130,18 +130,6 @@ export function ReviewScreen() {
     });
   }
 
-  function moveGroup(category: CategoryId, direction: -1 | 1) {
-    if (!adventure) return;
-    const visible = groups.map((group) => group.category);
-    const neighbor = visible[visible.indexOf(category) + direction];
-    if (!neighbor) return;
-    const order = adventure.categoryOrder.slice();
-    const from = order.indexOf(category);
-    const to = order.indexOf(neighbor);
-    [order[from], order[to]] = [order[to], order[from]];
-    dispatch({ type: "set-category-order", order });
-  }
-
   return (
     <main className="screen screen-review">
       <TopBar title={named ?? "Klopt het lijstje?"} to="/toevoegen" />
@@ -181,24 +169,10 @@ export function ReviewScreen() {
           Nog geen producten. <Link to="/toevoegen">Voeg er een paar toe.</Link>
         </p>
       )}
-      {groups.map((group, groupIndex) => (
+      {groups.map((group) => (
         <motion.section key={group.category} layout="position" transition={spring} className="category-block">
           <header>
             <h2>{categoryLabel(group.category)}</h2>
-            <div className="mini-actions">
-              <button type="button" className="round-button round-s" aria-label="Categorie omhoog" disabled={groupIndex === 0} onClick={() => moveGroup(group.category, -1)}>
-                <Arrow up />
-              </button>
-              <button
-                type="button"
-                className="round-button round-s"
-                aria-label="Categorie omlaag"
-                disabled={groupIndex === groups.length - 1}
-                onClick={() => moveGroup(group.category, 1)}
-              >
-                <Arrow />
-              </button>
-            </div>
           </header>
           <ul>
             <AnimatePresence initial={false}>
@@ -310,8 +284,10 @@ function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRo
         )}
       </button>
       <div className="item-main">
-        <strong>{item.name}</strong>
-        {detail && <small className="item-detail">{detail}</small>}
+        <button type="button" className="item-text-button" aria-label={`Bewerk ${item.name}`} data-testid="edit-item-text" onClick={onEdit}>
+          <strong>{item.name}</strong>
+          {detail && <small className="item-detail">{detail}</small>}
+        </button>
         {offer && retailer && (
           <button
             type="button"
