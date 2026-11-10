@@ -30,8 +30,8 @@ export type ImageKind = "generic" | "photo";
 /** The parent's choice of picture; undefined lets automatic order pick. "off" is the Open Food Facts front photo. */
 export type ImageChoice = "reference" | "photo" | "drawing" | "off";
 
-/** How the product itself was identified. "off": Open Food Facts by barcode; "barcode": a web page that prints the barcode. */
-export type ItemSource = "catalog" | "manual" | "off" | "barcode" | "vision" | "user_created";
+/** How the product itself was identified. "off": Open Food Facts by barcode; "barcode": a web page that prints the barcode; "shared": restored from a shared list. */
+export type ItemSource = "catalog" | "manual" | "off" | "barcode" | "vision" | "user_created" | "shared";
 
 /** Background tidying of a product the parent typed in; "failed" stops after a few tries and keeps the item as typed. */
 export type Enrichment = { status: "pending" | "done" | "failed"; tries: number; at?: number };

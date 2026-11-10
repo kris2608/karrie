@@ -3,7 +3,7 @@ import { SHARE_URL } from "./share";
 import { isCategoryId } from "./categories";
 import { canonicalEan } from "./ean";
 import { isRetailer, type RetailerId } from "./retailers";
-import type { Adventure, AdventureItem, CategoryId, SavedItem, SavedList } from "./types";
+import type { Adventure, AdventureItem, CategoryId, PackInfo, SavedItem, SavedList } from "./types";
 
 /**
  * Compact shopping-list payload for temporary short links (`/l/{id}`).
@@ -15,6 +15,7 @@ export const SHARE_LIST_VERSION = 1 as const;
 export const SHARE_LIST_MAX_ITEMS = 100;
 export const SHARE_LIST_MAX_NAME = 40;
 export const SHARE_LIST_MAX_PACKAGE = 24;
+export const SHARE_LIST_MAX_VARIANT = 40;
 
 export type SharedListItemV1 = {
   name: string;
@@ -26,6 +27,8 @@ export type SharedListItemV1 = {
   ean?: string;
   kind?: "custom_generic";
   icon?: string;
+  /** Flavour/variant when known on the sender; never a guess. */
+  variant?: string;
 };
 
 export type SharedListV1 = {
@@ -45,10 +48,24 @@ function clip(value: string, max: number): string {
   return value.replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+/** Bundled kebab, central PG shapes (b-/n-/pl-/c-), or custom: — never photo:/shared:/UUID. */
+const CENTRAL_ID = /^(?:b|n|pl|c)-[a-z0-9]+$/i;
+const KEBAB_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function isShareableProductId(productId: string, kind?: SavedItem["kind"]): boolean {
+  const id = productId.trim();
+  if (!id || id.length > 80) return false;
+  if (kind === "custom_generic" || id.startsWith("custom:")) return true;
+  if (id.startsWith("photo:") || id.startsWith("shared:")) return false;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return false;
+  if (productById(id)) return true;
+  return CENTRAL_ID.test(id) || KEBAB_ID.test(id);
+}
+
 function shareableProductId(item: Pick<AdventureItem | SavedItem, "productId" | "kind">): string | undefined {
   if (!item.productId) return undefined;
-  if (item.kind === "custom_generic" || item.productId.startsWith("custom:")) return item.productId.slice(0, 80);
-  return productById(item.productId) ? item.productId : undefined;
+  if (!isShareableProductId(item.productId, item.kind)) return undefined;
+  return item.productId.trim().slice(0, 80);
 }
 
 function shareableIcon(item: Pick<AdventureItem | SavedItem, "icon" | "productId">): string | undefined {
@@ -75,6 +92,8 @@ function shareItem(item: AdventureItem | SavedItem): SharedListItemV1 | null {
   if (item.kind === "custom_generic") shared.kind = "custom_generic";
   const icon = shareableIcon(item);
   if (icon) shared.icon = icon;
+  const variant = item.recognition?.variant ? clip(item.recognition.variant, SHARE_LIST_MAX_VARIANT) : "";
+  if (variant) shared.variant = variant;
   return shared;
 }
 
@@ -130,24 +149,55 @@ export function sanitizeAnalyticsUrl(url: string): string {
   }
 }
 
-/** Local SavedItems for import: fresh identity fields only, no photos or recognition. */
+type ShareImageFields = Pick<PackInfo, "ean" | "brand" | "imageChoice" | "kind" | "source">;
+
+/**
+ * Clear a forced drawing lock when the item has a resolvable commercial identity (EAN or brand),
+ * and restore a share/barcode source so identityOf treats the pack as branded.
+ * True generics keep drawing.
+ */
+export function normalizeSharedImageChoice<T extends ShareImageFields>(item: T): T {
+  const brand = item.brand?.trim();
+  if (!item.ean && !brand) return item;
+  const unlocked =
+    item.imageChoice === "drawing"
+      ? (() => {
+          const { imageChoice: _drop, ...rest } = item;
+          return rest;
+        })()
+      : item;
+  if (unlocked.source) return unlocked as T;
+  return { ...unlocked, source: item.ean ? ("barcode" as const) : ("shared" as const) } as T;
+}
+
+/** Local SavedItems for import: identity for lookups, never personal photos or recognition blobs. */
 export function toImportSavedItems(list: SharedListV1): SavedItem[] {
   return list.items.map((item) => {
     const productId = item.productId ?? `shared:${item.category}:${item.name.toLowerCase()}`;
     const icon = item.icon ?? (productById(productId)?.illustration ?? productById(productId)?.id) ?? "unknown";
+    const ean = item.ean ? canonicalEan(item.ean) ?? item.ean : undefined;
+    const brand = item.brand?.trim() || undefined;
+    const commercial = Boolean(ean || brand);
     const saved: SavedItem = {
       productId,
       name: item.name,
       icon,
       category: item.category,
       quantity: item.quantity,
-      ...(item.brand && { brand: item.brand }),
+      ...(brand && { brand }),
       ...(item.packageSize && { packageSize: item.packageSize }),
-      ...(item.ean && { ean: item.ean }),
+      ...(ean && { ean }),
       ...(item.kind === "custom_generic" && { kind: "custom_generic" }),
       imageKind: "generic",
-      imageChoice: "drawing",
+      ...(commercial
+        ? {
+            source: ean ? ("barcode" as const) : ("shared" as const),
+            ...(item.variant && {
+              recognition: { variant: item.variant, confidence: "medium" as const },
+            }),
+          }
+        : { imageChoice: "drawing" as const }),
     };
-    return saved;
+    return normalizeSharedImageChoice(saved);
   });
 }

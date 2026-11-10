@@ -14,6 +14,7 @@ import { Karrie } from "../components/mascot/Karrie";
 import { analyticsEvents, commitMilestoneEvents } from "./analyticsEvents";
 import { useCustomEnrichment } from "./customEnrichment";
 import { initialState, reducer, type Action, type AppState } from "./reducer";
+import { useSharedPackHydrate } from "./sharedPackHydrate";
 
 type AdventureContextValue = AppState & {
   dispatch: (action: Action) => void;
@@ -110,6 +111,7 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   }, [listItems, retailer]);
 
   useCustomEnrichment(state, dispatch, ready);
+  useSharedPackHydrate(state, dispatch, ready);
 
   const value = useMemo(() => ({ ...state, dispatch }), [state, dispatch]);
   if (!ready) {

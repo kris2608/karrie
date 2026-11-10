@@ -1,5 +1,6 @@
 import { DEFAULT_CATEGORY_ORDER } from "../domain/categories";
 import { houseBrandRetailer } from "../domain/retailers";
+import { normalizeSharedImageChoice } from "../domain/shareList";
 import { sortByCategory } from "../domain/shopQueue";
 import type {
   Adventure,
@@ -118,10 +119,11 @@ export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
 }
 
 export function itemFromSaved(saved: SavedItem): AdventureItem {
+  const normalized = normalizeSharedImageChoice(saved);
   return {
-    ...saved,
+    ...normalized,
     id: crypto.randomUUID(),
-    quantity: Math.max(1, Math.min(24, saved.quantity)),
+    quantity: Math.max(1, Math.min(24, normalized.quantity)),
     status: "pending",
   };
 }

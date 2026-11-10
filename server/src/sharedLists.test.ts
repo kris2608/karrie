@@ -61,6 +61,20 @@ describe("sanitizeSharedList", () => {
       code: "too-many",
     });
   });
+
+  it("keeps catalog-shaped ids and variants, strips local-only product ids", () => {
+    const cleaned = sanitizeSharedList({
+      version: 1,
+      items: [
+        { name: "Calvé", quantity: 1, category: "breakfast", productId: "b-calve", ean: "8710400322100", brand: "Calvé", variant: "naturel" },
+        { name: "Foto", quantity: 1, category: "dairy", productId: "photo:local" },
+        { name: "Shared", quantity: 1, category: "dairy", productId: "shared:dairy:melk" },
+      ],
+    });
+    expect(cleaned?.items[0]).toMatchObject({ productId: "b-calve", ean: "8710400322100", variant: "naturel", brand: "Calvé" });
+    expect(cleaned?.items[1].productId).toBeUndefined();
+    expect(cleaned?.items[2].productId).toBeUndefined();
+  });
 });
 
 describe("sharedLists store", () => {

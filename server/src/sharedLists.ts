@@ -20,6 +20,7 @@ export type SharedListItem = {
   ean?: string;
   kind?: "custom_generic";
   icon?: string;
+  variant?: string;
 };
 
 export type SharedListPayload = {
@@ -66,6 +67,19 @@ function isId(value: string): boolean {
   return /^[A-Za-z0-9_-]{16,64}$/.test(value);
 }
 
+const CENTRAL_ID = /^(?:b|n|pl|c)-[a-z0-9]+$/i;
+const KEBAB_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Bundled kebab, central PG shapes, or custom: — never photo:/shared:/UUID. */
+export function isShareableProductId(productId: string, kind?: SharedListItem["kind"]): boolean {
+  const id = productId.trim();
+  if (!id || id.length > 80) return false;
+  if (kind === "custom_generic" || id.startsWith("custom:")) return true;
+  if (id.startsWith("photo:") || id.startsWith("shared:")) return false;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return false;
+  return CENTRAL_ID.test(id) || KEBAB_ID.test(id);
+}
+
 export type SanitizeResult =
   | { ok: true; list: SharedListPayload }
   | { ok: false; code: "empty" | "invalid" | "too-many" };
@@ -93,15 +107,21 @@ export function sanitizeSharedListResult(raw: unknown): SanitizeResult {
       return { ok: false, code: "invalid" };
     }
     const shared: SharedListItem = { name, quantity, category: item.category };
-    if (typeof item.productId === "string" && item.productId.trim()) shared.productId = item.productId.trim().slice(0, 80);
+    const kind = item.kind === "custom_generic" ? ("custom_generic" as const) : undefined;
+    if (kind) shared.kind = kind;
+    if (typeof item.productId === "string" && isShareableProductId(item.productId, kind)) {
+      shared.productId = item.productId.trim().slice(0, 80);
+    }
     if (typeof item.brand === "string" && clip(item.brand, SHARED_LIST_MAX_NAME)) shared.brand = clip(item.brand, SHARED_LIST_MAX_NAME);
     if (typeof item.packageSize === "string" && clip(item.packageSize, SHARED_LIST_MAX_PACKAGE)) {
       shared.packageSize = clip(item.packageSize, SHARED_LIST_MAX_PACKAGE);
     }
     if (typeof item.ean === "string" && /^\d{8,14}$/.test(item.ean.trim())) shared.ean = item.ean.trim();
-    if (item.kind === "custom_generic") shared.kind = "custom_generic";
     if (typeof item.icon === "string" && item.icon.trim() && item.icon.trim() !== "unknown") {
       shared.icon = item.icon.trim().slice(0, 60);
+    }
+    if (typeof item.variant === "string" && clip(item.variant, SHARED_LIST_MAX_NAME)) {
+      shared.variant = clip(item.variant, SHARED_LIST_MAX_NAME);
     }
     items.push(shared);
   }
@@ -123,6 +143,27 @@ export function contentHashOf(list: SharedListPayload): string {
   return createHash("sha256").update(JSON.stringify(list)).digest("hex");
 }
 
+/** Drop productIds that are not custom and not present in catalog_products; keep the rest of the row. */
+async function dropUnknownCatalogIds(list: SharedListPayload, query: (text: string, values?: unknown[]) => Promise<Rows>): Promise<SharedListPayload> {
+  const ids = [...new Set(list.items.map((item) => item.productId).filter((id): id is string => Boolean(id) && !id.startsWith("custom:")))];
+  if (!ids.length) return list;
+  let known: Set<string>;
+  try {
+    const { rows } = await query(`SELECT id FROM catalog_products WHERE id = ANY($1::text[])`, [ids]);
+    known = new Set(rows.map((row) => String(row.id)));
+  } catch {
+    return list;
+  }
+  return {
+    ...list,
+    items: list.items.map((item) => {
+      if (!item.productId || item.productId.startsWith("custom:") || known.has(item.productId)) return item;
+      const { productId: _drop, ...rest } = item;
+      return rest;
+    }),
+  };
+}
+
 export function createSharedListStore(pool: PoolLike, now: () => number = Date.now): SharedListStore {
   const totals: SharedListStats = { created: 0, hits: 0, expired: 0, missing: 0, purged: 0 };
 
@@ -134,7 +175,7 @@ export function createSharedListStore(pool: PoolLike, now: () => number = Date.n
     async create(raw) {
       const sanitized = sanitizeSharedListResult(raw);
       if (!sanitized.ok) return { ok: false, code: sanitized.code };
-      const list = sanitized.list;
+      const list = await dropUnknownCatalogIds(sanitized.list, query);
       const hash = contentHashOf(list);
       const createdAt = new Date(now());
       const expiresAt = new Date(createdAt.getTime() + SHARED_LIST_TTL_MS);

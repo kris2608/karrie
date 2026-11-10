@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { identityOf, wantsStoreImage } from "./imageIdentity";
 import {
   SHARE_LIST_MAX_ITEMS,
+  isShareableProductId,
+  normalizeSharedImageChoice,
   sanitizeAnalyticsUrl,
   shareIdFromPath,
   sharedListPageUrl,
@@ -9,6 +12,7 @@ import {
   type SharedListV1,
 } from "./shareList";
 import type { AdventureItem } from "./types";
+import { pickArt } from "../components/ItemArt";
 
 const melk: AdventureItem = {
   id: "a",
@@ -88,10 +92,10 @@ describe("toSharedList", () => {
     expect(result.list.name).toBeUndefined();
   });
 
-  it("drops unverified EAN candidates and unknown catalog ids without rejecting the row", () => {
+  it("drops unverified EAN candidates and local-only ids without rejecting the row", () => {
     const bad: AdventureItem = {
       ...melk,
-      productId: "not-a-real-product",
+      productId: "photo:abc",
       ean: "123",
       recognition: { confidence: "low", eanCandidate: "8710496978722" },
     };
@@ -100,6 +104,24 @@ describe("toSharedList", () => {
     if (result.status !== "ok") return;
     expect(result.list.items[0].ean).toBeUndefined();
     expect(result.list.items[0].productId).toBeUndefined();
+  });
+
+  it("keeps central catalog id shapes and strips photo/shared/UUID ids", () => {
+    expect(isShareableProductId("melk")).toBe(true);
+    expect(isShareableProductId("b-abc123")).toBe(true);
+    expect(isShareableProductId("n-deadbeef")).toBe(true);
+    expect(isShareableProductId("custom:cashew")).toBe(true);
+    expect(isShareableProductId("photo:local")).toBe(false);
+    expect(isShareableProductId("shared:dairy:melk")).toBe(false);
+    expect(isShareableProductId("550e8400-e29b-41d4-a716-446655440000")).toBe(false);
+    const shared = toSharedList({
+      name: "x",
+      items: [{ ...hagelslag, productId: "b-calve123", recognition: { confidence: "high", variant: "naturel" } }],
+    });
+    expect(shared.status).toBe("ok");
+    if (shared.status !== "ok") return;
+    expect(shared.list.items[0]).toMatchObject({ productId: "b-calve123", variant: "naturel", ean: "8710496978722" });
+    expect(JSON.stringify(shared)).not.toMatch(/photoId/);
   });
 
   it("rejects empty lists and invalid product fields", () => {
@@ -148,20 +170,45 @@ describe("short link helpers", () => {
 });
 
 describe("import mapping", () => {
-  it("creates local saved items without photos and with pending-ready fields", () => {
+  it("keeps generics on drawings and unlocks commercial identity for EAN/brand items", () => {
     const list: SharedListV1 = {
       version: 1,
       retailer: "lidl",
       items: [
         { name: "Melk", quantity: 2, category: "dairy", productId: "melk" },
         { name: "Hagelslag", quantity: 1, category: "breakfast", ean: "8710496978722", brand: "De Ruijter" },
+        { name: "Chocomel Vol", quantity: 1, category: "drinks", brand: "Chocomel", variant: "vol" },
+        { name: "Banaan", quantity: 1, category: "produce", productId: "banaan" },
       ],
     };
     const items = toImportSavedItems(list);
-    expect(items).toHaveLength(2);
-    expect(items[0]).toMatchObject({ productId: "melk", quantity: 2, imageKind: "generic", imageChoice: "drawing" });
-    expect(items[1].ean).toBe("8710496978722");
-    expect(items.every((item) => !("photoId" in item && item.photoId))).toBe(true);
+    expect(items[0]).toMatchObject({ productId: "melk", imageChoice: "drawing" });
+    expect(items[1]).toMatchObject({ ean: "8710496978722", brand: "De Ruijter", source: "barcode" });
+    expect(items[1].imageChoice).toBeUndefined();
+    expect(wantsStoreImage(items[1])).toBe(true);
+    expect(identityOf(items[1])?.generic).toBe(false);
+    expect(items[2]).toMatchObject({ brand: "Chocomel", source: "shared", recognition: { variant: "vol" } });
+    expect(identityOf(items[2])?.generic).toBe(false);
+    expect(items[3]).toMatchObject({ productId: "banaan", imageChoice: "drawing" });
+    expect(items.every((item) => !item.photoId)).toBe(true);
+    expect(pickArt(items[1].imageChoice, { prijsprofeet: "https://cdn.example/hagel.jpg" })).toEqual({
+      source: "prijsprofeet",
+      url: "https://cdn.example/hagel.jpg",
+    });
+    expect(pickArt(items[0].imageChoice, { prijsprofeet: "https://cdn.example/x.jpg" })).toBeNull();
+  });
+
+  it("repairs legacy drawing locks when an EAN or brand is present", () => {
+    const legacy = normalizeSharedImageChoice({
+      name: "Hagelslag",
+      ean: "8710496978722",
+      brand: "De Ruijter",
+      imageChoice: "drawing" as const,
+      source: undefined,
+    });
+    expect(legacy.imageChoice).toBeUndefined();
+    expect(legacy.source).toBe("barcode");
+    expect(normalizeSharedImageChoice({ name: "Melk", imageChoice: "drawing" as const, source: undefined }).imageChoice).toBe("drawing");
   });
 
   it("imports a complete 100-product snapshot", () => {

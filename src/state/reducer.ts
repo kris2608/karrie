@@ -22,6 +22,7 @@ import type {
   Adventure,
   AdventureItem,
   AlternativeAssessment,
+  BarcodeInfo,
   CategoryId,
   ImageChoice,
   MissionState,
@@ -32,7 +33,7 @@ import type {
   SavedList,
 } from "../domain/types";
 import { isRetailer, type RetailerId } from "../domain/retailers";
-import { toImportSavedItems, type SharedListV1 } from "../domain/shareList";
+import { normalizeSharedImageChoice, toImportSavedItems, type SharedListV1 } from "../domain/shareList";
 import { productById, products } from "../data/catalog";
 import {
   createAdventure,
@@ -154,6 +155,16 @@ export type Action =
   | { type: "cheer"; milestone: number }
   | { type: "set-photo"; itemId: string; photoId: string }
   | { type: "apply-recognition"; itemId: string; photoId?: string; pack: VisionPack }
+  /** Trusted OFF/barcode pack facts for a shared-list item after EAN lookup; never overwrites a parent photo. */
+  | {
+      type: "apply-shared-pack";
+      itemId: string;
+      ean: string;
+      imageUrl?: string;
+      brand?: string;
+      packageSize?: string;
+      barcode?: BarcodeInfo;
+    }
   | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }
   /** A generic product the catalog does not have; `itemId` lets the screen undo exactly this line. */
   | { type: "add-custom"; name: string; itemId: string }
@@ -393,6 +404,7 @@ export function reducer(state: AppState, action: Action): AppState {
         ? withRetailer(
             withHomeProgress({
               ...stored,
+              items: stored.items.map((item) => normalizeSharedImageChoice(item)),
               history: stored.history ?? [],
               categoryOrder: mergeCategoryOrder(stored.categoryOrder),
             }),
@@ -403,7 +415,9 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!isRetailer(settings.retailer)) delete settings.retailer;
       return {
         adventure,
-        saved: Array.isArray(action.data.saved) ? action.data.saved : [],
+        saved: Array.isArray(action.data.saved)
+          ? action.data.saved.map((list) => ({ ...list, items: list.items.map((item) => normalizeSharedImageChoice(item)) }))
+          : [],
         stickers: Array.isArray(action.data.stickers) ? action.data.stickers : [],
         categoryOrder: mergeCategoryOrder(action.data.categoryOrder),
         settings,
@@ -612,6 +626,26 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "set-photo":
       return updateItem(state, action.itemId, (item) => withParentPhoto(item, action.photoId));
+    case "apply-shared-pack": {
+      return updateItem(state, action.itemId, (item) => {
+        if (item.ean !== action.ean) return item;
+        if (item.photoId) return item;
+        const next: AdventureItem = {
+          ...item,
+          source: item.source === "off" ? item.source : "barcode",
+          ...(action.brand && !item.brand && { brand: action.brand }),
+          ...(action.packageSize && !item.packageSize && { packageSize: action.packageSize }),
+          ...(action.barcode && !item.barcode && { barcode: action.barcode }),
+        };
+        if (action.imageUrl && !item.imageUrl) {
+          next.imageUrl = action.imageUrl;
+          next.imageKind = "photo";
+          next.imageSource = "off";
+          if (next.imageChoice === "drawing") delete next.imageChoice;
+        }
+        return next;
+      });
+    }
     case "apply-recognition": {
       const next = updateItem(state, action.itemId, (item) => {
         if (item.ean) return action.photoId ? withParentPhoto(item, action.photoId) : item;

@@ -32,7 +32,11 @@ export function identityOf(item: Identifiable): ImageIdentity | null {
     const parsed = parseName(item.name);
     return { name: cut(parsed?.base, 60) ?? name, brand, ...(parsed?.size && { size: sizeLabel(parsed.size) }), generic: false, typed: true };
   }
-  const branded = (item.source === "vision" && item.recognition?.specific) || item.source === "off" || item.source === "barcode";
+  const branded =
+    (item.source === "vision" && item.recognition?.specific) ||
+    item.source === "off" ||
+    item.source === "barcode" ||
+    item.source === "shared";
   if (branded && brand) {
     return { name, brand, variant: cut(item.recognition?.variant, 40), size: cut(item.packageSize, 20), generic: false };
   }
