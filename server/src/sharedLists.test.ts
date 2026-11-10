@@ -112,6 +112,29 @@ describe("sharedLists store", () => {
     expect(store.stats()).toMatchObject({ created: 2, hits: 2, expired: 2, purged: 2 });
   });
 
+  it("keeps central catalog ids even when catalog_products has no matching row", async () => {
+    const { pool } = memoryPool();
+    await pool.query(TABLE_SQL);
+    await pool.query(`CREATE TABLE catalog_products (id text PRIMARY KEY)`);
+    const store = createSharedListStore(pool, () => Date.UTC(2026, 10, 9, 12));
+    const created = await store.create({
+      version: 1,
+      items: [
+        { name: "Calvé", quantity: 1, category: "breakfast", productId: "b-notyet123", ean: "8710400322100" },
+        { name: "Onbekend", quantity: 1, category: "dairy", productId: "mystery-sku" },
+        { name: "Melk", quantity: 1, category: "dairy", productId: "melk" },
+      ],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const got = await store.get(created.id);
+    expect(got.ok).toBe(true);
+    if (!got.ok) return;
+    expect(got.list.items[0].productId).toBe("b-notyet123");
+    expect(got.list.items[1].productId).toBeUndefined();
+    expect(got.list.items[2].productId).toBeUndefined();
+  });
+
   it("returns unavailable when postgres queries fail", async () => {
     const pool = {
       query: async () => {

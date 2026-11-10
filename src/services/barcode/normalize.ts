@@ -44,6 +44,19 @@ export type StoreImageHint = {
   brand?: string;
 };
 
+/** Central catalog product ids confirmed by Postgres (`b-…` / `n-…` / `pl-…` / `c-…`). */
+const CENTRAL_PRODUCT_ID = /^(?:b|n|pl|c)-[a-z0-9]+$/i;
+/** Variant ids are sha1 prefixes (no letter prefix). */
+const CENTRAL_VARIANT_ID = /^[a-f0-9]{12,32}$/i;
+
+export function isCentralCatalogId(value: unknown): value is string {
+  return typeof value === "string" && CENTRAL_PRODUCT_ID.test(value);
+}
+
+function isCentralVariantId(value: unknown): value is string {
+  return typeof value === "string" && CENTRAL_VARIANT_ID.test(value);
+}
+
 export type BarcodeAnswer =
   | {
       ean: string;
@@ -52,6 +65,10 @@ export type BarcodeAnswer =
       source: BarcodeSource;
       at: number;
       department?: CategoryId;
+      /** Confirmed Postgres catalog product id; only when the server stored/hit the row. */
+      catalogProductId?: string;
+      /** Confirmed Postgres variant id for this EAN. */
+      catalogVariantId?: string;
       pack?: PackSummary;
       storeImage?: StoreImageHint;
     }
@@ -125,6 +142,8 @@ export function cleanAnswer(value: unknown, ean: string): BarcodeAnswer | null {
   if (pack?.displayQuantity) found.quantity = pack.displayQuantity;
   else if (pack?.conflict) delete found.quantity;
   const department = isCategoryId(raw.department) ? raw.department : undefined;
+  const catalogProductId = isCentralCatalogId(raw.catalogProductId) ? raw.catalogProductId : undefined;
+  const catalogVariantId = isCentralVariantId(raw.catalogVariantId) ? raw.catalogVariantId : undefined;
   return {
     ean,
     status: raw.status,
@@ -132,6 +151,8 @@ export function cleanAnswer(value: unknown, ean: string): BarcodeAnswer | null {
     source: from,
     at: raw.at,
     ...(department && { department }),
+    ...(catalogProductId && { catalogProductId }),
+    ...(catalogVariantId && { catalogVariantId }),
     ...(pack && { pack }),
     ...(storeImage && { storeImage }),
   };

@@ -53,7 +53,8 @@ export function hasOffPhoto(item: Pictured): boolean {
  * photo. Products without a barcode, and standard products a parent typed in, keep their drawing.
  */
 export function wantsStoreImage(item: Pictured & Pick<PackInfo, "ean" | "kind">): boolean {
-  return Boolean(item.ean) && item.kind !== "custom_generic";
+  // Exact-EAN retailer photos — including shared imports that arrive as custom_generic with an EAN.
+  return Boolean(item.ean);
 }
 
 /** A product the parent typed is looked up by its name: a brand may have a retailer or Open Food Facts photo. */

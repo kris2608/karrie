@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sourcesLine } from "../features/photo/PhotoResultSheet";
 import type { FoundAnswer } from "../services/barcode/lookup";
 import type { RecognizedProduct } from "../services/vision/types";
-import { catalogByName, categoryFromName, categoryFromTags, mergeDraft } from "./productDraft";
+import { catalogByName, categoryFromName, categoryFromTags, mergeDraft, newItemFor } from "./productDraft";
 import type { SavedItem } from "./types";
 
 const CALVE = "8710400000006";
@@ -173,5 +173,40 @@ describe("merging barcode, photo and my products", () => {
       photo: { ...PHOTO, productName: "Pepsi", genericName: "Frisdrank", brand: "Pepsi", category: "houdbaar" },
     });
     expect(draft.category).toBe("drinks");
+  });
+
+  it("copies confirmed catalog ids from the barcode answer onto the pack", () => {
+    const draft = mergeDraft({
+      ean: CALVE,
+      barcode: { ...OFF, catalogProductId: "b-abc123def456", catalogVariantId: "aabbccddeeff001122334455" },
+    });
+    expect(draft.pack).toMatchObject({ catalogProductId: "b-abc123def456", catalogVariantId: "aabbccddeeff001122334455" });
+    expect(draft.match?.id).toBe("pindakaas");
+    const { item } = newItemFor(draft, draft.name, draft.category);
+    expect(item.productId).toBe("pindakaas");
+    expect(item.pack?.catalogProductId).toBe("b-abc123def456");
+  });
+
+  it("S6: generic Melk without EAN keeps the bundled drawing id and invents no catalog ids", () => {
+    const match = catalogByName("Melk");
+    expect(match?.id).toBe("melk");
+    const draft = {
+      name: "Melk",
+      category: "dairy" as const,
+      icon: "melk",
+      match,
+      keepPhoto: false,
+      fields: {},
+      pack: {},
+      from: {},
+      unsure: false,
+      confident: true,
+      recognized: true,
+    };
+    const { item, withPhoto } = newItemFor(draft, "Melk", "dairy");
+    expect(item).toMatchObject({ productId: "melk", icon: "melk" });
+    expect(item.pack?.catalogProductId).toBeUndefined();
+    expect(item.pack?.ean).toBeUndefined();
+    expect(withPhoto).toBe(false);
   });
 });

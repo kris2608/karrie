@@ -42,6 +42,10 @@ export type BarcodeAnswer = {
   at: number;
   /** Resolved shop department from PP slug / OFF tags / name; never invents pantry. */
   department?: ProductCategory;
+  /** Confirmed Postgres catalog product id (`b-…`); only when the central write/hit succeeded. */
+  catalogProductId?: string;
+  /** Confirmed Postgres variant id for this EAN; only when the central write/hit succeeded. */
+  catalogVariantId?: string;
   /** Pack-size evidence from OFF / PrijsProfeet / parent; conflict means the parent should confirm. */
   pack?: PackSummary;
   /** Exact-EAN retailer image already in the catalog, so the client can skip PrijsProfeet. */
@@ -391,7 +395,7 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
   async function persist(answer: BarcodeAnswer): Promise<BarcodeAnswer> {
     const withDept = withDepartment(answer);
     if (!config.catalog || withDept.status === "none" || !withDept.product || !withDept.source) return withDept;
-    await config.catalog.upsertBarcodeRecord({
+    const ids = await config.catalog.upsertBarcodeRecord({
       ean: withDept.ean,
       status: withDept.status,
       product: withDept.product,
@@ -399,13 +403,16 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       at: withDept.at,
       ...(withDept.department && { department: withDept.department }),
     });
-    const pack = await config.catalog.packForGtin(withDept.ean).catch(() => null);
-    if (!pack) return withDept;
+    const withIds: BarcodeAnswer = ids
+      ? { ...withDept, catalogProductId: ids.productId, catalogVariantId: ids.variantId }
+      : withDept;
+    const pack = await config.catalog.packForGtin(withIds.ean).catch(() => null);
+    if (!pack) return withIds;
     const product = {
-      ...withDept.product,
+      ...withIds.product!,
       ...(pack.displayQuantity ? { quantity: pack.displayQuantity } : pack.conflict ? { quantity: undefined } : {}),
     };
-    return { ...withDept, product, pack };
+    return { ...withIds, product, pack };
   }
 
   function persistMiss(ean: string) {
@@ -419,6 +426,8 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     if (hit) {
       const answer = withDepartment({
         ...hit.answer,
+        catalogProductId: hit.productId,
+        catalogVariantId: hit.variantId,
         pack: hit.pack,
         ...(hit.storeImage && { storeImage: hit.storeImage }),
       });

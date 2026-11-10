@@ -62,16 +62,19 @@ export function isShareableProductId(productId: string, kind?: SavedItem["kind"]
   return CENTRAL_ID.test(id) || KEBAB_ID.test(id);
 }
 
-function shareableProductId(item: Pick<AdventureItem | SavedItem, "productId" | "kind">): string | undefined {
+function shareableProductId(item: Pick<AdventureItem | SavedItem, "productId" | "kind" | "catalogProductId">): string | undefined {
+  // Prefer confirmed central identity on the wire so recipients reuse the same catalog row.
+  const central = item.catalogProductId?.trim();
+  if (central && isShareableProductId(central, item.kind)) return central.slice(0, 80);
   if (!item.productId) return undefined;
   if (!isShareableProductId(item.productId, item.kind)) return undefined;
   return item.productId.trim().slice(0, 80);
 }
 
-function shareableIcon(item: Pick<AdventureItem | SavedItem, "icon" | "productId">): string | undefined {
+function shareableIcon(item: Pick<AdventureItem | SavedItem, "icon" | "productId" | "catalogProductId">): string | undefined {
   const icon = item.icon?.trim();
   if (!icon || icon === "unknown") return undefined;
-  if (icon === item.productId) return undefined;
+  if (icon === item.productId || icon === item.catalogProductId) return undefined;
   return icon.slice(0, 60);
 }
 

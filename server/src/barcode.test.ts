@@ -235,7 +235,7 @@ describe("barcode lookup", () => {
           cacheGet: async () => null,
           cachePut: async () => undefined,
           rememberSeen: async () => undefined,
-          upsertBarcodeRecord: async () => undefined,
+          upsertBarcodeRecord: async () => null,
           packForGtin: async () => pack,
         },
       },

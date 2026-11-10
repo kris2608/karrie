@@ -226,7 +226,7 @@ describe("shared barcode catalog", () => {
       byGtin: async () => {
         throw new Error("down");
       },
-      upsertBarcodeRecord: async () => undefined,
+      upsertBarcodeRecord: async () => null,
       packForGtin: async () => ({ sources: [], conflict: false }),
       cacheGet: async () => null,
       cachePut: async () => undefined,
@@ -580,6 +580,133 @@ function invoke(
     void handler(req, res);
   });
 }
+
+describe("central product identity reuse (S1–S5)", () => {
+  it("S1: first EAN upsert returns confirmed catalog ids and stores facts/image", async () => {
+    const { catalog, pool } = await readyCatalog();
+    const ids = await catalog.upsertBarcodeRecord({
+      ean: "3017620425035",
+      status: "off-exact",
+      product: {
+        name: "Nutella",
+        brand: "Ferrero",
+        quantity: "400 g",
+        nutriScore: "E",
+        per100: { energyKcal: 539 },
+        imageUrl: NUTELLA.image_front_url,
+      },
+      source: {
+        kind: "off",
+        name: "Open Food Facts",
+        url: "https://world.openfoodfacts.org/product/3017620425035",
+        dataLicense: "ODbL",
+      },
+      at: Date.now(),
+    });
+    expect(ids).toMatchObject({ productId: expect.stringMatching(/^b-[a-z0-9]+$/i), variantId: expect.stringMatching(/^[a-f0-9]{12,32}$/i) });
+    const { rows: facts } = await pool.query(`SELECT nutri_score FROM product_facts WHERE variant_id = $1`, [ids!.variantId]);
+    expect(facts[0]?.nutri_score).toBe("E");
+    const { rows: images } = await pool.query(`SELECT url FROM product_images WHERE product_id = $1`, [ids!.productId]);
+    expect(images.some((row) => String(row.url).includes("openfoodfacts"))).toBe(true);
+  });
+
+  it("S2: second lookup is cached with the same catalog ids and no OFF call", async () => {
+    const { catalog } = await readyCatalog();
+    let offCalls = 0;
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes("openfoodfacts")) {
+        offCalls += 1;
+        return offResponse(NUTELLA);
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    const first = createBarcodeLookup({ userAgent: "test", catalog }, fetchImpl as never, () => Date.now(), async () => undefined);
+    const created = await first.lookup("3017620425035", { allowWeb: false });
+    expect(created.ok && created.answer.catalogProductId).toMatch(/^b-/);
+    expect(created.ok && created.answer.catalogVariantId).toMatch(/^[a-f0-9]+$/i);
+    expect(offCalls).toBe(1);
+
+    await vi.waitFor(async () => {
+      expect(await catalog.byGtin("3017620425035")).toBeTruthy();
+    });
+
+    const second = createBarcodeLookup({ userAgent: "test", catalog }, fetchImpl as never, () => Date.now(), async () => undefined);
+    const reused = await second.lookup("3017620425035", { allowWeb: false });
+    expect(reused).toMatchObject({
+      ok: true,
+      cached: true,
+      answer: {
+        catalogProductId: created.ok ? created.answer.catalogProductId : undefined,
+        catalogVariantId: created.ok ? created.answer.catalogVariantId : undefined,
+      },
+    });
+    expect(offCalls).toBe(1);
+  });
+
+  it("S4: different EAN / formulation get distinct catalogVariantId (and often productId)", async () => {
+    const { catalog } = await readyCatalog();
+    const a = await catalog.upsertBarcodeRecord({
+      ean: "8710624292502",
+      status: "off-exact",
+      product: { name: "Coca-Cola", brand: "Coca-Cola", quantity: "330 ml" },
+      source: { kind: "off", name: "Open Food Facts", url: "https://world.openfoodfacts.org/product/8710624292502", dataLicense: "ODbL" },
+      at: Date.now(),
+    });
+    const b = await catalog.upsertBarcodeRecord({
+      ean: "5449000000996",
+      status: "off-exact",
+      product: { name: "Coca-Cola Zero", brand: "Coca-Cola", quantity: "330 ml", variant: "Zero" },
+      source: { kind: "off", name: "Open Food Facts", url: "https://world.openfoodfacts.org/product/5449000000996", dataLicense: "ODbL" },
+      at: Date.now(),
+    });
+    expect(a?.variantId).toBeTruthy();
+    expect(b?.variantId).toBeTruthy();
+    expect(a!.variantId).not.toBe(b!.variantId);
+    expect(a!.productId).not.toBe(b!.productId);
+  });
+
+  it("S5: upsert failure leaves recognition ok without catalog ids and increments writeErrors", async () => {
+    const { catalog, pool } = await readyCatalog();
+    const original = pool.query.bind(pool);
+    pool.query = (async (text: string, values?: unknown[]) => {
+      if (String(text).includes("INSERT INTO catalog_products")) throw new Error("write-fail");
+      return original(text, values);
+    }) as typeof pool.query;
+    const beforeErrors = catalog.stats().writeErrors;
+    const ids = await catalog.upsertBarcodeRecord({
+      ean: "3017620425035",
+      status: "off-exact",
+      product: { name: "Nutella", brand: "Ferrero", quantity: "400 g" },
+      source: {
+        kind: "off",
+        name: "Open Food Facts",
+        url: "https://world.openfoodfacts.org/product/3017620425035",
+        dataLicense: "ODbL",
+      },
+      at: Date.now(),
+    });
+    expect(ids).toBeNull();
+    expect(catalog.stats().writeErrors).toBeGreaterThan(beforeErrors);
+
+    const broken = {
+      enabled: true as const,
+      degraded: () => true,
+      stats: () => ({ enabled: true, degraded: true, migrations: [], products: 0, identifiers: 0, centralHits: 0, writes: 0, writeErrors: 1 }),
+      byGtin: async () => null,
+      upsertBarcodeRecord: async () => null,
+      packForGtin: async () => ({ sources: [], conflict: false }),
+      cacheGet: async () => null,
+      cachePut: async () => undefined,
+      rememberSeen: async () => undefined,
+    };
+    const fetchImpl = vi.fn(async () => offResponse(NUTELLA));
+    const lookup = createBarcodeLookup({ userAgent: "test", catalog: broken }, fetchImpl as never, () => Date.now(), async () => undefined);
+    const result = await lookup.lookup("3017620425035", { allowWeb: false });
+    expect(result.ok && result.answer.product?.name).toBe("Nutella");
+    expect(result.ok && result.answer.catalogProductId).toBeUndefined();
+    expect(result.ok && result.answer.catalogVariantId).toBeUndefined();
+  });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

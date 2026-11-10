@@ -124,6 +124,25 @@ describe("toSharedList", () => {
     expect(JSON.stringify(shared)).not.toMatch(/photoId/);
   });
 
+  it("S3: share prefers catalogProductId over bundled productId and never sends photoId", () => {
+    const result = toSharedList({
+      name: "Delen",
+      items: [
+        {
+          ...hagelslag,
+          productId: "hagelslag",
+          catalogProductId: "b-deruijter99",
+          catalogVariantId: "aabbccddeeff001122334455",
+          icon: "hagelslag",
+        },
+      ],
+    });
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.list.items[0]).toMatchObject({ productId: "b-deruijter99", ean: "8710496978722", brand: "De Ruijter" });
+    expect(JSON.stringify(result)).not.toMatch(/photoId|catalogVariantId|local-photo/);
+  });
+
   it("rejects empty lists and invalid product fields", () => {
     expect(toSharedList({ name: "x", items: [] })).toEqual({ status: "error", code: "empty" });
     expect(toSharedList({ name: "x", items: [{ ...melk, name: "" }] })).toEqual({ status: "error", code: "invalid" });

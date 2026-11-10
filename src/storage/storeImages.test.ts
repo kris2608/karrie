@@ -56,7 +56,7 @@ describe("which products look for a retailer photo", () => {
     expect(wantsStoreImage(scanned())).toBe(true);
     expect(wantsStoreImage(scanned(OFF))).toBe(true);
     expect(wantsStoreImage(item({}))).toBe(false);
-    expect(wantsStoreImage(item({ ean: EAN, kind: "custom_generic" }))).toBe(false);
+    expect(wantsStoreImage(item({ ean: EAN, kind: "custom_generic" }))).toBe(true);
     expect(wantsStoreImage(scanned({ photoId: "p1", imageKind: "photo", imageSource: "parent" }))).toBe(true);
     const adventure = {
       phase: "draft",

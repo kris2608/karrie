@@ -74,6 +74,65 @@ describe("shared pack hydrate", () => {
     expect(withParent.adventure!.items[0].imageUrl).not.toBe("https://images.openfoodfacts.org/other.jpg");
   });
 
+  it("allows EAN + custom_generic hydrate and applies nutrition plus catalog ids", () => {
+    expect(
+      needsSharedPackHydrate({
+        id: "c",
+        productId: "custom:hagelslag",
+        name: "Hagelslag",
+        icon: "unknown",
+        category: "breakfast",
+        quantity: 1,
+        status: "pending",
+        ean: "8710496978722",
+        kind: "custom_generic",
+        source: "shared",
+      }),
+    ).toBe(true);
+
+    let state = reducer(initialState, {
+      type: "import-shared-list",
+      mode: "open",
+      list: {
+        version: 1,
+        items: [
+          {
+            name: "Hagelslag",
+            quantity: 1,
+            category: "breakfast",
+            ean: "8710496978722",
+            brand: "De Ruijter",
+            productId: "b-deruijter99",
+            kind: "custom_generic",
+          },
+        ],
+      },
+    });
+    const itemId = state.adventure!.items[0].id;
+    state = reducer(state, {
+      type: "apply-shared-pack",
+      itemId,
+      ean: "8710496978722",
+      imageUrl: "https://images.openfoodfacts.org/images/products/871/front.jpg",
+      nutrition: { nutriscore: "d", sugars100g: 60 },
+      ingredients: "Suiker, cacao",
+      catalogProductId: "b-deruijter99",
+      catalogVariantId: "aabbccddeeff001122334455",
+      offAttribution: true,
+      barcode: { status: "off-exact", sourceName: "Open Food Facts", sourceUrl: "https://world.openfoodfacts.org/product/8710496978722", at: 1 },
+    });
+    expect(state.adventure!.items[0]).toMatchObject({
+      imageUrl: "https://images.openfoodfacts.org/images/products/871/front.jpg",
+      nutrition: { nutriscore: "d", sugars100g: 60 },
+      ingredients: "Suiker, cacao",
+      catalogProductId: "b-deruijter99",
+      catalogVariantId: "aabbccddeeff001122334455",
+      offAttribution: true,
+      source: "barcode",
+    });
+    expect(state.adventure!.items[0].photoId).toBeUndefined();
+  });
+
   it("repairs legacy drawing+EAN on hydrate so store lookups can run", () => {
     const state = reducer(initialState, {
       type: "hydrate",

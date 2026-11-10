@@ -144,6 +144,8 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
   const barcodeInfo: BarcodeInfo | undefined = barcode ? { status: barcode.status, sourceName: barcode.source.name, sourceUrl: barcode.source.url, at: barcode.at } : mine?.barcode;
 
   const packConflict = packConflictOf(barcode);
+  const catalogProductId = barcode?.catalogProductId ?? mine?.catalogProductId;
+  const catalogVariantId = barcode?.catalogVariantId ?? mine?.catalogVariantId;
   const pack: VisionPack = {
     recognition: vision?.pack.recognition ?? mine?.recognition,
     alternative: vision?.pack.alternative ?? mine?.alternative,
@@ -152,6 +154,8 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     ean: ean ?? mine?.ean,
     barcode: barcodeInfo,
     imageUrl: offImage,
+    ...(catalogProductId && { catalogProductId }),
+    ...(catalogVariantId && { catalogVariantId }),
     nutrition,
     ...(ingredients && { ingredients }),
     fieldSources,

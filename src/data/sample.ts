@@ -30,6 +30,8 @@ const PACK_KEYS = [
   "imageSource",
   "imageChoice",
   "source",
+  "catalogProductId",
+  "catalogVariantId",
   "nutrition",
   "ingredients",
   "offAttribution",
@@ -88,6 +90,9 @@ export type VisionPack = {
   barcode?: BarcodeInfo;
   /** The Open Food Facts front photo; a parent photo replaces it. */
   imageUrl?: string;
+  /** Confirmed central catalog ids from the barcode answer; never guessed. */
+  catalogProductId?: string;
+  catalogVariantId?: string;
   nutrition?: Nutrition;
   ingredients?: string;
   fieldSources?: FieldSources;
@@ -106,6 +111,8 @@ export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
     imageKind: photoId || offImage ? "photo" : "generic",
     imageSource: photoId ? "parent" : offImage ? "off" : undefined,
     source: vision.barcode ? (vision.barcode.status === "web-page" ? "barcode" : "off") : vision.recognition ? "vision" : "manual",
+    catalogProductId: vision.catalogProductId,
+    catalogVariantId: vision.catalogVariantId,
     nutrition: vision.nutrition,
     ingredients: vision.ingredients,
     offAttribution:

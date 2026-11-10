@@ -425,9 +425,9 @@ export function createCatalogStore(
       }
     },
 
-    async upsertBarcodeRecord(input: UpsertBarcodeInput) {
-      try {
-        await run("write:barcode", () =>
+    async upsertBarcodeRecord(input: UpsertBarcodeInput): Promise<{ productId: string; variantId: string } | null> {
+      const writeOnce = async (): Promise<{ productId: string; variantId: string }> =>
+        withTimeout(
           tx(async (db) => {
             const brand = input.product.brand;
             const name = input.product.name ?? brand ?? input.ean;
@@ -595,10 +595,21 @@ export function createCatalogStore(
             }
 
             counters.writes += 1;
+            return { productId: resolvedProductId, variantId: bindVariantId };
           }),
+          CATALOG_RULES.queryTimeoutMs,
         );
+
+      try {
+        return await writeOnce();
       } catch {
-        counters.writeErrors += 1;
+        try {
+          return await writeOnce();
+        } catch {
+          counters.degraded = true;
+          counters.writeErrors += 1;
+          return null;
+        }
       }
     },
 

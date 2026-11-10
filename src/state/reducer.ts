@@ -27,6 +27,7 @@ import type {
   ImageChoice,
   MissionState,
   NamePhoto,
+  Nutrition,
   PackInfo,
   Product,
   SavedItem,
@@ -164,6 +165,11 @@ export type Action =
       brand?: string;
       packageSize?: string;
       barcode?: BarcodeInfo;
+      nutrition?: Nutrition;
+      ingredients?: string;
+      catalogProductId?: string;
+      catalogVariantId?: string;
+      offAttribution?: true;
     }
   | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }
   /** A generic product the catalog does not have; `itemId` lets the screen undo exactly this line. */
@@ -629,15 +635,21 @@ export function reducer(state: AppState, action: Action): AppState {
     case "apply-shared-pack": {
       return updateItem(state, action.itemId, (item) => {
         if (item.ean !== action.ean) return item;
-        if (item.photoId) return item;
+        // Parent photo locks the picture path; nutrition/ids may still gap-fill.
+        const lockPhoto = Boolean(item.photoId);
         const next: AdventureItem = {
           ...item,
           source: item.source === "off" ? item.source : "barcode",
           ...(action.brand && !item.brand && { brand: action.brand }),
           ...(action.packageSize && !item.packageSize && { packageSize: action.packageSize }),
           ...(action.barcode && !item.barcode && { barcode: action.barcode }),
+          ...(action.nutrition && !item.nutrition && { nutrition: action.nutrition }),
+          ...(action.ingredients && !item.ingredients && { ingredients: action.ingredients }),
+          ...(action.catalogProductId && !item.catalogProductId && { catalogProductId: action.catalogProductId }),
+          ...(action.catalogVariantId && !item.catalogVariantId && { catalogVariantId: action.catalogVariantId }),
+          ...(action.offAttribution && !item.offAttribution && { offAttribution: true }),
         };
-        if (action.imageUrl && !item.imageUrl) {
+        if (!lockPhoto && action.imageUrl && !item.imageUrl) {
           next.imageUrl = action.imageUrl;
           next.imageKind = "photo";
           next.imageSource = "off";

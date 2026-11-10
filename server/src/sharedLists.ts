@@ -144,9 +144,16 @@ export function contentHashOf(list: SharedListPayload): string {
 }
 
 /** Drop productIds that are not custom and not present in catalog_products; keep the rest of the row. */
+/** Central PG product ids — keep even when not yet present in catalog_products. */
+const CENTRAL_PRODUCT_ID = /^(?:b|n|pl|c)-[a-z0-9]+$/i;
+
 async function dropUnknownCatalogIds(list: SharedListPayload, query: (text: string, values?: unknown[]) => Promise<Rows>): Promise<SharedListPayload> {
   const ids = [
-    ...new Set(list.items.map((item) => item.productId).filter((id): id is string => typeof id === "string" && !id.startsWith("custom:"))),
+    ...new Set(
+      list.items
+        .map((item) => item.productId)
+        .filter((id): id is string => typeof id === "string" && !id.startsWith("custom:") && !CENTRAL_PRODUCT_ID.test(id)),
+    ),
   ];
   if (!ids.length) return list;
   let known: Set<string>;
@@ -159,7 +166,9 @@ async function dropUnknownCatalogIds(list: SharedListPayload, query: (text: stri
   return {
     ...list,
     items: list.items.map((item) => {
-      if (!item.productId || item.productId.startsWith("custom:") || known.has(item.productId)) return item;
+      if (!item.productId || item.productId.startsWith("custom:") || CENTRAL_PRODUCT_ID.test(item.productId) || known.has(item.productId)) {
+        return item;
+      }
       const { productId: _drop, ...rest } = item;
       return rest;
     }),

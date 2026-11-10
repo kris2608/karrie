@@ -116,6 +116,14 @@ export type PackInfo = {
   imageSource?: ImageSource;
   imageChoice?: ImageChoice;
   source?: ItemSource;
+  /**
+   * Confirmed central catalog product id (`b-…` / `n-…` / `pl-…` / `c-…`).
+   * Never invented client-side; only set after a Postgres hit or successful upsert.
+   * Gameplay/illustration still uses `productId` (bundled kebab, `photo:`, or `custom:`).
+   */
+  catalogProductId?: string;
+  /** Confirmed central variant id for this EAN; only after Postgres confirms. */
+  catalogVariantId?: string;
   nutrition?: Nutrition;
   /** Ingredient list from a trusted source (OFF / page / photo); never invent. */
   ingredients?: string;
