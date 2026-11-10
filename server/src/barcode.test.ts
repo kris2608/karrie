@@ -261,6 +261,49 @@ describe("barcode lookup", () => {
     });
   });
 
+  it("resolves drinks department from PrijsProfeet even when OFF also returns tags", async () => {
+    const storeRows: OfferRow[] = [
+      {
+        retailer: "albert_heijn",
+        sourceProductId: "a1",
+        productName: "Pepsi Regular",
+        brand: "Pepsi",
+        ean: OTHER,
+        quantity: "1.5 l",
+        category: "frisdrank",
+        promotionStatus: "unknown",
+        sourceUrl: "https://www.ah.nl/producten/pepsi",
+      },
+    ];
+    const offDrink: OffProduct = {
+      code: OTHER,
+      product_name_nl: "Pepsi",
+      brands: "Pepsi",
+      quantity: "1.5 l",
+      categories_tags: ["en:beverages", "en:sodas", "en:carbonated-drinks"],
+      nutriscore_grade: "e",
+    };
+    let time = 1_000_000;
+    const lookup = createBarcodeLookup(
+      {
+        userAgent: "Karrie/1.0 (https://karrieapp.onrender.com)",
+        storeImages: { find: async () => ({ ok: true, image: null, rows: storeRows, cached: false }) },
+      },
+      async () => offResponse(offDrink),
+      () => time,
+      async () => undefined,
+    );
+    const result = await lookup.lookup(OTHER, { allowWeb: true });
+    expect(result).toMatchObject({
+      ok: true,
+      answer: {
+        status: "web-page",
+        department: "drinks",
+        product: { name: "Pepsi Regular", brand: "Pepsi", categories: expect.arrayContaining(["frisdrank", "en:sodas"]) },
+      },
+    });
+  });
+
   it("still answers from PrijsProfeet when Open Food Facts is down", async () => {
     const storeRows: OfferRow[] = [
       {

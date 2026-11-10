@@ -175,18 +175,47 @@ describe("shared barcode catalog", () => {
         per100: { energyKcal: 42, sugars: 10.6 },
         ingredients: "water, suiker",
         imageUrl,
+        categories: ["frisdrank", "en:sodas"],
       },
       source: { kind: "web", name: "Jumbo", url: "https://www.jumbo.com/producten/cola" },
       at: Date.now(),
+      department: "drinks",
     });
     const { rows } = await pool.query(`SELECT nutri_score, ingredients, source FROM product_facts`);
     expect(rows[0]).toMatchObject({ nutri_score: "E", ingredients: "water, suiker", source: "openfoodfacts" });
+    const { rows: products } = await pool.query(`SELECT category_id FROM catalog_products WHERE name = 'Cola'`);
+    expect(products[0]).toMatchObject({ category_id: "drinks" });
     const hit = await catalog.byGtin(ean);
     expect(hit?.answer).toMatchObject({
       status: "web-page",
       source: { kind: "web" },
+      department: "drinks",
       product: { name: "Cola", brand: "Test", nutriScore: "E", ingredients: "water, suiker", imageUrl },
     });
+  });
+
+  it("upgrades a pantry catalog row to drinks when a later barcode resolve is clearer", async () => {
+    const { catalog, pool } = await readyCatalog();
+    const ean = "8712345678906";
+    await catalog.upsertBarcodeRecord({
+      ean,
+      status: "web-page",
+      product: { name: "Mystery Drink", brand: "Test" },
+      source: { kind: "web", name: "Jumbo", url: "https://www.jumbo.com/producten/x" },
+      at: Date.now(),
+    });
+    const { rows: before } = await pool.query(`SELECT category_id FROM catalog_products WHERE name = 'Mystery Drink'`);
+    expect(before[0]?.category_id).toBe("pantry");
+    await catalog.upsertBarcodeRecord({
+      ean,
+      status: "web-page",
+      product: { name: "Mystery Drink", brand: "Test", categories: ["frisdrank"] },
+      source: { kind: "web", name: "Jumbo", url: "https://www.jumbo.com/producten/x" },
+      at: Date.now(),
+      department: "drinks",
+    });
+    const { rows: after } = await pool.query(`SELECT category_id FROM catalog_products WHERE name = 'Mystery Drink'`);
+    expect(after[0]?.category_id).toBe("drinks");
   });
 
   it("falls back to Open Food Facts when the database is down", async () => {

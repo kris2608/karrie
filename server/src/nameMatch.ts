@@ -1,6 +1,9 @@
-import { PRODUCT_CATEGORIES, type ProductCategory } from "./offers/match.js";
+import { type ProductCategory } from "./offers/match.js";
 import { HOUSE_BRANDS, isHouseBrandRow, RETAILER_RANK, type RetailerId, type SourceRetailer } from "./offers/prijsprofeet.js";
 import { parseName, parseSize, type Packaging, type ParsedName, type Size } from "./productName.js";
+import { categoryOf } from "./resolveCategory.js";
+
+export { categoryOf } from "./resolveCategory.js";
 
 /**
  * Deciding, without a model, whether a search row shows the product a parent typed: the same brand, the same
@@ -485,41 +488,6 @@ export function privateLabelImages(typed: string, rows: NameRow[], retailer: Ret
     out.push(imageOf(entry.row, "medium", entry.row.brands[0]));
   }
   return out;
-}
-
-/** Where each PrijsProfeet category sits in the shop; categories without one clear department are left out. */
-const DEPARTMENT_OF: Record<string, ProductCategory> = {
-  "groente-fruit": "produce",
-  "zuivel-eieren": "dairy",
-  kaas: "dairy",
-  vlees: "meat",
-  vis: "meat",
-  vega: "meat",
-  "brood-bakkerij": "bakery",
-  ontbijt: "breakfast",
-  "pasta-rijst-wereldkeuken": "pantry",
-  "soepen-conserven-sauzen": "pantry",
-  "snoep-koek-chips": "pantry",
-  frisdrank: "drinks",
-  "koffie-thee": "drinks",
-  bier: "drinks",
-  wijn: "drinks",
-  "sterke-drank": "drinks",
-  "bier-wijn-sterke-drank": "drinks",
-  diepvries: "frozen",
-  huishouden: "household",
-  drogisterij: "household",
-  huidverzorging: "household",
-  haarverzorging: "household",
-  deodorant: "household",
-  mondverzorging: "household",
-  "baby-kind": "household",
-  huisdier: "household",
-};
-
-/** The app department for a PrijsProfeet category, when it has one clear place. */
-export function categoryOf(unified: string | undefined): ProductCategory | undefined {
-  return unified && Object.hasOwn(DEPARTMENT_OF, unified) && PRODUCT_CATEGORIES.includes(DEPARTMENT_OF[unified]) ? DEPARTMENT_OF[unified] : undefined;
 }
 
 /** Words of the base as typed ("Calvé pindakaas", 0, 1 -> "Calvé"). */

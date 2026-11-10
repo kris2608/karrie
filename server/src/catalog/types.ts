@@ -54,6 +54,8 @@ export type UpsertBarcodeInput = {
   product: BarcodeProduct;
   source: NonNullable<BarcodeAnswer["source"]>;
   at: number;
+  /** Resolved shop department when known (PP / OFF / name); omit rather than invent pantry. */
+  department?: import("../offers/match.js").ProductCategory;
 };
 
 export type UpsertNameImagesInput = {

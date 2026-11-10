@@ -4,8 +4,11 @@ import type { FoundAnswer } from "../services/barcode/lookup";
 import type { RecognizedProduct } from "../services/vision/types";
 import { categoryIcon } from "./categoryIcon";
 import { normalize } from "./matchProduct";
+import { resolveCategory } from "./resolveCategory";
 import type { BarcodeInfo, CategoryId, FieldSource, FieldSources, Nutrition, Product, SavedItem } from "./types";
 import { draftFromVision, needsCheck } from "./visionMapping";
+
+export { categoryFromName, categoryFromTags, resolveCategory } from "./resolveCategory";
 
 /** One proposed field, with where it came from. Only the parent's own data counts as verified. */
 export type DraftField = { value: string; source: FieldSource; verified: boolean };
@@ -47,27 +50,6 @@ function pick(...offers: Offer[]): DraftField | undefined {
     .filter((offer) => Boolean(offer.value))
     .sort((a, b) => b.rank - a.rank)[0];
   return best && { value: best.value!, source: best.source, verified: best.source === "parent" };
-}
-
-/** Open Food Facts tags that say clearly where a product is in the shop; anything else stays undecided. */
-const TAG_CATEGORY: [RegExp, CategoryId][] = [
-  [/^en:frozen-/, "frozen"],
-  [/^en:(dairies|dairy-|milks?|yogurts?|cheeses?|eggs|creams?|fresh-desserts|custards?|puddings?)/, "dairy"],
-  [/^en:(breads|pastries|cakes|viennoiseries)$/, "bakery"],
-  [/^en:(fresh-fruits|fresh-vegetables)$/, "produce"],
-  [/^en:(non-food-products|household-products|cleaning-products|detergents)$/, "household"],
-];
-
-/** Dutch names that are clearly cooled dairy when Open Food Facts tags are thin or missing. */
-const DAIRY_NAME = /\b(vla|yoghurt|yogurt|kwark|karnemelk|slagroom|drinkyoghurt|roomkaas)\b/i;
-
-export function categoryFromTags(tags: string[] | undefined): CategoryId | undefined {
-  for (const [pattern, category] of TAG_CATEGORY) if (tags?.some((tag) => pattern.test(tag))) return category;
-  return undefined;
-}
-
-export function categoryFromName(name: string | undefined): CategoryId | undefined {
-  return name && DAIRY_NAME.test(name) ? "dairy" : undefined;
 }
 
 /** Only an exact catalog name or alias: "Chocoladereep melk" must not become "melk". */
@@ -137,13 +119,10 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
   );
 
   const match = (mine && products.find((product) => product.id === mine.productId)) || vision?.match || catalogByName(found?.name) || null;
-  const category =
-    mine?.category ??
-    vision?.category ??
-    categoryFromTags(found?.categories) ??
-    categoryFromName(found?.name ?? fields.name?.value) ??
-    match?.category ??
-    "pantry";
+  const fromBarcode =
+    barcode?.department ??
+    resolveCategory({ tags: found?.categories, name: found?.name ?? fields.name?.value });
+  const category = mine?.category ?? fromBarcode ?? vision?.category ?? match?.category ?? "pantry";
   const offImage = mine?.imageSource === "off" ? mine.imageUrl : found?.imageUrl;
   const nutrition = mine?.nutrition ?? nutritionOf(barcode);
   const fromBarcodeIngredients = barcode?.product.ingredients?.trim().slice(0, 600) || undefined;

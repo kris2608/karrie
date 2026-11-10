@@ -98,6 +98,20 @@ describe("guardNormalized", () => {
     expect(guardNormalized({ ...WALNUTS, canonicalName: "rozijn", displayName: "Rozijnen", singularName: "rozijn", pluralName: "rozijnen" }, "rozijnen")).not.toBeNull();
   });
 
+  it("upgrades a pantry model answer to drinks when the name is clearly a drink", () => {
+    const cola: RawNormalized = {
+      ...WALNUTS,
+      canonicalName: "cola",
+      displayName: "Cola",
+      singularName: "cola",
+      pluralName: "cola",
+      childFriendlyLabel: "cola",
+      category: "pantry",
+      subcategory: null,
+    };
+    expect(guardNormalized(cola, "cola")).toMatchObject({ category: "drinks", displayName: "Cola" });
+  });
+
   it("maps model answers and errors without throwing", async () => {
     expect(interpretNormalized(completed(WALNUTS), "walnoten")).toMatchObject({ ok: true, product: { displayName: "Walnoten" }, usage: { inputTokens: 400 } });
     expect(interpretNormalized(completed({ ...WALNUTS, calories: 600 }), "walnoten")).toMatchObject({ ok: false, code: "malformed" });

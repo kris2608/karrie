@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Usage } from "./limits.js";
 import { normalizeName, plainName, singularKey } from "./productName.js";
 import { errorCode, type RecognizeErrorCode } from "./recognize.js";
+import { resolveCategory } from "./resolveCategory.js";
 import { CATALOG_TYPES } from "./schema.js";
 
 export const DEPARTMENTS = [
@@ -113,13 +114,16 @@ export function guardNormalized(raw: RawNormalized, typed: string): NormalizedPr
   if (!near) return null;
   const label = tidy(raw.childFriendlyLabel);
   const subcategory = raw.subcategory ? tidy(raw.subcategory).slice(0, 30) : null;
+  const displayName = plainName(raw.displayName)!;
+  const heuristic = resolveCategory({ name: displayName }) ?? resolveCategory({ name: typed });
+  const category = raw.category === "pantry" && heuristic && heuristic !== "pantry" ? heuristic : raw.category;
   return {
     canonicalName: normalizeName(raw.canonicalName),
-    displayName: plainName(raw.displayName)!,
+    displayName,
     singularName: normalizeName(raw.singularName),
     pluralName: normalizeName(raw.pluralName),
     childFriendlyLabel: plainName(label) ? normalizeName(label) : normalizeName(raw.displayName),
-    category: raw.category,
+    category,
     subcategory: subcategory && plainName(subcategory) ? subcategory.toLowerCase() : null,
     closestDrawing: raw.closestDrawing === "none" ? null : raw.closestDrawing,
     confidence: raw.confidence,

@@ -8,6 +8,7 @@ import type { ProductCategory } from "../offers/match.js";
 import { PRODUCT_CATEGORIES } from "../offers/match.js";
 import { formulationWords, words } from "../nameMatch.js";
 import { parseName } from "../productName.js";
+import { resolveCategory } from "../resolveCategory.js";
 import { aliasKey, normalizedKey, packFromQuantity, packKey, sizeMatches } from "./keys.js";
 import { quantityMlOf, summarizePack, type PackEvidence, type PackEvidenceSource } from "./pack.js";
 import type {
@@ -124,12 +125,20 @@ function rebuildAnswer(row: Record<string, unknown>): BarcodeAnswer {
       ...(product.imageUrl && { imageLicense: "CC BY-SA" as const }),
     };
   }
+  const departmentRaw = asString(row.category_id);
+  const department =
+    departmentRaw &&
+    departmentRaw !== "pantry" &&
+    PRODUCT_CATEGORIES.includes(departmentRaw as ProductCategory)
+      ? (departmentRaw as ProductCategory)
+      : undefined;
   return {
     ean: String(row.gtin),
     status: confidence,
     product,
     source,
     at: new Date(String(row.last_verified_at ?? row.refreshed_at ?? Date.now())).getTime(),
+    ...(department && { department }),
   };
 }
 
@@ -210,7 +219,7 @@ export function createCatalogStore(
           const { rows } = await db.query(
             `SELECT i.gtin, i.confidence, i.source AS id_source, i.last_verified_at,
                     v.id AS variant_id, v.label AS variant_label, v.product_id,
-                    p.name, p.brand, p.formulation,
+                    p.name, p.brand, p.formulation, p.category_id,
                     f.nutri_score, f.per100, f.ingredients, f.refreshed_at, f.source_url AS facts_url
              FROM product_identifiers i
              JOIN product_variants v ON v.id = i.variant_id
@@ -427,7 +436,10 @@ export function createCatalogStore(
             const productId = productIdFromKey(key, "b");
             const pack = packFromQuantity(input.product.quantity);
             const keyPack = packKey(pack);
-            const category = guessCategory(input.product.categories) ?? "pantry";
+            const category =
+              input.department ??
+              resolveCategory({ tags: input.product.categories, name: input.product.name }) ??
+              "pantry";
 
             await ensureCategory(db, category);
             await db.query(
@@ -439,6 +451,10 @@ export function createCatalogStore(
                  name = EXCLUDED.name,
                  brand = COALESCE(EXCLUDED.brand, catalog_products.brand),
                  formulation = COALESCE(EXCLUDED.formulation, catalog_products.formulation),
+                 category_id = CASE
+                   WHEN catalog_products.category_id = 'pantry' AND EXCLUDED.category_id <> 'pantry' THEN EXCLUDED.category_id
+                   ELSE catalog_products.category_id
+                 END,
                  updated_at = now(),
                  last_seen_at = now()
                RETURNING id`,
@@ -597,7 +613,10 @@ export function createCatalogStore(
             const formulation = answer.variant;
             const key = normalizedKey([name, formulation].filter(Boolean).join(" "), name);
             const productId = productIdFromKey(key, "n");
-            const category = answer.category ?? "pantry";
+            const category =
+              answer.category ??
+              resolveCategory({ name: [name, formulation].filter(Boolean).join(" ") }) ??
+              "pantry";
             await ensureCategory(db, category);
             const aliases = [name, formulation ? `${name} ${formulation}` : null].filter((value): value is string => Boolean(value));
             await db.query(
@@ -608,6 +627,10 @@ export function createCatalogStore(
                ON CONFLICT (normalized_key) DO UPDATE SET
                  brand = COALESCE(EXCLUDED.brand, catalog_products.brand),
                  formulation = COALESCE(EXCLUDED.formulation, catalog_products.formulation),
+                 category_id = CASE
+                   WHEN catalog_products.category_id = 'pantry' AND EXCLUDED.category_id <> 'pantry' THEN EXCLUDED.category_id
+                   ELSE catalog_products.category_id
+                 END,
                  updated_at = now(),
                  last_seen_at = now()`,
               [productId, key, name, name, formulation ?? null, category, JSON.stringify(aliases)],
@@ -1203,19 +1226,6 @@ async function ensureCategory(db: Queryable, id: string) {
   );
 }
 
-function guessCategory(tags?: string[]): string | undefined {
-  if (!tags?.length) return undefined;
-  const joined = tags.join(" ").toLowerCase();
-  if (/drink|beverage|frisdrank|sap|water|koffie|thee/.test(joined)) return "drinks";
-  if (/dairy|zuivel|milk|yoghurt|kaas|cheese/.test(joined)) return "dairy";
-  if (/frozen|diepvries|ijs/.test(joined)) return "frozen";
-  if (/fruit|vegetable|groente|produce/.test(joined)) return "produce";
-  if (/bread|bakery|brood/.test(joined)) return "bakery";
-  if (/meat|vlees|vis|fish/.test(joined)) return "meat";
-  if (/breakfast|ontbijt|jam|hagelslag/.test(joined)) return "breakfast";
-  if (/household|schoonmaak|hygiene/.test(joined)) return "household";
-  return "pantry";
-}
 
 export function disabledCatalog(): Catalog {
   return {

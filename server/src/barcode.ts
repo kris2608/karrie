@@ -5,8 +5,9 @@ import type { CatalogStore } from "./catalog/types.js";
 import { eanForms } from "./ean.js";
 import { cleanUrl, get, readLimited, stripHtml, usageOf, type Fetch, type RawResponse } from "./images.js";
 import type { Usage } from "./limits.js";
-import { categoryOf } from "./nameMatch.js";
+import type { ProductCategory } from "./offers/match.js";
 import { imageRetailerName, RETAILER_RANK, type OfferRow } from "./offers/prijsprofeet.js";
+import { categoryOf, resolveCategory } from "./resolveCategory.js";
 import type { StoreImageLookup } from "./storeImage.js";
 
 /**
@@ -39,6 +40,8 @@ export type BarcodeAnswer = {
   product?: BarcodeProduct;
   source?: BarcodeSource;
   at: number;
+  /** Resolved shop department from PP slug / OFF tags / name; never invents pantry. */
+  department?: ProductCategory;
   /** Pack-size evidence from OFF / PrijsProfeet / parent; conflict means the parent should confirm. */
   pack?: PackSummary;
   /** Exact-EAN retailer image already in the catalog, so the client can skip PrijsProfeet. */
@@ -167,6 +170,12 @@ export function mergePpWithOff(
 ): BarcodeAnswer {
   const base = pp.product;
   const fill = off?.product;
+  const categories =
+    base.categories?.length && fill?.categories?.length
+      ? [...base.categories, ...fill.categories.filter((tag) => !base.categories!.includes(tag))]
+      : base.categories?.length
+        ? base.categories
+        : fill?.categories;
   const product: BarcodeProduct = {
     ...base,
     ...(fill && {
@@ -174,14 +183,22 @@ export function mergePpWithOff(
       ...(!base.brand && fill.brand ? { brand: fill.brand } : {}),
       ...(!base.quantity && fill.quantity ? { quantity: fill.quantity } : {}),
       ...(!base.variant && fill.variant ? { variant: fill.variant } : {}),
-      ...(fill.categories?.length ? { categories: fill.categories } : {}),
+      ...(categories?.length ? { categories } : {}),
       ...(!base.nutriScore && fill.nutriScore ? { nutriScore: fill.nutriScore } : {}),
       ...(!base.per100 && fill.per100 ? { per100: fill.per100 } : {}),
       ...(!base.ingredients && fill.ingredients ? { ingredients: fill.ingredients } : {}),
       ...(!base.imageUrl && fill.imageUrl ? { imageUrl: fill.imageUrl } : {}),
     }),
   };
-  return { ...pp, product, ...(storeImage && { storeImage }) };
+  const department = resolveCategory({ tags: product.categories, name: product.name });
+  return { ...pp, product, ...(department && { department }), ...(storeImage && { storeImage }) };
+}
+
+function withDepartment(answer: BarcodeAnswer): BarcodeAnswer {
+  if (answer.status === "none" || !answer.product) return answer;
+  const department =
+    answer.department ?? resolveCategory({ tags: answer.product.categories, name: answer.product.name });
+  return department ? { ...answer, department } : answer;
 }
 
 function retryAfter(header: string | null): number | undefined {
@@ -372,21 +389,23 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
   }
 
   async function persist(answer: BarcodeAnswer): Promise<BarcodeAnswer> {
-    if (!config.catalog || answer.status === "none" || !answer.product || !answer.source) return answer;
+    const withDept = withDepartment(answer);
+    if (!config.catalog || withDept.status === "none" || !withDept.product || !withDept.source) return withDept;
     await config.catalog.upsertBarcodeRecord({
-      ean: answer.ean,
-      status: answer.status,
-      product: answer.product,
-      source: answer.source,
-      at: answer.at,
+      ean: withDept.ean,
+      status: withDept.status,
+      product: withDept.product,
+      source: withDept.source,
+      at: withDept.at,
+      ...(withDept.department && { department: withDept.department }),
     });
-    const pack = await config.catalog.packForGtin(answer.ean).catch(() => null);
-    if (!pack) return answer;
+    const pack = await config.catalog.packForGtin(withDept.ean).catch(() => null);
+    if (!pack) return withDept;
     const product = {
-      ...answer.product,
+      ...withDept.product,
       ...(pack.displayQuantity ? { quantity: pack.displayQuantity } : pack.conflict ? { quantity: undefined } : {}),
     };
-    return { ...answer, product, pack };
+    return { ...withDept, product, pack };
   }
 
   function persistMiss(ean: string) {
@@ -398,11 +417,11 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     if (!config.catalog) return null;
     const hit = await config.catalog.byGtin(ean).catch(() => null);
     if (hit) {
-      const answer: BarcodeAnswer = {
+      const answer = withDepartment({
         ...hit.answer,
         pack: hit.pack,
         ...(hit.storeImage && { storeImage: hit.storeImage }),
-      };
+      });
       remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
       void config.catalog.rememberSeen(hit.productId);
       if (hit.stale) {

@@ -151,4 +151,27 @@ describe("merging barcode, photo and my products", () => {
       "dairy",
     );
   });
+
+  it("puts drinks in Dranken from PP slug, OFF tags, department, or name", () => {
+    expect(mergeDraft({ ean: CALVE, barcode: { ...WEB, product: { ...WEB.product, categories: ["frisdrank"] } } }).category).toBe("drinks");
+    expect(
+      mergeDraft({
+        ean: CALVE,
+        barcode: { ...WEB, product: { name: "Pepsi", brand: "Pepsi", categories: ["en:sodas"] } },
+      }).category,
+    ).toBe("drinks");
+    expect(mergeDraft({ ean: CALVE, barcode: { ...WEB, department: "drinks", product: { name: "Pepsi", brand: "Pepsi" } } }).category).toBe(
+      "drinks",
+    );
+    expect(mergeDraft({ ean: CALVE, barcode: { ...WEB, product: { name: "Cola zero", brand: "Coca-Cola" } } }).category).toBe("drinks");
+  });
+
+  it("prefers barcode department over a wrong vision houdbaar section", () => {
+    const draft = mergeDraft({
+      ean: CALVE,
+      barcode: { ...WEB, department: "drinks", product: { name: "Pepsi", brand: "Pepsi", categories: ["frisdrank"] } },
+      photo: { ...PHOTO, productName: "Pepsi", genericName: "Frisdrank", brand: "Pepsi", category: "houdbaar" },
+    });
+    expect(draft.category).toBe("drinks");
+  });
 });

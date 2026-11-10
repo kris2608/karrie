@@ -1,3 +1,6 @@
+import { isCategoryId } from "../../domain/categories";
+import type { CategoryId } from "../../domain/types";
+
 /** Mirrors server/src/barcode.ts. Everything is checked again here; the server answer is never trusted blindly. */
 export type BarcodeProduct = {
   name?: string;
@@ -48,6 +51,7 @@ export type BarcodeAnswer =
       product: BarcodeProduct;
       source: BarcodeSource;
       at: number;
+      department?: CategoryId;
       pack?: PackSummary;
       storeImage?: StoreImageHint;
     }
@@ -120,12 +124,14 @@ export function cleanAnswer(value: unknown, ean: string): BarcodeAnswer | null {
   const storeImage = cleanStoreHint(raw.storeImage, ean);
   if (pack?.displayQuantity) found.quantity = pack.displayQuantity;
   else if (pack?.conflict) delete found.quantity;
+  const department = isCategoryId(raw.department) ? raw.department : undefined;
   return {
     ean,
     status: raw.status,
     product: found,
     source: from,
     at: raw.at,
+    ...(department && { department }),
     ...(pack && { pack }),
     ...(storeImage && { storeImage }),
   };
