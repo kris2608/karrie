@@ -120,6 +120,26 @@ describe("merging barcode, photo and my products", () => {
     expect(mergeDraft({ ean: CALVE })).toMatchObject({ name: "", ean: CALVE, recognized: false, pack: { ean: CALVE } });
   });
 
+  it("keeps Nutri-Score from Open Food Facts on a PrijsProfeet web-page answer", () => {
+    const merged: FoundAnswer = {
+      ...WEB,
+      product: {
+        ...WEB.product,
+        nutriScore: "C",
+        per100: { sugars: 6.5 },
+        ingredients: "pinda's, zout",
+        imageUrl: "https://images.openfoodfacts.org/x.jpg",
+      },
+    };
+    const draft = mergeDraft({ ean: CALVE, barcode: merged });
+    expect(draft.pack.nutrition).toEqual({ nutriscore: "c", sugars100g: 6.5 });
+    expect(draft.pack.ingredients).toBe("pinda's, zout");
+    expect(draft.pack.imageUrl).toBe(merged.product.imageUrl);
+    expect(draft.pack.fieldSources?.nutrition).toBe("off");
+    expect(sourcesLine(draft, false)).toContain("Voeding: Open Food Facts (ODbL)");
+    expect(sourcesLine(draft, false)).toContain("jumbo.com");
+  });
+
   it("uses only exact catalog names and clear Open Food Facts shop sections", () => {
     expect(catalogByName("Pindakaas")?.id).toBe("pindakaas");
     expect(catalogByName("Chocoladereep melk")).toBeNull();

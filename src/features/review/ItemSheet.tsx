@@ -16,6 +16,7 @@ import { confirmPackSize } from "../../services/barcode/pack";
 import { useAdventure } from "../../state/AdventureContext";
 import { privateLabelImages, usePrivateLabelAnswer } from "../../storage/nameImages";
 import { PackConflict } from "../photo/PackConflict";
+import { useOffNutrition } from "../add/useOffNutrition";
 import { AlternativePreviewSheet } from "./AlternativePreviewSheet";
 import { DrawingPicker } from "./DrawingPicker";
 import { PictureBlock } from "./PictureBlock";
@@ -88,6 +89,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const plKey = plQuery && listRetailer ? privateLabelLookupKey(plQuery, listRetailer) : undefined;
   const altAnswer = usePrivateLabelAnswer(plKey);
   const jumboAlt = altAnswer?.privateLabelAlternatives?.[0] ?? null;
+  const nutrition = useOffNutrition(item.ean, item.nutrition);
 
   useEffect(() => {
     if (plKey) privateLabelImages.request(plKey);
@@ -124,7 +126,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
         <div className="scan-card-text">
           <h2>{item.name}</h2>
           {detail && <span>{detail}</span>}
-          <NutriScoreMark grade={item.nutrition?.nutriscore} />
+          <NutriScoreMark grade={nutrition?.nutriscore} />
           <span>{categoryLabel(item.category)}</span>
           {item.ean && <small>EAN {item.ean}</small>}
           {item.source === "vision" && <small>Herkend van een foto</small>}

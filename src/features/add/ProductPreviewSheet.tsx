@@ -8,6 +8,7 @@ import { retailerName, type RetailerId } from "../../domain/retailers";
 import type { AdventureItem, CategoryId, PackInfo } from "../../domain/types";
 import { ProductInfo } from "../review/ProductInfo";
 import { OfferTag } from "../offers/OfferTag";
+import { useOffNutrition } from "./useOffNutrition";
 
 /** Enough pack fields for art, Nutri-Score, barcode and facts when the tile has a remembered or listed item. */
 export type PreviewPack = Pick<PackInfo, "brand" | "packageSize" | "source" | "recognition" | "nutrition" | "ean" | "barcode"> & {
@@ -38,6 +39,7 @@ function sparsePack(pack?: PreviewPack) {
 export function ProductPreviewSheet({ open, name, category, art, pack, mine, offer, quantity, onAdd, onClose }: ProductPreviewSheetProps) {
   const brand = pack ? brandLabel({ name, brand: pack.brand }) : undefined;
   const detail = [brand, pack?.recognition?.variant, pack?.packageSize].filter(Boolean).join(" · ");
+  const nutrition = useOffNutrition(pack?.ean, pack?.nutrition);
   const factsItem = pack
     ? ({
         id: "preview",
@@ -51,7 +53,7 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
         packageSize: pack.packageSize,
         source: pack.source,
         recognition: pack.recognition,
-        nutrition: pack.nutrition,
+        nutrition,
         ean: pack.ean,
         barcode: pack.barcode,
       } satisfies AdventureItem)
@@ -65,7 +67,7 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
           <div className="scan-card-text">
             <h2>{name}</h2>
             {detail && <span>{detail}</span>}
-            <NutriScoreMark grade={pack?.nutrition?.nutriscore} />
+            <NutriScoreMark grade={nutrition?.nutriscore} />
             <span>{categoryLabel(category)}</span>
             {mine && <small>Uit Mijn producten</small>}
             {pack?.ean && <small data-testid="preview-ean">EAN {pack.ean}</small>}

@@ -523,6 +523,10 @@ export function createCatalogStore(
               [input.ean, bindVariantId, input.source.kind === "off" ? "openfoodfacts" : "web", input.status, packConflict],
             );
 
+            const hasOffFacts = Boolean(input.product.nutriScore || input.product.per100 || input.product.ingredients);
+            const offFactsUrl =
+              input.source.kind === "off" ? input.source.url : `https://world.openfoodfacts.org/product/${input.ean}`;
+
             if (input.source.kind === "off") {
               await upsertEvidence(db, {
                 gtin: input.ean,
@@ -533,7 +537,9 @@ export function createCatalogStore(
                 at: input.at,
               });
               await refreshConflictFlag(db, input.ean);
+            }
 
+            if (input.source.kind === "off" || hasOffFacts) {
               const when = new Date(input.at).toISOString();
               await db.query(
                 `INSERT INTO product_facts (
@@ -541,13 +547,13 @@ export function createCatalogStore(
                  ) VALUES ($1, 'openfoodfacts', $2, 'ODbL', $3, $4::jsonb, $5, $6::timestamptz, $6::timestamptz)
                  ON CONFLICT (variant_id, source) DO UPDATE SET
                    source_url = EXCLUDED.source_url,
-                   nutri_score = EXCLUDED.nutri_score,
-                   per100 = EXCLUDED.per100,
-                   ingredients = EXCLUDED.ingredients,
+                   nutri_score = COALESCE(EXCLUDED.nutri_score, product_facts.nutri_score),
+                   per100 = COALESCE(EXCLUDED.per100, product_facts.per100),
+                   ingredients = COALESCE(EXCLUDED.ingredients, product_facts.ingredients),
                    refreshed_at = EXCLUDED.refreshed_at`,
                 [
                   bindVariantId,
-                  input.source.url,
+                  offFactsUrl,
                   input.product.nutriScore ?? null,
                   input.product.per100 ? JSON.stringify(input.product.per100) : null,
                   input.product.ingredients ?? null,
@@ -556,7 +562,8 @@ export function createCatalogStore(
               );
             }
 
-            if (input.product.imageUrl && input.source.kind === "off") {
+            // product.imageUrl is always an images.openfoodfacts.org URL when set.
+            if (input.product.imageUrl) {
               const imageId = imageIdOf(resolvedProductId, input.product.imageUrl);
               await db.query(
                 `INSERT INTO product_images (
@@ -567,7 +574,7 @@ export function createCatalogStore(
                    preferred = true,
                    usage_status = 'cc_by_sa',
                    last_checked_at = now()`,
-                [imageId, resolvedProductId, bindVariantId, input.product.imageUrl, input.source.url],
+                [imageId, resolvedProductId, bindVariantId, input.product.imageUrl, offFactsUrl],
               );
             }
 

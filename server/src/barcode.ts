@@ -159,6 +159,31 @@ export function offUrl(ean: string): string {
   return `${BARCODE_RULES.offOrigin}/api/v3/product/${ean}?${params}`;
 }
 
+/** PrijsProfeet identity wins; Open Food Facts only fills empty nutrition and related slots. */
+export function mergePpWithOff(
+  pp: BarcodeAnswer & { product: BarcodeProduct; source: BarcodeSource },
+  off: { product: BarcodeProduct } | null,
+  storeImage?: NonNullable<BarcodeAnswer["storeImage"]>,
+): BarcodeAnswer {
+  const base = pp.product;
+  const fill = off?.product;
+  const product: BarcodeProduct = {
+    ...base,
+    ...(fill && {
+      ...(!base.name && fill.name ? { name: fill.name } : {}),
+      ...(!base.brand && fill.brand ? { brand: fill.brand } : {}),
+      ...(!base.quantity && fill.quantity ? { quantity: fill.quantity } : {}),
+      ...(!base.variant && fill.variant ? { variant: fill.variant } : {}),
+      ...(fill.categories?.length ? { categories: fill.categories } : {}),
+      ...(!base.nutriScore && fill.nutriScore ? { nutriScore: fill.nutriScore } : {}),
+      ...(!base.per100 && fill.per100 ? { per100: fill.per100 } : {}),
+      ...(!base.ingredients && fill.ingredients ? { ingredients: fill.ingredients } : {}),
+      ...(!base.imageUrl && fill.imageUrl ? { imageUrl: fill.imageUrl } : {}),
+    }),
+  };
+  return { ...pp, product, ...(storeImage && { storeImage }) };
+}
+
 function retryAfter(header: string | null): number | undefined {
   if (!header) return undefined;
   const seconds = Number(header);
@@ -440,18 +465,39 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
   async function lookupFresh(ean: string, allowWeb: boolean, options: { refreshOnly?: boolean } = {}): Promise<LookupResult> {
     const failures: string[] = [];
     const storePromise = withStore(ean);
-    let raw: OffProduct | null;
+    let raw: OffProduct | null = null;
+    let offFailed = false;
     try {
       raw = await askOff(ean);
     } catch (error) {
+      offFailed = true;
       failures.push(error instanceof OffError ? `off:http-${error.status}` : "off:unreachable");
-      if (!options.refreshOnly) remember(ean, { error: true, until: now() + BARCODE_RULES.errorTtlMs });
-      return { ok: false, code: "unavailable", failures };
     }
     const store = await storePromise;
     const off = raw ? fromOff(ean, raw) : null;
+    const fromPp = fromPrijsProfeet(ean, store.rows);
+
+    if (fromPp) {
+      if (!off && !offFailed) failures.push(raw ? "off:not-credible" : "off:not-found");
+      let answer = mergePpWithOff(fromPp as BarcodeAnswer & { product: BarcodeProduct; source: BarcodeSource }, off, store.image);
+      answer = await persist(answer);
+      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
+      return { ok: true, answer, cached: false, searchCalls: 0, failures };
+    }
+
+    if (offFailed) {
+      if (!options.refreshOnly) remember(ean, { error: true, until: now() + BARCODE_RULES.errorTtlMs });
+      return { ok: false, code: "unavailable", failures };
+    }
+
     if (off) {
-      const source: BarcodeSource = { kind: "off", name: "Open Food Facts", url: `${BARCODE_RULES.offOrigin}/product/${ean}`, dataLicense: "ODbL", ...(off.product.imageUrl && { imageLicense: "CC BY-SA" as const }) };
+      const source: BarcodeSource = {
+        kind: "off",
+        name: "Open Food Facts",
+        url: `${BARCODE_RULES.offOrigin}/product/${ean}`,
+        dataLicense: "ODbL",
+        ...(off.product.imageUrl && { imageLicense: "CC BY-SA" as const }),
+      };
       let answer: BarcodeAnswer = {
         ean,
         status: off.status,
@@ -464,16 +510,9 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
       return { ok: true, answer, cached: false, searchCalls: 0, failures };
     }
+
     failures.push(raw ? "off:not-credible" : "off:not-found");
     if (options.refreshOnly) return { ok: true, answer: { ean, status: "none", at: now() }, cached: false, searchCalls: 0, failures };
-
-    const fromPp = fromPrijsProfeet(ean, store.rows);
-    if (fromPp) {
-      let answer: BarcodeAnswer = { ...fromPp, ...(store.image && { storeImage: store.image }) };
-      answer = await persist(answer);
-      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
-      return { ok: true, answer, cached: false, searchCalls: 0, failures };
-    }
 
     if (!allowWeb || !config.web) {
       // Without the web search the miss is not final, so it is kept briefly.

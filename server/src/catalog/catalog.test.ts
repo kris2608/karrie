@@ -161,6 +161,34 @@ describe("shared barcode catalog", () => {
     expect(hit?.answer.status).toBe("web-page");
   });
 
+  it("persists Open Food Facts nutrition on a PrijsProfeet web-page upsert", async () => {
+    const { catalog, pool } = await readyCatalog();
+    const ean = "8710624292502";
+    const imageUrl = "https://images.openfoodfacts.org/images/products/871/062/429/2502/front.jpg";
+    await catalog.upsertBarcodeRecord({
+      ean,
+      status: "web-page",
+      product: {
+        name: "Cola",
+        brand: "Test",
+        nutriScore: "E",
+        per100: { energyKcal: 42, sugars: 10.6 },
+        ingredients: "water, suiker",
+        imageUrl,
+      },
+      source: { kind: "web", name: "Jumbo", url: "https://www.jumbo.com/producten/cola" },
+      at: Date.now(),
+    });
+    const { rows } = await pool.query(`SELECT nutri_score, ingredients, source FROM product_facts`);
+    expect(rows[0]).toMatchObject({ nutri_score: "E", ingredients: "water, suiker", source: "openfoodfacts" });
+    const hit = await catalog.byGtin(ean);
+    expect(hit?.answer).toMatchObject({
+      status: "web-page",
+      source: { kind: "web" },
+      product: { name: "Cola", brand: "Test", nutriScore: "E", ingredients: "water, suiker", imageUrl },
+    });
+  });
+
   it("falls back to Open Food Facts when the database is down", async () => {
     const broken = {
       enabled: true as const,

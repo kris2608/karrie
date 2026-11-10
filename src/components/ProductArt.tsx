@@ -420,14 +420,35 @@ const croissant: Draw = ({ color, accent }) => ({
   marks: line("M44 52q6 16 0 34M64 44v40M84 52q-6 16 0 34", accent ?? shade(color, 0.25), 3),
 });
 
-const cracker: Draw = ({ color, accent }) => ({
-  layers: [
-    L(<ellipse cx="64" cy="58" rx="36" ry="12" />, accent ?? shade(color, 0.12)),
-    L(<path d="M28 64c0 7 16 12 36 12s36-5 36-12v14c0 7-16 12-36 12s-36-5-36-12z" />, color),
-    L(<ellipse cx="64" cy="64" rx="36" ry="12" />, tint(color, 0.25)),
-  ],
-  marks: <g>{[[52, 62], [64, 66], [76, 62]].map(([cx, cy]) => dot(cx, cy, 2, shade(color, 0.3)))}</g>,
-});
+/** Stack of square knäckebröd / crispbread — not round biscuits. */
+const cracker: Draw = ({ color, accent }) => {
+  const holes = shade(color, 0.28);
+  return {
+    layers: [
+      L(<rect x="28" y="70" width="72" height="28" rx="4" />, accent ?? shade(color, 0.12)),
+      L(<rect x="24" y="50" width="72" height="28" rx="4" />, shade(color, 0.06)),
+      L(<rect x="32" y="30" width="72" height="28" rx="4" />, color, {
+        shine: [{ cx: 48, cy: 40, rx: 14, ry: 4, rot: -8 }],
+      }),
+    ],
+    marks: (
+      <g fill={holes}>
+        {[
+          [44, 38],
+          [58, 38],
+          [72, 38],
+          [86, 38],
+          [44, 48],
+          [58, 48],
+          [72, 48],
+          [86, 48],
+        ].map(([cx, cy]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2.2" />
+        ))}
+      </g>
+    ),
+  };
+};
 
 const milk: Draw = ({ color, accent = "#4aa8e0" }) => ({
   layers: [
@@ -551,6 +572,129 @@ const pasta: Draw = () => ({
       <rect x="64" y="52" width="18" height="8" rx="4" transform="rotate(20 73 56)" />
       <rect x="54" y="70" width="18" height="8" rx="4" transform="rotate(-10 63 74)" />
       <rect x="70" y="70" width="12" height="8" rx="4" transform="rotate(30 76 74)" />
+    </g>
+  ),
+});
+
+/** Whole avocado with a cut half showing the pit. */
+const avocado: Draw = ({ color = "#5a8f3a", accent = "#c9a15b" }) => ({
+  layers: [
+    L(
+      <path d="M86 48c10 8 14 24 8 40-6 18-22 30-36 28-8-1-14-8-14-16 0-22 10-46 24-54 6-4 12-2 18 2z" />,
+      shade(color, 0.08),
+      { shine: [{ cx: 78, cy: 62, rx: 6, ry: 12, rot: 20 }] },
+    ),
+    L(
+      <path d="M42 44c14-10 30-8 40 6 8 12 8 34-2 48-8 12-22 18-34 14-14-4-22-20-18-36 2-10 8-20 14-32z" />,
+      tint(color, 0.35),
+      { flat: true },
+    ),
+    L(<ellipse cx="48" cy="72" rx="14" ry="16" />, accent, { flat: true }),
+  ],
+  marks: (
+    <g>
+      {dot(48, 72, 7, shade(accent, 0.18))}
+      {line("M70 28l4-10", BROWN, 4)}
+      {dot(72, 18, 3, BROWN)}
+    </g>
+  ),
+});
+
+/** Clear bag of mixed cut vegetables (wok / pasta veg). */
+const vegBag: Draw = ({ color = "#7dce55", accent = "#ef6a32" }) => ({
+  layers: [
+    L(<path d="M34 38h60l8 66c0 6-4 10-10 10H36c-6 0-10-4-10-10z" />, "#e8f6ef", {
+      shine: [{ cx: 44, cy: 70, rx: 4, ry: 18 }],
+    }),
+    L(<path d="M32 24h64l-4 16H36z" />, shade(color, 0.06), { flat: true }),
+  ],
+  marks: (
+    <g>
+      <rect x="42" y="54" width="16" height="10" rx="4" fill={accent} transform="rotate(-18 50 59)" />
+      <rect x="60" y="62" width="18" height="9" rx="4" fill="#f0b15a" transform="rotate(12 69 66)" />
+      <circle cx="52" cy="78" r="8" fill={color} />
+      <circle cx="70" cy="82" r="7" fill="#6aaa3a" />
+      <path d="M74 52c6-2 12 2 14 8 2 6-2 12-8 14-4 2-10 0-12-6-2-6 0-12 6-16z" fill="#ef4540" />
+      <path d="M44 88c4-8 14-10 20-4" fill="none" stroke="#3aaa4a" strokeWidth="3" strokeLinecap="round" />
+      {line("M40 28v8M52 28v8M64 28v8M76 28v8M88 28v8", tint(color, 0.4), 2)}
+    </g>
+  ),
+});
+
+/** Round cookies with chocolate chips — not a plain box. */
+const cookies: Draw = ({ color = "#f0a03a", accent = "#c47a32" }) => ({
+  layers: [
+    L(<ellipse cx="48" cy="78" rx="26" ry="24" />, shade(color, 0.08)),
+    L(<ellipse cx="78" cy="58" rx="28" ry="26" />, color, { shine: [{ cx: 68, cy: 48, rx: 10, ry: 5, rot: -20 }] }),
+  ],
+  marks: (
+    <g fill={accent}>
+      {[
+        [68, 48],
+        [86, 52],
+        [74, 64],
+        [90, 68],
+        [66, 70],
+        [40, 72],
+        [54, 82],
+        [36, 86],
+        [50, 68],
+      ].map(([cx, cy]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3.2" />
+      ))}
+    </g>
+  ),
+});
+
+/** Corn can with cob on the label. */
+const cornCan: Draw = ({ color = "#ffe14a", accent = "#f0b429" }) => ({
+  layers: [
+    L(<path d="M38 40h52v62c0 5-12 9-26 9s-26-4-26-9z" />, color, { shine: [{ cx: 46, cy: 72, rx: 3, ry: 18 }] }),
+    L(<ellipse cx="64" cy="40" rx="26" ry="8" />, tint(color, 0.45), { flat: true }),
+    L(<rect x="38" y="58" width="52" height="30" />, accent, { flat: true }),
+  ],
+  marks: (
+    <g>
+      {line("M44 40h40", shade(color, 0.2), 2)}
+      <ellipse cx="64" cy="73" rx="10" ry="12" fill="#fff3a0" stroke="#c48a3a" strokeWidth="2" />
+      {[
+        [60, 66],
+        [68, 66],
+        [60, 74],
+        [68, 74],
+        [60, 82],
+        [68, 82],
+        [64, 70],
+        [64, 78],
+      ].map(([cx, cy]) => dot(cx, cy, 1.6, "#f0b429"))}
+      <path d="M64 58c-4-6 0-10 0-10s4 4 0 10z" fill="#3aaa4a" />
+    </g>
+  ),
+});
+
+/** Pickle jar with gherkins inside — not a generic sauce jar. */
+const pickleJar: Draw = ({ color = "#7dce55", accent = "#3aaa4a" }) => ({
+  layers: jarLayers("#dff6c8", "#c9a15b", tint(color, 0.35), false),
+  marks: (
+    <g>
+      <path
+        d="M48 68c-2 10 2 22 8 24 4 2 8-2 10-10 2-10-2-22-8-24-4-2-8 2-10 10z"
+        fill={color}
+        stroke={accent}
+        strokeWidth="2"
+      />
+      <path
+        d="M66 72c-2 10 2 20 8 22 4 2 8-2 10-10 2-10-2-20-8-22-4-2-8 2-10 10z"
+        fill={shade(color, 0.08)}
+        stroke={accent}
+        strokeWidth="2"
+      />
+      {[
+        [52, 74],
+        [56, 84],
+        [72, 78],
+        [76, 88],
+      ].map(([cx, cy]) => dot(cx, cy, 1.6, tint(accent, 0.35)))}
     </g>
   ),
 });
@@ -751,6 +895,9 @@ const BESPOKE: Record<string, Draw> = {
   sperziebonen: greenBeans,
   knoflook: garlic,
   aubergine: eggplant,
+  avocado,
+  wokgroenten: vegBag,
+  pastagroenten: vegBag,
   brood: bread,
   melk: milk,
   eieren: eggs,
@@ -765,6 +912,10 @@ const BESPOKE: Record<string, Draw> = {
   pasta,
   pindakaas: peanutButter,
   toiletpapier: toiletRoll,
+  crackers: cracker,
+  koekjes: cookies,
+  mais: cornCan,
+  augurk: pickleJar,
 };
 
 export const BESPOKE_IDS = Object.keys(BESPOKE);

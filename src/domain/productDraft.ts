@@ -76,8 +76,12 @@ export function catalogByName(name: string | undefined): Product | null {
   return (wanted && products.find((product) => [product.name, ...product.aliases].some((alias) => normalize(alias) === wanted))) || null;
 }
 
-function nutritionOf(answer: FoundAnswer | undefined): Nutrition | undefined {
-  if (!answer || answer.source.kind !== "off") return undefined;
+/**
+ * Nutri-Score and per-100g from the barcode product payload.
+ * The server only places these fields from Open Food Facts (including on PP-primary web-page answers).
+ */
+export function nutritionOf(answer: FoundAnswer | undefined): Nutrition | undefined {
+  if (!answer?.product) return undefined;
   const { per100 = {}, nutriScore } = answer.product;
   const nutrition: Nutrition = {
     nutriscore: nutriScore?.toLowerCase(),
@@ -142,10 +146,8 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     "pantry";
   const offImage = mine?.imageSource === "off" ? mine.imageUrl : found?.imageUrl;
   const nutrition = mine?.nutrition ?? nutritionOf(barcode);
-  const ingredients =
-    mine?.ingredients ??
-    (barcode?.source.kind === "off" ? barcode.product.ingredients?.trim().slice(0, 600) || undefined : undefined) ??
-    vision?.pack.recognition?.ingredientsSeen;
+  const fromBarcodeIngredients = barcode?.product.ingredients?.trim().slice(0, 600) || undefined;
+  const ingredients = mine?.ingredients ?? fromBarcodeIngredients ?? vision?.pack.recognition?.ingredientsSeen;
   const kept = (name: FieldName) => {
     const field = fields[name];
     return field && field.source !== "guess" ? field.value : undefined;

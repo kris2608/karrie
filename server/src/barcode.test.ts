@@ -204,7 +204,7 @@ describe("barcode lookup", () => {
     expect(calls.filter((call) => call.url.startsWith(BARCODE_RULES.offOrigin))).toHaveLength(2);
   });
 
-  it("uses PrijsProfeet pack size in the first Open Food Facts answer", async () => {
+  it("prefers PrijsProfeet identity and fills Nutri-Score from Open Food Facts", async () => {
     const pack: PackSummary = {
       sources: [
         { source: "openfoodfacts", quantityRaw: "220 ml", quantityMl: 220, retrievedAt: 1 },
@@ -246,7 +246,53 @@ describe("barcode lookup", () => {
     const result = await lookup.lookup(CALVE, { allowWeb: true });
     expect(result).toMatchObject({
       ok: true,
-      answer: { status: "off-exact", product: { quantity: "1 l" }, pack: { displayQuantity: "1 l", conflict: false } },
+      answer: {
+        status: "web-page",
+        source: { kind: "web", name: "Jumbo" },
+        product: {
+          name: "Campina vanillevla",
+          brand: "Campina",
+          quantity: "1 l",
+          nutriScore: "C",
+          imageUrl: OFF_CALVE.image_front_url,
+        },
+        pack: { displayQuantity: "1 l", conflict: false },
+      },
+    });
+  });
+
+  it("still answers from PrijsProfeet when Open Food Facts is down", async () => {
+    const storeRows: OfferRow[] = [
+      {
+        retailer: "jumbo",
+        sourceProductId: "j1",
+        productName: "Campina vanillevla",
+        brand: "Campina",
+        ean: CALVE,
+        quantity: "1 l",
+        promotionStatus: "unknown",
+        sourceUrl: "https://www.jumbo.com/producten/campina",
+      },
+    ];
+    let time = 1_000_000;
+    const lookup = createBarcodeLookup(
+      {
+        userAgent: "Karrie/1.0 (https://karrieapp.onrender.com)",
+        storeImages: { find: async () => ({ ok: true, image: null, rows: storeRows, cached: false }) },
+      },
+      async () => offResponse(null, 503),
+      () => time,
+      async () => undefined,
+    );
+    const result = await lookup.lookup(CALVE, { allowWeb: true });
+    expect(result).toMatchObject({
+      ok: true,
+      answer: {
+        status: "web-page",
+        product: { name: "Campina vanillevla", brand: "Campina" },
+        source: { kind: "web", name: "Jumbo" },
+      },
+      failures: ["off:http-503"],
     });
   });
 

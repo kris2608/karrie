@@ -108,7 +108,13 @@ export function packFromVision(vision: VisionPack, photoId?: string): PackInfo {
     source: vision.barcode ? (vision.barcode.status === "web-page" ? "barcode" : "off") : vision.recognition ? "vision" : "manual",
     nutrition: vision.nutrition,
     ingredients: vision.ingredients,
-    offAttribution: vision.barcode && vision.barcode.status !== "web-page" ? true : undefined,
+    offAttribution:
+      (vision.barcode && vision.barcode.status !== "web-page") ||
+      Boolean(vision.nutrition) ||
+      Boolean(vision.ingredients) ||
+      Boolean(vision.imageUrl)
+        ? true
+        : undefined,
     barcode: vision.barcode,
     fieldSources: vision.fieldSources,
     recognition: vision.recognition,

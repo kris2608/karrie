@@ -51,7 +51,11 @@ export function sourcesLine(draft: ProductDraft | null, hasPhoto: boolean): stri
   const parts: string[] = [];
   const barcode = draft.from.barcode;
   if (barcode?.source.kind === "off") parts.push(`Gegevens: Open Food Facts (ODbL)${draft.imageUrl && !hasPhoto ? ", foto CC BY-SA" : ""}.`);
-  if (barcode?.source.kind === "web") parts.push(`Gevonden op ${barcode.source.name} via de streepjescode.`);
+  if (barcode?.source.kind === "web") {
+    parts.push(`Gevonden op ${barcode.source.name} via de streepjescode.`);
+    const offBits = Boolean(draft.pack.nutrition || draft.pack.ingredients || (draft.imageUrl && !hasPhoto));
+    if (offBits) parts.push(`Voeding: Open Food Facts (ODbL)${draft.imageUrl && !hasPhoto ? ", foto CC BY-SA" : ""}.`);
+  }
   if (draft.from.photo) parts.push("Herkend met OpenAI.");
   if (draft.from.mine && !barcode && !draft.from.photo) return "Uit Mijn producten.";
   parts.push("Controleer het altijd even zelf.");

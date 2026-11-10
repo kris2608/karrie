@@ -23,7 +23,7 @@ it("heeft een catalogus van minstens 80 unieke producten", () => {
   expect(products.length).toBeGreaterThanOrEqual(80);
   expect(new Set(products.map((product) => product.id)).size).toBe(products.length);
   expect(products.filter((product) => !ART[product.id]).map((product) => product.id)).toEqual([]);
-  expect(BESPOKE_IDS).toHaveLength(24);
+  expect(BESPOKE_IDS).toHaveLength(31);
   expect(BESPOKE_IDS.filter((id) => !products.some((product) => product.id === id))).toEqual([]);
 });
 

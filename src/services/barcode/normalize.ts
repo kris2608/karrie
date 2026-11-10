@@ -115,7 +115,7 @@ export function cleanAnswer(value: unknown, ean: string): BarcodeAnswer | null {
   const from = source(raw.source);
   if (!from || (!found.name && !found.imageUrl)) return null;
   if ((raw.status === "web-page") !== (from.kind === "web")) return null;
-  if (from.kind === "web") delete found.imageUrl;
+  // Keep OFF-hosted imageUrl on web-page answers (PP identity + OFF photo fill).
   const pack = cleanPack(raw.pack);
   const storeImage = cleanStoreHint(raw.storeImage, ean);
   if (pack?.displayQuantity) found.quantity = pack.displayQuantity;

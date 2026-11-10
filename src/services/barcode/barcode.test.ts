@@ -43,6 +43,35 @@ describe("barcode answers from the server", () => {
     expect(cleanAnswer({ ...OFF_ANSWER, status: "web-page" }, CALVE)).toBeNull();
     expect(cleanAnswer({ ...OFF_ANSWER, source: { kind: "off", url: "http://insecure.example" } }, CALVE)).toBeNull();
   });
+
+  it("keeps OFF nutrition and photo on a web-page (PrijsProfeet) answer", () => {
+    const merged = {
+      ean: CALVE,
+      status: "web-page" as const,
+      product: {
+        name: "Campina vanillevla",
+        brand: "Campina",
+        quantity: "1 l",
+        nutriScore: "B" as const,
+        per100: { sugars: 12 },
+        ingredients: "melk, suiker",
+        imageUrl: "https://images.openfoodfacts.org/images/products/871/front.jpg",
+      },
+      source: { kind: "web" as const, name: "Jumbo", url: "https://www.jumbo.com/producten/campina" },
+      at: 1,
+    };
+    expect(cleanAnswer(merged, CALVE)).toMatchObject({
+      status: "web-page",
+      product: {
+        name: "Campina vanillevla",
+        nutriScore: "B",
+        per100: { sugars: 12 },
+        ingredients: "melk, suiker",
+        imageUrl: merged.product.imageUrl,
+      },
+      source: { kind: "web", name: "Jumbo" },
+    });
+  });
 });
 
 describe("barcode lookup on the device", () => {
