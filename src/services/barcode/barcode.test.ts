@@ -148,4 +148,29 @@ describe("barcode lookup on the device", () => {
 
     expect(await limited.lookup("8710400000007", [])).toMatchObject({ status: "error", code: "invalid" });
   });
+
+  it("force-refresh hits the API even with a fresh cache and writes the new answer", async () => {
+    const repaired = {
+      ...OFF_ANSWER,
+      product: { ...OFF_ANSWER.product, name: "Calvé Pindakaas sticky", quantity: "600 g" },
+      catalogProductId: "b-calve",
+      catalogVariantId: "abcdef0123456789",
+      at: 2,
+    };
+    const { lookup, requests, cache } = setup(ok(repaired));
+    cache.set(CALVE, { answer: OFF_ANSWER, savedAt: 1_000_000 });
+    expect(await lookup.refresh(CALVE)).toMatchObject({
+      status: "found",
+      cached: false,
+      answer: { product: { name: "Calvé Pindakaas sticky", quantity: "600 g" }, catalogProductId: "b-calve" },
+    });
+    expect(requests).toHaveLength(1);
+    expect(cache.get(CALVE)).toMatchObject({ answer: { product: { quantity: "600 g" } } });
+  });
+
+  it("force-refresh stays offline without a request", async () => {
+    const { lookup, requests } = setup(ok(OFF_ANSWER), false);
+    expect(await lookup.refresh(CALVE)).toEqual({ status: "offline", ean: CALVE });
+    expect(requests).toHaveLength(0);
+  });
 });

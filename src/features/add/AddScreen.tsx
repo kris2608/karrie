@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../../domain/categories";
 import { customAddLabel, orderedCatalogResults, pinnedCatalogGeneric } from "../../domain/addSearch";
@@ -16,6 +16,7 @@ import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
+import { usePullToRefresh } from "../../hooks/usePullToRefresh";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { activeSection } from "./sectionSpy";
 import { NewProductSheet, type NewProductChoice } from "./NewProductSheet";
@@ -28,7 +29,9 @@ import { useOfferViews } from "../../storage/offers";
 import { buzz } from "../../feedback/haptics";
 import { playPop } from "../../feedback/sound";
 import { badgeSpring, spring } from "../../motion/variants";
+import { catalogSync } from "../../services/catalog/sync";
 import { recognizeList } from "../../state/reducer";
+import { collectRefreshEans, runRefreshEanPacks } from "../../state/refreshEanPacks";
 import { useAdventure } from "../../state/AdventureContext";
 
 type DraftLine = {
@@ -187,6 +190,21 @@ export function AddScreen() {
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
+  const sheetOpen = newName !== null || pasteOpen || pickingStore || preview !== null;
+  const onPullRefresh = useCallback(async () => {
+    const eans = collectRefreshEans(mine, adventure);
+    const [result] = await Promise.all([
+      runRefreshEanPacks({ eans, dispatch }),
+      catalogSync.refresh(),
+    ]);
+    if (result === "offline") show("Geen verbinding");
+    else if (result === "updated") show("Producten bijgewerkt");
+    else show("Niets te vernieuwen");
+  }, [mine, adventure, dispatch, show]);
+  const { progress: pullProgress, refreshing: pullRefreshing } = usePullToRefresh({
+    enabled: !sheetOpen,
+    onRefresh: onPullRefresh,
+  });
   const draft = adventure?.phase === "draft" ? adventure : null;
   const retailer = draft ? draft.retailer : settings.retailer;
   const { views, deals } = useOfferViews(draft?.items ?? NO_ITEMS, draft?.retailer);
@@ -489,6 +507,15 @@ export function AddScreen() {
 
   return (
     <main className="screen screen-add">
+      <div
+        className={pullRefreshing || pullProgress > 0.05 ? "ptr-indicator is-visible" : "ptr-indicator"}
+        style={{ "--ptr": pullProgress } as CSSProperties}
+        aria-hidden="true"
+        data-testid="ptr-indicator"
+        data-refreshing={pullRefreshing ? "true" : undefined}
+      >
+        <span className="ptr-spinner" />
+      </div>
       <div className="add-head" ref={headRef}>
         <TopBar
           title="Wat nemen we mee?"

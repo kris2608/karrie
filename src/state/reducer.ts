@@ -24,6 +24,7 @@ import type {
   BarcodeInfo,
   CategoryId,
   ImageChoice,
+  ItemSource,
   MissionState,
   NamePhoto,
   Nutrition,
@@ -32,6 +33,7 @@ import type {
   SavedItem,
   SavedList,
 } from "../domain/types";
+import { sameEan } from "../domain/ean";
 import { isRetailer, type RetailerId } from "../domain/retailers";
 import { normalizeSharedImageChoice, SHARED_IMPORT_LIST_NAME, toImportSavedItems, type SharedListV1 } from "../domain/shareList";
 import { productById, products } from "../data/catalog";
@@ -167,6 +169,22 @@ export type Action =
       ingredients?: string;
       catalogProductId?: string;
       catalogVariantId?: string;
+      offAttribution?: true;
+    }
+  /** Force-refresh central pack facts onto every local copy of this EAN; keeps parent photos and drawing ids. */
+  | {
+      type: "refresh-ean-pack";
+      ean: string;
+      name?: string;
+      brand?: string;
+      packageSize?: string;
+      barcode?: BarcodeInfo;
+      nutrition?: Nutrition;
+      ingredients?: string;
+      catalogProductId?: string;
+      catalogVariantId?: string;
+      imageUrl?: string;
+      source?: Extract<ItemSource, "off" | "barcode">;
       offAttribution?: true;
     }
   | { type: "edit-item"; itemId: string; name?: string; category?: CategoryId; icon?: string; productId?: string }
@@ -332,6 +350,59 @@ function updateCustom(state: AppState, productId: string, change: <T extends Sav
     saved: savedChanged ? saved : state.saved,
     adventure: state.adventure && listChanged ? touch(state.adventure, { items: items! }) : state.adventure,
   };
+}
+
+/** Applies one change to every local copy of an EAN: open list, Mijn producten, and saved lists. */
+function updateByEan(state: AppState, ean: string, change: <T extends SavedItem | AdventureItem>(item: T) => T): AppState {
+  const own = <T extends SavedItem | AdventureItem>(item: T) => sameEan(item.ean, ean);
+  const apply = <T extends SavedItem | AdventureItem>(items: T[]) => {
+    const next = items.map((item) => (own(item) ? change(item) : item));
+    return next.some((item, index) => item !== items[index]) ? next : items;
+  };
+  const items = state.adventure ? apply(state.adventure.items) : undefined;
+  const saved = state.saved.map((list) => {
+    const next = apply(list.items);
+    return next === list.items ? list : { ...list, items: next };
+  });
+  const mine = apply(state.mine);
+  const savedChanged = saved.some((list, index) => list !== state.saved[index]);
+  const listChanged = Boolean(state.adventure && items && items !== state.adventure.items);
+  if (mine === state.mine && !savedChanged && !listChanged) return state;
+  return {
+    ...state,
+    mine,
+    saved: savedChanged ? saved : state.saved,
+    adventure: state.adventure && listChanged ? touch(state.adventure, { items: items! }) : state.adventure,
+  };
+}
+
+/** Overwrites central pack facts for an EAN copy; keeps parent photos and gameplay drawing ids. */
+function refreshEanFields<T extends SavedItem | AdventureItem>(
+  item: T,
+  action: Extract<Action, { type: "refresh-ean-pack" }>,
+): T {
+  if (!sameEan(item.ean, action.ean)) return item;
+  const lockPhoto = Boolean(item.photoId) || item.imageSource === "parent";
+  const next: T = {
+    ...item,
+    ...(action.name && { name: action.name.trim().slice(0, 40), canonicalName: normalize(action.name) }),
+    ...(action.brand !== undefined && { brand: action.brand || undefined }),
+    ...(action.packageSize !== undefined && { packageSize: action.packageSize || undefined }),
+    ...(action.barcode && { barcode: action.barcode }),
+    ...(action.nutrition && { nutrition: action.nutrition }),
+    ...(action.ingredients !== undefined && { ingredients: action.ingredients || undefined }),
+    ...(action.catalogProductId && { catalogProductId: action.catalogProductId }),
+    ...(action.catalogVariantId && { catalogVariantId: action.catalogVariantId }),
+    ...(action.source && { source: action.source }),
+    ...(action.offAttribution && { offAttribution: true as const }),
+  };
+  if (!lockPhoto && action.imageUrl && !item.imageUrl) {
+    next.imageUrl = action.imageUrl;
+    next.imageKind = "photo";
+    next.imageSource = "off";
+    if (next.imageChoice === "drawing") delete next.imageChoice;
+  }
+  return next;
 }
 
 function enriched<T extends SavedItem | AdventureItem>(item: T, result: CustomEnrichment): T {
@@ -648,6 +719,8 @@ export function reducer(state: AppState, action: Action): AppState {
         return next;
       });
     }
+    case "refresh-ean-pack":
+      return updateByEan(state, action.ean, (item) => refreshEanFields(item, action));
     case "apply-recognition": {
       const next = updateItem(state, action.itemId, (item) => {
         if (item.ean) return action.photoId ? withParentPhoto(item, action.photoId) : item;

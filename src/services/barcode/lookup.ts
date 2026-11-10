@@ -90,7 +90,7 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
   }
 
   /** My products first: what a parent confirmed for this code wins over anything a database says. */
-  return function lookupBarcode(code: string, mine: SavedItem[]): Promise<BarcodeOutcome> {
+  function lookupBarcode(code: string, mine: SavedItem[]): Promise<BarcodeOutcome> {
     const ean = canonicalEan(code);
     if (!ean) return Promise.resolve({ status: "error", ean: code, code: "invalid" });
     const own = mine.find((entry) => sameEan(entry.ean, ean));
@@ -100,10 +100,26 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
     const promise = lookup(ean).finally(() => inFlight.delete(ean));
     inFlight.set(ean, promise);
     return promise;
-  };
+  }
+
+  /**
+   * Always hits the API when online (skips mine + cache TTL), then writes the device cache.
+   * Used by pull-to-refresh so local mine cannot block a Postgres repair.
+   */
+  async function refreshBarcode(code: string): Promise<BarcodeOutcome> {
+    const ean = canonicalEan(code);
+    if (!ean) return { status: "error", ean: code, code: "invalid" };
+    if (!deps.online()) return { status: "offline", ean };
+    const entry = await deps.readCache(ean);
+    const cached = entry && cleanAnswer(entry.answer, ean);
+    const stale = cached && entry ? { answer: cached, savedAt: entry.savedAt } : undefined;
+    return remote(ean, stale);
+  }
+
+  return Object.assign(lookupBarcode, { refresh: refreshBarcode });
 }
 
-export const lookupBarcode = createBarcodeLookup({
+const barcodeLookup = createBarcodeLookup({
   fetch: (...args) => fetch(...args),
   online: () => typeof navigator === "undefined" || navigator.onLine !== false,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
@@ -111,3 +127,6 @@ export const lookupBarcode = createBarcodeLookup({
   readCache: (ean) => readProductCache<CacheEntry>(ean),
   writeCache: (ean, entry) => writeProductCache(ean, entry),
 });
+
+export const lookupBarcode = barcodeLookup;
+export const refreshBarcode = barcodeLookup.refresh;

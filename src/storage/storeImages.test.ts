@@ -188,6 +188,25 @@ describe("retailer photo store", () => {
     expect(instance.status(EAN)).toBe("none");
   });
 
+  it("force-refresh rechecks a still-fresh found photo, and accept seeds one immediately", async () => {
+    const next = { ...STORE, imageUrl: "https://www.jumbo.com/dam-images/fit-in/360x360/Products/calve-new.png" };
+    const { instance, calls } = store(() => ({ status: "ok", image: next }), {
+      [EAN]: { state: "found", image: STORE, attempts: 0, retryAt: NOW + STORE_IMAGE_RULES.foundRecheckMs, updatedAt: NOW },
+    });
+    await instance.hydrate();
+    instance.request(EAN);
+    await settle();
+    expect(calls).toEqual([]);
+    instance.request(EAN, { refresh: true });
+    await settle();
+    expect(calls).toEqual([EAN]);
+    expect(instance.image(EAN)).toEqual(next);
+
+    const other = "8710400000006";
+    instance.accept(other, STORE);
+    expect(instance.image(other)).toEqual(STORE);
+  });
+
   it("waits for the connection when offline, without losing the request", async () => {
     let up = false;
     const { instance, calls, goOnline } = store(() => (up ? { status: "ok", image: STORE } : { status: "offline" }));

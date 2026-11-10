@@ -178,12 +178,21 @@ export function createLookupStore<V>(deps: LookupStoreDeps<V>) {
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
-    /** Queues one lookup per key; asking again for the same key is free. */
-    request(key: string | undefined) {
-      if (!key || queue.has(key) || active.has(key) || (hydrated && !due(entries[key], deps.now()))) return;
+    /**
+     * Queues one lookup per key; asking again for the same key is free.
+     * `refresh: true` bypasses the found/none retry window (pull-to-refresh).
+     */
+    request(key: string | undefined, options?: { refresh?: boolean }) {
+      if (!key || queue.has(key) || active.has(key)) return;
+      if (hydrated && !options?.refresh && !due(entries[key], deps.now())) return;
       queue.add(key);
       emit();
       pump();
+    },
+    /** Seeds a found photo immediately (e.g. barcode answer.storeImage) so the UI updates before a recheck. */
+    accept(key: string | undefined, image: V) {
+      if (!key || !found(image)) return;
+      set(key, { state: "found", image, attempts: 0, retryAt: deps.now() + rules.foundRecheckMs, updatedAt: deps.now() });
     },
   };
 }

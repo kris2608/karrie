@@ -770,6 +770,36 @@ a.settings-link { text-decoration: none; color: inherit; }
   padding-top: 0;
   padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + var(--space-6));
 }
+.ptr-indicator {
+  position: fixed;
+  top: calc(var(--safe-top) + 4px);
+  left: 0;
+  right: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  height: 36px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(calc((var(--ptr, 0) - 1) * 28px));
+  transition: opacity 0.12s ease;
+}
+.ptr-indicator.is-visible { opacity: 1; }
+.ptr-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid var(--teal-soft);
+  border-top-color: var(--teal);
+  opacity: calc(0.35 + var(--ptr, 0) * 0.65);
+  transform: rotate(calc(var(--ptr, 0) * 220deg));
+}
+.ptr-indicator[data-refreshing="true"] .ptr-spinner {
+  animation: ptr-spin 0.7s linear infinite;
+}
+@keyframes ptr-spin {
+  to { transform: rotate(360deg); }
+}
 .add-head {
   position: sticky;
   top: 0;

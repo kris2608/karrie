@@ -42,10 +42,10 @@ export function createCatalogSync(deps: CatalogSyncDeps) {
     await deps.save(state);
   }
 
-  async function pull(): Promise<void> {
+  async function pull(force = false): Promise<void> {
     if (!deps.online() || !deps.origin) return;
     const stored = (await deps.load()) ?? { since: null, products: [], checkedAt: 0 };
-    if (stored.checkedAt && deps.now() - stored.checkedAt < SIX_HOURS) {
+    if (!force && stored.checkedAt && deps.now() - stored.checkedAt < SIX_HOURS) {
       extendCatalog(stored.products);
       return;
     }
@@ -71,6 +71,16 @@ export function createCatalogSync(deps: CatalogSyncDeps) {
     await apply({ since, products, checkedAt: deps.now() });
   }
 
+  function sync(options?: { force?: boolean }) {
+    if (running) return running;
+    running = pull(options?.force === true)
+      .catch(() => undefined)
+      .finally(() => {
+        running = null;
+      });
+    return running;
+  }
+
   return {
     /** Apply a cached sync without network; safe during offline startup. */
     async hydrate() {
@@ -78,15 +88,9 @@ export function createCatalogSync(deps: CatalogSyncDeps) {
       if (stored?.products.length) extendCatalog(stored.products);
     },
     /** Fetch incremental changes when online; never throws. */
-    sync() {
-      if (running) return running;
-      running = pull()
-        .catch(() => undefined)
-        .finally(() => {
-          running = null;
-        });
-      return running;
-    },
+    sync,
+    /** Same as sync({ force: true }); used by pull-to-refresh on Toevoegen. */
+    refresh: () => sync({ force: true }),
   };
 }
 
