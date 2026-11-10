@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ItemArt } from "../../components/ItemArt";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
+import { productHeading } from "../../domain/productHeading";
 import { retailerName } from "../../domain/retailers";
 import { SHARED_IMPORT_LIST_NAME, toImportSavedItems, type SharedListV1 } from "../../domain/shareList";
 import type { Adventure } from "../../domain/types";
@@ -44,15 +45,19 @@ export function ImportSharedListSheet({ list, adventure, onClose, onImport }: Im
               {store ? ` · ${store}` : ""} · {items.length} {items.length === 1 ? "product" : "producten"}
             </p>
             <ul className="share-import-items" aria-label="Producten in dit lijstje">
-              {items.slice(0, 12).map((item, index) => (
-                <li key={`${item.productId}-${index}`}>
-                  <ItemArt item={item} />
-                  <span>
-                    <strong>{item.name}</strong>
-                    {item.quantity > 1 ? <small>×{item.quantity}</small> : null}
-                  </span>
-                </li>
-              ))}
+              {items.slice(0, 12).map((item, index) => {
+                const heading = productHeading({ name: item.name, brand: item.brand, packageSize: item.packageSize });
+                const detail = [heading.subtitle, item.quantity > 1 ? `×${item.quantity}` : null].filter(Boolean).join(" · ");
+                return (
+                  <li key={`${item.productId}-${index}`}>
+                    <ItemArt item={item} />
+                    <span>
+                      <strong>{heading.title}</strong>
+                      {detail ? <small className="item-detail">{detail}</small> : null}
+                    </span>
+                  </li>
+                );
+              })}
               {items.length > 12 && <li className="share-import-more">+{items.length - 12} meer</li>}
             </ul>
             {unfinished ? (

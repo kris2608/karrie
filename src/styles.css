@@ -1379,7 +1379,8 @@ a.settings-link { text-decoration: none; color: inherit; }
 .share-import-items .product-art { width: 40px; flex: none; }
 .share-import-items span { display: grid; gap: 2px; min-width: 0; }
 .share-import-items strong { font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.share-import-items small { color: var(--ink-soft); font-weight: 800; }
+.share-import-items small,
+.share-import-items .item-detail { color: var(--ink-soft); font-weight: 800; }
 .share-import-more { color: var(--ink-soft); font-weight: 800; padding-left: calc(40px + var(--space-3)); }
 .share-import-actions { display: grid; gap: var(--space-3); }
 .share-import-actions.sheet-actions { display: grid; }
