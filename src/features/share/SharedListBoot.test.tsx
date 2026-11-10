@@ -1,12 +1,41 @@
 /** @vitest-environment jsdom */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { Adventure } from "../../domain/types";
 import { SharedListBoot } from "./SharedListBoot";
 
 const fetchList = vi.fn();
 const dispatch = vi.fn();
+
+const emptyAdventure: Adventure = {
+  id: "empty",
+  name: "Boodschappenlijst",
+  phase: "draft",
+  items: [],
+  categoryOrder: [],
+  history: [],
+  createdAt: 1,
+  updatedAt: 1,
+};
+
+const unfinishedAdventure: Adventure = {
+  ...emptyAdventure,
+  id: "open",
+  items: [
+    {
+      id: "i1",
+      productId: "banaan",
+      name: "Banaan",
+      icon: "banaan",
+      category: "produce",
+      quantity: 1,
+      status: "pending",
+    },
+  ],
+};
+
+let adventure: Adventure = emptyAdventure;
 
 vi.mock("../../services/shareList/client", () => ({
   shareListClient: {
@@ -21,25 +50,30 @@ vi.mock("../../services/analytics", () => ({
 
 vi.mock("../../state/AdventureContext", () => ({
   useAdventure: () => ({
-    adventure: {
-      id: "empty",
-      name: "Boodschappenlijst",
-      phase: "draft",
-      items: [],
-      categoryOrder: [],
-      history: [],
-      createdAt: 1,
-      updatedAt: 1,
-    } satisfies Adventure,
+    get adventure() {
+      return adventure;
+    },
     dispatch,
     hydrated: true,
   }),
 }));
 
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div
+      data-testid="location-probe"
+      data-pathname={location.pathname}
+      data-notice={(location.state as { notice?: string } | null)?.notice ?? ""}
+    />
+  );
+}
+
 afterEach(() => {
   cleanup();
   fetchList.mockReset();
   dispatch.mockReset();
+  adventure = emptyAdventure;
 });
 
 describe("SharedListBoot", () => {
@@ -110,5 +144,31 @@ describe("SharedListBoot", () => {
         }),
       }),
     );
+  });
+
+  it("saves only and returns home with a confirmation toast", async () => {
+    adventure = unfinishedAdventure;
+    fetchList.mockResolvedValue({
+      status: "ok",
+      list: {
+        version: 1,
+        items: [{ name: "Melk", quantity: 1, category: "dairy", productId: "melk" }],
+      },
+    });
+    render(
+      <MemoryRouter initialEntries={["/l/abcdefghijklmnop"]}>
+        <Routes>
+          <Route path="/l/:id" element={<SharedListBoot />} />
+          <Route path="/" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("import-shared-list")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("import-save-only"));
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "import-shared-list", mode: "save-only" }),
+    );
+    await waitFor(() => expect(screen.getByTestId("location-probe").getAttribute("data-pathname")).toBe("/"));
+    expect(screen.getByTestId("location-probe").getAttribute("data-notice")).toBe("Lijstje bewaard");
   });
 });

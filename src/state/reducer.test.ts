@@ -261,6 +261,20 @@ it("bewaart een gedeeld lijstje zonder het actieve avontuur te overschrijven", (
   expect(state.saved[0].items[0]).toMatchObject({ name: "Brood", imageKind: "generic" });
 });
 
+it("geeft naamloze gedeelde imports de titel Gedeeld lijstje", () => {
+  const unnamed = {
+    version: 1 as const,
+    items: [{ name: "Melk", quantity: 1, category: "dairy" as const, productId: "melk" }],
+  };
+  let state = reducer(initialState, { type: "import-shared-list", list: unnamed, mode: "save-only" });
+  expect(state.saved[0]?.name).toBe("Gedeeld lijstje");
+  expect(listName(state.saved[0]!)).toBe("Gedeeld lijstje");
+
+  state = reducer(initialState, { type: "import-shared-list", list: unnamed, mode: "open" });
+  expect(state.adventure?.name).toBe("Gedeeld lijstje");
+  expect(state.saved[0]?.name).toBe("Gedeeld lijstje");
+});
+
 it("maakt van een geplakte lijst een avontuur en bewaart een favoriet", () => {
   const lines = recognizeList("banaan\n2 pakken yoghurt").flatMap((line) =>
     line.product ? [{ product: line.product, quantity: line.quantity }] : [],

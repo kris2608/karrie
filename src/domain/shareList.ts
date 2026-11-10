@@ -16,6 +16,8 @@ export const SHARE_LIST_MAX_ITEMS = 100;
 export const SHARE_LIST_MAX_NAME = 40;
 export const SHARE_LIST_MAX_PACKAGE = 24;
 export const SHARE_LIST_MAX_VARIANT = 40;
+/** Home/import title when a shared snapshot has no custom name (not the generic Boodschappenlijst default). */
+export const SHARED_IMPORT_LIST_NAME = "Gedeeld lijstje";
 
 export type SharedListItemV1 = {
   name: string;

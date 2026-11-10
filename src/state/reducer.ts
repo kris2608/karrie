@@ -34,7 +34,7 @@ import type {
   SavedList,
 } from "../domain/types";
 import { isRetailer, type RetailerId } from "../domain/retailers";
-import { normalizeSharedImageChoice, toImportSavedItems, type SharedListV1 } from "../domain/shareList";
+import { normalizeSharedImageChoice, SHARED_IMPORT_LIST_NAME, toImportSavedItems, type SharedListV1 } from "../domain/shareList";
 import { productById, products } from "../data/catalog";
 import {
   createAdventure,
@@ -860,7 +860,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case "import-shared-list": {
       const items = toImportSavedItems(action.list);
       if (!items.length) return state;
-      const name = action.list.name?.trim().slice(0, 40) || DEFAULT_LIST_NAME;
+      const name = action.list.name?.trim().slice(0, 40) || SHARED_IMPORT_LIST_NAME;
       const retailer = isRetailer(action.list.retailer) ? action.list.retailer : undefined;
       const entry: SavedList = {
         id: crypto.randomUUID(),

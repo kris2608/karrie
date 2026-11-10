@@ -49,7 +49,11 @@ export function SharedListBoot() {
     dispatch({ type: "import-shared-list", list, mode });
     trackEvent({ name: "shared_list_imported", data: { item_count: list.items.length, entry: "link" } });
     setBoot({ status: "idle" });
-    navigate(mode === "open" ? "/controleren" : "/", { replace: true });
+    if (mode === "open") {
+      navigate("/controleren", { replace: true });
+      return;
+    }
+    navigate("/", { replace: true, state: { notice: "Lijstje bewaard" } });
   }
 
   return (

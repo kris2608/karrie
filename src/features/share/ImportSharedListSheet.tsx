@@ -3,7 +3,7 @@ import { ItemArt } from "../../components/ItemArt";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { retailerName } from "../../domain/retailers";
-import { toImportSavedItems, type SharedListV1 } from "../../domain/shareList";
+import { SHARED_IMPORT_LIST_NAME, toImportSavedItems, type SharedListV1 } from "../../domain/shareList";
 import type { Adventure } from "../../domain/types";
 
 export type ImportSharedListSheetProps = {
@@ -22,7 +22,7 @@ export function ImportSharedListSheet({ list, adventure, onClose, onImport }: Im
   const [confirmOpen, setConfirmOpen] = useState(false);
   const unfinished = hasUnfinished(adventure);
   const items = list ? toImportSavedItems(list) : [];
-  const title = list?.name?.trim() || "Gedeeld lijstje";
+  const title = list?.name?.trim() || SHARED_IMPORT_LIST_NAME;
   const store = list?.retailer ? retailerName(list.retailer) : null;
 
   function requestOpen() {
@@ -35,7 +35,7 @@ export function ImportSharedListSheet({ list, adventure, onClose, onImport }: Im
 
   return (
     <>
-      <Sheet open={Boolean(list)} onClose={onClose} label="Gedeeld lijstje">
+      <Sheet open={Boolean(list)} onClose={onClose} label={SHARED_IMPORT_LIST_NAME}>
         {list && (
           <div className="share-import" data-testid="import-shared-list">
             <h2>Dit lijstje openen?</h2>
