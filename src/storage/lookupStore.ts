@@ -77,6 +77,8 @@ export type LookupStoreDeps<V> = {
   rules?: LookupRules;
   /** Whether an answer holds a photo; for a barcode every answer that is not null does. */
   found?: (value: V) => boolean;
+  /** Privacy-safe analytics hook after a real network attempt settles (not offline waits). */
+  onSettled?: (info: { key: string; outcome: "found" | "not_found" | "error" }) => void;
 };
 
 export function createLookupStore<V>(deps: LookupStoreDeps<V>) {
@@ -126,7 +128,23 @@ export function createLookupStore<V>(deps: LookupStoreDeps<V>) {
       }
       return;
     }
-    set(key, nextEntry(entries[key], outcome, deps.now(), rules, found));
+    const entry = nextEntry(entries[key], outcome, deps.now(), rules, found);
+    set(key, entry);
+    if (deps.onSettled) {
+      const result =
+        outcome.status === "ok"
+          ? outcome.image !== null && found(outcome.image)
+            ? "found"
+            : "not_found"
+          : outcome.status === "limit"
+            ? "error"
+            : "error";
+      try {
+        deps.onSettled({ key, outcome: result });
+      } catch {
+        // Analytics must never break image lookups.
+      }
+    }
   }
 
   function pump() {

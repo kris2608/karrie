@@ -380,7 +380,7 @@ export function createHandler(deps: AppDeps) {
       const reply = (result: LookupResult) => {
         if (!result.ok) return send(502, { status: "error", code: result.code });
         entry.found = result.answer.status;
-        return send(200, { status: "ok", answer: result.answer });
+        return send(200, { status: "ok", answer: result.answer, lookupSource: result.lookupSource });
       };
       const hit = barcode.lookup.cached(ean);
       if (hit) {

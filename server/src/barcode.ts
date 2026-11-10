@@ -53,8 +53,11 @@ export type BarcodeAnswer = {
   storeImage?: { ean: string; imageUrl: string; retailer: string; sourceUrl?: string; quantity?: string; productName?: string; brand?: string };
 };
 
+/** Where this HTTP response came from — never inferred from EAN or catalog ids alone. */
+export type BarcodeLookupSource = "server_cache" | "postgres" | "open_food_facts" | "prijsprofeet" | "web_search";
+
 export type LookupResult =
-  | { ok: true; answer: BarcodeAnswer; cached: boolean; usage?: Usage; searchCalls: number; failures: string[] }
+  | { ok: true; answer: BarcodeAnswer; cached: boolean; lookupSource: BarcodeLookupSource; usage?: Usage; searchCalls: number; failures: string[] }
   | { ok: false; code: "unavailable"; failures: string[] };
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -332,7 +335,10 @@ class OffError extends Error {
 }
 
 export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fetch, now: () => number = Date.now, sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))) {
-  const cache = new Map<string, { answer: BarcodeAnswer; until: number } | { error: true; until: number }>();
+  const cache = new Map<
+    string,
+    { answer: BarcodeAnswer; until: number; lookupSource: BarcodeLookupSource } | { error: true; until: number }
+  >();
   const pending = new Map<string, Promise<LookupResult>>();
   let nextSlot = 0;
 
@@ -396,7 +402,10 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
     return { usage, searchCalls };
   }
 
-  function remember(ean: string, entry: { answer: BarcodeAnswer; until: number } | { error: true; until: number }) {
+  function remember(
+    ean: string,
+    entry: { answer: BarcodeAnswer; until: number; lookupSource: BarcodeLookupSource } | { error: true; until: number },
+  ) {
     if (cache.size >= BARCODE_RULES.cacheEntries) cache.delete(cache.keys().next().value as string);
     cache.set(ean, entry);
   }
@@ -440,18 +449,18 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
         pack: hit.pack,
         ...(hit.storeImage && { storeImage: hit.storeImage }),
       });
-      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
+      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs, lookupSource: "postgres" });
       void config.catalog.rememberSeen(hit.productId);
       if (hit.stale) {
         void lookupFresh(ean, false, { refreshOnly: true }).catch(() => undefined);
       }
-      return { ok: true, answer, cached: true, searchCalls: 0, failures: [] };
+      return { ok: true, answer, cached: true, lookupSource: "postgres", searchCalls: 0, failures: [] };
     }
     const miss = await config.catalog.cacheGet<{ status: "none" }>(`barcode:${ean}`).catch(() => null);
     if (miss?.status === "none") {
       const answer: BarcodeAnswer = { ean, status: "none", at: now() };
-      remember(ean, { answer, until: now() + BARCODE_RULES.missTtlMs });
-      return { ok: true, answer, cached: true, searchCalls: 0, failures: [] };
+      remember(ean, { answer, until: now() + BARCODE_RULES.missTtlMs, lookupSource: "postgres" });
+      return { ok: true, answer, cached: true, lookupSource: "postgres", searchCalls: 0, failures: [] };
     }
     return null;
   }
@@ -519,8 +528,8 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
       if (!off && !offFailed) failures.push(raw ? "off:not-credible" : "off:not-found");
       let answer = mergePpWithOff(fromPp as BarcodeAnswer & { product: BarcodeProduct; source: BarcodeSource }, off, store.image);
       answer = await persist(answer);
-      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
-      return { ok: true, answer, cached: false, searchCalls: 0, failures };
+      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs, lookupSource: "prijsprofeet" });
+      return { ok: true, answer, cached: false, lookupSource: "prijsprofeet", searchCalls: 0, failures };
     }
 
     if (offFailed) {
@@ -545,34 +554,47 @@ export function createBarcodeLookup(config: BarcodeConfig, fetchImpl: Fetch = fe
         ...(store.image && { storeImage: store.image }),
       };
       answer = await persist(answer);
-      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs });
-      return { ok: true, answer, cached: false, searchCalls: 0, failures };
+      remember(ean, { answer, until: now() + BARCODE_RULES.foundTtlMs, lookupSource: "open_food_facts" });
+      return { ok: true, answer, cached: false, lookupSource: "open_food_facts", searchCalls: 0, failures };
     }
 
     failures.push(raw ? "off:not-credible" : "off:not-found");
-    if (options.refreshOnly) return { ok: true, answer: { ean, status: "none", at: now() }, cached: false, searchCalls: 0, failures };
+    if (options.refreshOnly) {
+      return { ok: true, answer: { ean, status: "none", at: now() }, cached: false, lookupSource: "open_food_facts", searchCalls: 0, failures };
+    }
 
     if (!allowWeb || !config.web) {
       // Without the web search the miss is not final, so it is kept briefly.
       const answer: BarcodeAnswer = { ean, status: "none", at: now() };
-      remember(ean, { answer, until: now() + (config.web ? BARCODE_RULES.errorTtlMs : BARCODE_RULES.missTtlMs) });
+      const lookupSource: BarcodeLookupSource = "open_food_facts";
+      remember(ean, {
+        answer,
+        until: now() + (config.web ? BARCODE_RULES.errorTtlMs : BARCODE_RULES.missTtlMs),
+        lookupSource,
+      });
       if (!config.web) persistMiss(ean);
       if (config.web) failures.push("web:budget");
-      return { ok: true, answer, cached: false, searchCalls: 0, failures };
+      return { ok: true, answer, cached: false, lookupSource, searchCalls: 0, failures };
     }
     const web = await askWeb(ean, failures);
     let answer = web.answer ?? { ean, status: "none" as const, at: now() };
     if (web.answer) answer = await persist({ ...answer, ...(store.image && { storeImage: store.image }) });
     else persistMiss(ean);
-    remember(ean, { answer, until: now() + (web.answer ? BARCODE_RULES.foundTtlMs : BARCODE_RULES.missTtlMs) });
-    return { ok: true, answer, cached: false, usage: web.usage, searchCalls: web.searchCalls, failures };
+    remember(ean, {
+      answer,
+      until: now() + (web.answer ? BARCODE_RULES.foundTtlMs : BARCODE_RULES.missTtlMs),
+      lookupSource: "web_search",
+    });
+    return { ok: true, answer, cached: false, lookupSource: "web_search", usage: web.usage, searchCalls: web.searchCalls, failures };
   }
 
   /** A cached answer, a remembered recent error, or nothing; never calls anyone. */
   function cached(ean: string): LookupResult | null {
     const entry = cache.get(ean);
     if (!entry || entry.until <= now()) return null;
-    return "error" in entry ? { ok: false, code: "unavailable", failures: [] } : { ok: true, answer: entry.answer, cached: true, searchCalls: 0, failures: [] };
+    return "error" in entry
+      ? { ok: false, code: "unavailable", failures: [] }
+      : { ok: true, answer: entry.answer, cached: true, lookupSource: "server_cache", searchCalls: 0, failures: [] };
   }
 
   return {

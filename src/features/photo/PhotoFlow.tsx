@@ -12,7 +12,8 @@ import { trackEvent } from "../../services/analytics";
 import { lookupBarcode, type BarcodeOutcome } from "../../services/barcode/lookup";
 import { vision, type VisionResult } from "../../services/vision/client";
 import { useAdventure } from "../../state/AdventureContext";
-import { barcodeSource } from "../../state/analyticsEvents";
+import { barcodeLookupAnalytics, barcodeSource } from "../../state/analyticsEvents";
+import type { BarcodeLookupSource } from "../../services/analytics";
 import { savePhoto } from "../../storage/photos";
 import { decodeStill } from "./barcodeReader";
 import { blobToDataUrl, decodePhoto, fullRect, processPhoto, releasePhoto, type ProcessedPhoto } from "./imageProcessing";
@@ -174,6 +175,13 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
             ? "offline"
             : "error";
     trackEvent({ name: "scanner_result", data: { method: "barcode", outcome: outcomeName } }, `scanner-result:barcode:${session.current}:${ean}`);
+    const lookup = barcodeLookupAnalytics(outcome);
+    if (lookup) {
+      trackEvent(
+        { name: "barcode_lookup_result", data: { source: lookup.source as BarcodeLookupSource, outcome: lookup.outcome } },
+        `barcode-lookup:${session.current}:${ean}`,
+      );
+    }
   }
 
   /** A confirmed code from the live preview: show the product straight away when it is known, else keep the camera open. */

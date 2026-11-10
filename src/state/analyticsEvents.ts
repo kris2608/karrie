@@ -7,8 +7,18 @@ import type { Action, AppState } from "./reducer";
 export function barcodeSource(outcome: BarcodeOutcome): RecognitionSource | null {
   if (outcome.status === "mine") return "my_products";
   if (outcome.status !== "found") return null;
-  if (outcome.cached) return "cache";
-  return outcome.answer.source.kind === "off" ? "open_food_facts" : "web_search";
+  return outcome.lookupSource;
+}
+
+/** Source + outcome for barcode_lookup_result; null when there is nothing meaningful to report. */
+export function barcodeLookupAnalytics(outcome: BarcodeOutcome): { source: RecognitionSource; outcome: "success" | "not_found" | "error" | "offline" | "rate_limited" } | null {
+  if (outcome.status === "mine") return { source: "my_products", outcome: "success" };
+  if (outcome.status === "found") return { source: outcome.lookupSource, outcome: "success" };
+  if (outcome.status === "none") return { source: outcome.lookupSource ?? "device_cache", outcome: "not_found" };
+  if (outcome.status === "offline") return { source: "device_cache", outcome: "offline" };
+  if (outcome.status === "limit") return { source: "device_cache", outcome: "rate_limited" };
+  if (outcome.status === "error") return { source: "device_cache", outcome: "error" };
+  return null;
 }
 
 function addMethod(action: Action): AddMethod | null {
@@ -59,9 +69,43 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
     }
   }
 
+  if ((action.type === "found" || action.type === "mission-done") && previous?.phase === "shopping") {
+    const previousFound = previous.items.filter((item) => item.status === "found").length;
+    const nextFound = next.items.filter((item) => item.status === "found").length;
+    if (previousFound === 0 && nextFound > 0) {
+      events.push({ event: { name: "adventure_first_item_found", data: { item_count: next.items.length } }, once: `first-found:${next.id}` });
+    }
+  }
+
   if (action.type === "mission-done") {
     const done = next.items.find((item) => item.mission?.status === "done" && item.mission.kept === action.keep && !previous?.items.some((old) => old.id === item.id && old.mission?.status === "done"));
     if (done) events.push({ event: { name: "bonus_mission_completed", data: { choice: action.keep } }, once: `${next.id}:${done.id}` });
+  }
+
+  if (action.type === "mission-skip") {
+    const skipped = previous?.items.find(
+      (item) =>
+        (item.mission?.status === "offered" || item.mission?.status === "active") &&
+        next.items.some((entry) => entry.id === item.id && entry.mission?.status === "skipped"),
+    );
+    if (skipped) {
+      events.push({ event: { name: "bonus_skipped", data: { kind: "healthier" } }, once: `bonus-skip:${next.id}:${skipped.id}:healthier` });
+    }
+  }
+
+  if (action.type === "play-skip") {
+    const skipped = previous?.items.find(
+      (item) =>
+        item.play &&
+        (item.play.status === "offered" || item.play.status === "active") &&
+        next.items.some((entry) => entry.id === item.id && entry.play?.status === "skipped"),
+    );
+    if (skipped?.play) {
+      events.push({
+        event: { name: "bonus_skipped", data: { kind: skipped.play.kind } },
+        once: `bonus-skip:${next.id}:${skipped.id}:${skipped.play.kind}`,
+      });
+    }
   }
 
   if ((action.type === "found" || action.type === "mission-done") && previous?.phase === "shopping" && next.phase === "done") {
@@ -74,11 +118,18 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
 
   if ((action.type === "save-favorite" || action.type === "save-favorite-as-new") && next.items.length) {
     const wasFavorite = action.type === "save-favorite" && before.saved.some((list) => list.id === next.id && list.favorite);
-    events.push({ event: { name: "shopping_list_saved", data: { action: wasFavorite ? "updated" : "new" } }, once: `save:${next.id}:${wasFavorite ? "u" : "n"}` });
+    // Repeatable: each explicit save counts. Action-instance key avoids StrictMode double-accept without collapsing updates.
+    events.push({
+      event: { name: "shopping_list_saved", data: { action: wasFavorite ? "updated" : "new" } },
+      once: `save:${action.type}:${next.id}:${next.updatedAt}:${wasFavorite ? "u" : "n"}`,
+    });
   }
 
   if (action.type === "open-saved") {
-    events.push({ event: { name: "saved_list_reopened" }, once: `open:${action.id}:${next.id}` });
+    events.push({
+      event: { name: "saved_list_reopened" },
+      once: `open:${action.id}:${next.id}:${next.updatedAt}`,
+    });
   }
 
   return events;

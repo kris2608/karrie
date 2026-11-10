@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { trackProductImageResult } from "../services/analyticsHelpers";
 import { nameImageClient, type NameAnswer, type NameImageClient } from "../services/images/nameImage";
 import { readKv, writeKv } from "./db";
 import { createLookupStore, LOOKUP_RULES, type LookupEntry, type LookupStatus } from "./lookupStore";
@@ -19,6 +20,7 @@ export function createNameImageStore(deps: {
   load: () => Promise<Record<string, NameImageEntry> | undefined>;
   save: (entries: Record<string, NameImageEntry>) => Promise<void>;
   online: (listener: () => void) => void;
+  onSettled?: (info: { key: string; outcome: "found" | "not_found" | "error" }) => void;
 }) {
   return createLookupStore<NameAnswer>({ ...deps, rules: LOOKUP_RULES, found: (answer) => Boolean(answer.match) });
 }
@@ -30,6 +32,7 @@ export function createPrivateLabelStore(deps: {
   load: () => Promise<Record<string, NameImageEntry> | undefined>;
   save: (entries: Record<string, NameImageEntry>) => Promise<void>;
   online: (listener: () => void) => void;
+  onSettled?: (info: { key: string; outcome: "found" | "not_found" | "error" }) => void;
 }) {
   return createLookupStore<NameAnswer>({
     ...deps,
@@ -47,6 +50,7 @@ export const nameImages = createNameImageStore({
   load: () => readKv<Record<string, NameImageEntry>>(KV_KEY),
   save: (entries) => writeKv(KV_KEY, entries),
   online: (listener) => window.addEventListener("online", listener, { once: true }),
+  onSettled: ({ key, outcome }) => trackProductImageResult("name", key, outcome),
 });
 
 export const privateLabelImages = createPrivateLabelStore({
@@ -55,6 +59,7 @@ export const privateLabelImages = createPrivateLabelStore({
   load: () => readKv<Record<string, NameImageEntry>>(PRIVATE_LABEL_KV),
   save: (entries) => writeKv(PRIVATE_LABEL_KV, entries),
   online: (listener) => window.addEventListener("online", listener, { once: true }),
+  onSettled: ({ key, outcome }) => trackProductImageResult("private_label", key, outcome),
 });
 
 export function useNameAnswer(key: string | undefined): NameAnswer | null {

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { identityKey, type ImageIdentity } from "../domain/imageIdentity";
 import { factsFor, type ProductFacts } from "../domain/productFacts";
+import { trackProductImageResult } from "../services/analyticsHelpers";
 import { images as defaultClient, type DiscoverOutcome, type Discovery, type ImageClient, type ReferenceImage } from "../services/images/client";
 import { readKv, writeKv } from "./db";
 import { savePhoto, usePhotoUrl } from "./photos";
@@ -138,6 +139,13 @@ export function createReferenceStore(deps: {
       if (shown && photoId) next = { ...next, photoId, photoFor: shown.imageUrl };
     }
     set(key, next);
+    const analyticsOutcome =
+      outcome.status === "ok"
+        ? next && (next.state === "found" || next.state === "personal" || next.state === "review")
+          ? "found"
+          : "not_found"
+        : "error";
+    trackProductImageResult("reference", key, analyticsOutcome);
   }
 
   function pump() {

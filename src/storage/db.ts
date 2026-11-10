@@ -113,9 +113,27 @@ export async function writeKv(key: string, value: unknown): Promise<void> {
   await (await database()).put("kv", value, key);
 }
 
-export async function loadPersisted(): Promise<Persisted> {
+export type LoadPersistedReason = "unavailable" | "read_failed";
+
+/** Successful empty install vs failed open/read — never treat a failure as empty data. */
+export type LoadPersistedResult =
+  | { ok: true; data: Persisted }
+  | { ok: false; reason: LoadPersistedReason };
+
+/** Drop a closed/broken connection so the next open can retry. */
+export function resetDatabaseConnection(): void {
+  connection = null;
+}
+
+export async function loadPersisted(): Promise<LoadPersistedResult> {
+  let db: Awaited<ReturnType<typeof database>>;
   try {
-    const db = await database();
+    db = await database();
+  } catch {
+    resetDatabaseConnection();
+    return { ok: false, reason: "unavailable" };
+  }
+  try {
     const adventure = (await db.get("kv", "adventure")) as Adventure | null | undefined;
     const saved = (await db.get("kv", "saved")) as SavedList[] | undefined;
     const stickers = (await db.get("kv", "stickers")) as string[] | undefined;
@@ -125,19 +143,28 @@ export async function loadPersisted(): Promise<Persisted> {
     const mine = (await db.get("kv", "mine")) as SavedItem[] | undefined;
     const feedback = (await db.get("kv", "feedback")) as { completed?: string[]; asked?: boolean } | undefined;
     return {
-      adventure: adventure ?? null,
-      saved: saved ?? [],
-      stickers: stickers ?? [],
-      categoryOrder: mergeCategoryOrder(categoryOrder),
-      settings: { ...defaultSettings, ...settings },
-      declined: Array.isArray(discovery?.declined) ? discovery.declined : [],
-      mine: Array.isArray(mine) ? mine : [],
-      completedAdventures: Array.isArray(feedback?.completed) ? feedback.completed.filter((id) => typeof id === "string") : [],
-      feedbackAsked: feedback?.asked === true,
+      ok: true,
+      data: {
+        adventure: adventure ?? null,
+        saved: saved ?? [],
+        stickers: stickers ?? [],
+        categoryOrder: mergeCategoryOrder(categoryOrder),
+        settings: { ...defaultSettings, ...settings },
+        declined: Array.isArray(discovery?.declined) ? discovery.declined : [],
+        mine: Array.isArray(mine) ? mine : [],
+        completedAdventures: Array.isArray(feedback?.completed) ? feedback.completed.filter((id) => typeof id === "string") : [],
+        feedbackAsked: feedback?.asked === true,
+      },
     };
   } catch {
-    return emptyPersisted();
+    resetDatabaseConnection();
+    return { ok: false, reason: "read_failed" };
   }
+}
+
+/** Saves run only after a successful load (or after a later save hiccup while data is still in memory). */
+export function mayPersist(status: "loading" | "ready" | "failed" | "save_failed"): boolean {
+  return status === "ready" || status === "save_failed";
 }
 
 export async function savePersisted(data: Persisted): Promise<void> {

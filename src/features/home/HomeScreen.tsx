@@ -245,8 +245,19 @@ export function HomeScreen() {
             Maak samen een lijstje. In de winkel speurt je kind naar de producten en verdient sterren en stickers.
           </p>
         )}
-        {(shopping || draft) && (
-          <PressButton variant="secondary" wide onClick={() => navigate(shopping ? "/winkel" : "/controleren")}>
+        {(shopping || draft) && adventure && (
+          <PressButton
+            variant="secondary"
+            wide
+            data-testid="resume-adventure"
+            onClick={() => {
+              trackEvent(
+                { name: "adventure_resumed", data: { phase: shopping ? "shopping" : "draft" } },
+                `resume:${adventure.id}:${shopping ? "shopping" : "draft"}`,
+              );
+              navigate(shopping ? "/winkel" : "/controleren");
+            }}
+          >
             {shopping ? "Verder speuren" : "Verder met lijstje"}
           </PressButton>
         )}

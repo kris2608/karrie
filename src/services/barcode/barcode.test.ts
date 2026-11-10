@@ -30,7 +30,8 @@ function setup(reply: () => Response, online = true) {
   return { lookup, requests, cache, advance: (ms: number) => (time += ms) };
 }
 
-const ok = (answer: unknown) => () => new Response(JSON.stringify({ status: "ok", answer }), { status: 200 });
+const ok = (answer: unknown, lookupSource = "open_food_facts") => () =>
+  new Response(JSON.stringify({ status: "ok", answer, lookupSource }), { status: 200 });
 
 describe("barcode answers from the server", () => {
   it("keeps only checked fields, Open Food Facts pictures and the licence of each part", () => {
@@ -95,8 +96,8 @@ describe("barcode lookup on the device", () => {
   });
 
   it("remembers a miss for a day and never caches an error", async () => {
-    const miss = setup(ok({ ean: CALVE, status: "none", at: 1 }));
-    expect(await miss.lookup(CALVE, [])).toEqual({ status: "none", ean: CALVE });
+    const miss = setup(ok({ ean: CALVE, status: "none", at: 1 }, "postgres"));
+    expect(await miss.lookup(CALVE, [])).toEqual({ status: "none", ean: CALVE, lookupSource: "postgres" });
     await miss.lookup(CALVE, []);
     expect(miss.requests).toHaveLength(1);
     miss.advance(BARCODE_CLIENT_RULES.missTtlMs + 1);
@@ -106,6 +107,12 @@ describe("barcode lookup on the device", () => {
     const down = setup(() => new Response(JSON.stringify({ status: "error", code: "unavailable" }), { status: 502 }));
     expect(await down.lookup(CALVE, [])).toEqual({ status: "error", ean: CALVE, code: "unavailable" });
     expect(down.cache.size).toBe(0);
+  });
+
+  it("passes through server lookupSource for found answers and uses device_cache when cached", async () => {
+    const { lookup } = setup(ok(OFF_ANSWER, "postgres"));
+    expect(await lookup(CALVE, [])).toMatchObject({ status: "found", cached: false, lookupSource: "postgres" });
+    expect(await lookup(CALVE, [])).toMatchObject({ status: "found", cached: true, lookupSource: "device_cache" });
   });
 
   it("soft-revalidates a cached found answer after six hours when online", async () => {

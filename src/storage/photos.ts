@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { Adventure, PackInfo, SavedList } from "../domain/types";
+import { trackStorageFailure } from "../services/analyticsHelpers";
 import { deletePhotos, photoKeys, readPhoto, writePhoto } from "./db";
 
 type Entry = { url: string | null; loading?: Promise<void> };
@@ -30,7 +31,13 @@ function load(id: string): Promise<void> {
 /** Stores a processed photo and makes it available immediately. */
 export async function savePhoto(blob: Blob): Promise<string> {
   const id = crypto.randomUUID();
-  await writePhoto(id, blob);
+  try {
+    await writePhoto(id, blob);
+  } catch (error) {
+    const quota = error instanceof DOMException && error.name === "QuotaExceededError";
+    trackStorageFailure("photo", quota ? "quota" : "write_failed");
+    throw error;
+  }
   entries.set(id, { url: URL.createObjectURL(blob) });
   emit();
   return id;

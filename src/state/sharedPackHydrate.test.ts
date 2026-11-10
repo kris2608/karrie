@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { LOOKUP_RULES } from "../storage/lookupStore";
 import { initialState, reducer } from "./reducer";
-import { neededSharedPackEans, needsSharedPackHydrate } from "./sharedPackHydrate";
+import {
+  neededSharedPackEans,
+  needsSharedPackHydrate,
+  nextHydrateAttempt,
+  shouldAttemptHydrate,
+} from "./sharedPackHydrate";
 
 describe("shared pack hydrate", () => {
   it("flags EAN items without an OFF photo and skips drawings without commercial identity", () => {
@@ -167,3 +173,75 @@ describe("shared pack hydrate", () => {
     expect(state.adventure!.items[0].source).toBe("barcode");
   });
 });
+
+describe("shared pack hydrate retry schedule", () => {
+  it("stops after a successful find and after a durable miss", () => {
+    expect(
+      nextHydrateAttempt(undefined, { status: "found", ean: "1", answer: {} as never, cached: false, lookupSource: "open_food_facts" }, 1000),
+    ).toMatchObject({
+      status: "complete",
+    });
+    expect(nextHydrateAttempt(undefined, { status: "none", ean: "1" }, 1000)).toMatchObject({
+      status: "miss",
+      retryAt: 1000 + LOOKUP_RULES.noneRetryMs,
+    });
+    expect(shouldAttemptHydrate({ status: "complete", attempts: 1, retryAt: Infinity }, 2000)).toBe(false);
+    expect(shouldAttemptHydrate({ status: "miss", attempts: 1, retryAt: 1000 + LOOKUP_RULES.noneRetryMs }, 2000)).toBe(false);
+  });
+
+  it("backs off on temporary errors and allows a later retry", () => {
+    const first = nextHydrateAttempt(undefined, { status: "error", ean: "1", code: "unreachable" }, 1000);
+    expect(first.status).toBe("retry");
+    expect(first.retryAt).toBe(1000 + LOOKUP_RULES.errorBaseMs);
+    expect(shouldAttemptHydrate(first, 1000)).toBe(false);
+    expect(shouldAttemptHydrate(first, first.retryAt)).toBe(true);
+
+    const offline = nextHydrateAttempt(first, { status: "offline", ean: "1" }, first.retryAt);
+    expect(offline.status).toBe("retry");
+    expect(offline.attempts).toBe(2);
+    expect(offline.retryAt).toBe(first.retryAt + LOOKUP_RULES.errorBaseMs * 4);
+  });
+
+  it("respects rate limits and caps attempts", () => {
+    const limited = nextHydrateAttempt(undefined, { status: "limit", ean: "1", code: "rate-limited" }, 0);
+    expect(limited).toMatchObject({ status: "retry", retryAt: LOOKUP_RULES.limitRetryMs });
+
+    let entry = undefined as ReturnType<typeof nextHydrateAttempt> | undefined;
+    for (let i = 0; i < 8; i += 1) {
+      entry = nextHydrateAttempt(entry, { status: "error", ean: "1", code: "boom" }, i);
+    }
+    expect(entry?.status).toBe("miss");
+    expect(shouldAttemptHydrate(entry, Number.MAX_SAFE_INTEGER)).toBe(false);
+  });
+
+  it("starts a fresh key immediately and skips in-flight pending", () => {
+    expect(shouldAttemptHydrate(undefined, 0)).toBe(true);
+    expect(shouldAttemptHydrate({ status: "pending", attempts: 0, retryAt: 0 }, 0)).toBe(false);
+  });
+});
+
+describe("shared pack hydrate fail then succeed", () => {
+  it("records retry then complete across outcomes", () => {
+    const failed = nextHydrateAttempt(undefined, { status: "error", ean: "871", code: "timeout" }, 0);
+    expect(failed.status).toBe("retry");
+    const ok = nextHydrateAttempt(
+      failed,
+      { status: "found", ean: "871", answer: {} as never, cached: false, lookupSource: "open_food_facts" },
+      failed.retryAt,
+    );
+    expect(ok.status).toBe("complete");
+    expect(shouldAttemptHydrate(ok, failed.retryAt + 1)).toBe(false);
+  });
+
+  it("does not invent extra lookups for already-complete keys", () => {
+    const spy = vi.fn();
+    const complete = nextHydrateAttempt(
+      undefined,
+      { status: "found", ean: "1", answer: {} as never, cached: false, lookupSource: "open_food_facts" },
+      0,
+    );
+    if (shouldAttemptHydrate(complete, 1)) spy();
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+

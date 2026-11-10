@@ -92,6 +92,26 @@ export function ShopScreen() {
     return () => window.clearTimeout(timer);
   }, [offered, reduced]);
 
+  const missionPresented = Boolean(current && offered === current.id && missionShown === current.id && !showGuess);
+
+  useEffect(() => {
+    if (!missionPresented || !current || !adventure) return;
+    trackEvent({ name: "bonus_offered", data: { kind: "healthier" } }, `bonus-offer:${adventure.id}:${current.id}:healthier`);
+  }, [missionPresented, current, adventure]);
+
+  useEffect(() => {
+    if (!showGuess || !current || !adventure || !play) return;
+    trackEvent({ name: "bonus_offered", data: { kind: play.kind } }, `bonus-offer:${adventure.id}:${current.id}:${play.kind}`);
+  }, [showGuess, current, adventure, play]);
+
+  useEffect(() => {
+    if (!play || !current || !adventure) return;
+    if (play.kind !== "color" && play.kind !== "drag") return;
+    if (play.status !== "offered" && play.status !== "active") return;
+    if (intro || sequence.locked) return;
+    trackEvent({ name: "bonus_offered", data: { kind: play.kind } }, `bonus-offer:${adventure.id}:${current.id}:${play.kind}`);
+  }, [play, current, adventure, intro, sequence.locked]);
+
   useEffect(() => {
     if ((location.state as { intro?: boolean } | null)?.intro) navigate(".", { replace: true, state: null });
   }, [location.state, navigate]);
@@ -127,7 +147,7 @@ export function ShopScreen() {
   const canSwipe = canLater && !dragPlay;
   const searching = current?.mission?.status === "active" ? current : null;
   const missionTarget = searching?.alternative?.targetType ? productById(searching.alternative.targetType) : undefined;
-  const showMission = Boolean(current && offered === current.id && missionShown === current.id && !showGuess);
+  const showMission = missionPresented;
 
   function finishPlay(kind: "guess" | "color" | "drag") {
     dispatch({ type: "play-done" });

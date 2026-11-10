@@ -1,14 +1,27 @@
 import { canonicalEan, sameEan } from "../../domain/ean";
 import type { SavedItem } from "../../domain/types";
+import type { BarcodeLookupSource } from "../analytics";
 import { readProductCache, writeProductCache } from "../../storage/db";
 import { cleanAnswer, type BarcodeAnswer } from "./normalize";
 
 export type FoundAnswer = Extract<BarcodeAnswer, { product: unknown }>;
 
+const SERVER_SOURCES = new Set<BarcodeLookupSource>([
+  "server_cache",
+  "postgres",
+  "open_food_facts",
+  "prijsprofeet",
+  "web_search",
+]);
+
+export function parseLookupSource(value: unknown): BarcodeLookupSource | undefined {
+  return typeof value === "string" && SERVER_SOURCES.has(value as BarcodeLookupSource) ? (value as BarcodeLookupSource) : undefined;
+}
+
 export type BarcodeOutcome =
-  | { status: "mine"; ean: string; item: SavedItem }
-  | { status: "found"; ean: string; answer: FoundAnswer; cached: boolean }
-  | { status: "none"; ean: string }
+  | { status: "mine"; ean: string; item: SavedItem; lookupSource: "my_products" }
+  | { status: "found"; ean: string; answer: FoundAnswer; cached: boolean; lookupSource: BarcodeLookupSource }
+  | { status: "none"; ean: string; lookupSource?: BarcodeLookupSource }
   | { status: "offline"; ean: string }
   | { status: "limit"; ean: string; code: string }
   | { status: "error"; ean: string; code: string };
@@ -44,7 +57,9 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
 
   async function remote(ean: string, stale: CacheEntry | undefined): Promise<BarcodeOutcome> {
     const fallback = (outcome: BarcodeOutcome): BarcodeOutcome =>
-      stale && stale.answer.status !== "none" ? { status: "found", ean, answer: stale.answer, cached: true } : outcome;
+      stale && stale.answer.status !== "none"
+        ? { status: "found", ean, answer: stale.answer, cached: true, lookupSource: "device_cache" }
+        : outcome;
     if (!deps.online()) return fallback({ status: "offline", ean });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), BARCODE_CLIENT_RULES.timeoutMs);
@@ -57,14 +72,24 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
         referrerPolicy: "no-referrer",
         signal: controller.signal,
       });
-      const body = (await response.json().catch(() => null)) as { status?: string; code?: string; answer?: unknown } | null;
+      const body = (await response.json().catch(() => null)) as {
+        status?: string;
+        code?: string;
+        answer?: unknown;
+        lookupSource?: unknown;
+      } | null;
       const answer = response.ok && body?.status === "ok" ? cleanAnswer(body.answer, ean) : null;
       if (!answer) {
         const code = body?.code ?? `http-${response.status}`;
         return fallback(LIMIT_CODES.has(code) ? { status: "limit", ean, code } : { status: "error", ean, code });
       }
+      const lookupSource =
+        parseLookupSource(body?.lookupSource) ??
+        (answer.status !== "none" && answer.source?.kind === "off" ? "open_food_facts" : answer.status === "none" ? "open_food_facts" : "web_search");
       await deps.writeCache(ean, { answer, savedAt: deps.now() });
-      return answer.status === "none" ? { status: "none", ean } : { status: "found", ean, answer, cached: false };
+      return answer.status === "none"
+        ? { status: "none", ean, lookupSource }
+        : { status: "found", ean, answer, cached: false, lookupSource };
     } catch {
       return fallback(deps.online() ? { status: "error", ean, code: controller.signal.aborted ? "timeout" : "unreachable" } : { status: "offline", ean });
     } finally {
@@ -82,10 +107,12 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
         if (deps.online() && age > BARCODE_CLIENT_RULES.revalidateAfterMs) {
           void remote(ean, entry).catch(() => undefined);
         }
-        return { status: "found", ean, answer: cached, cached: true };
+        return { status: "found", ean, answer: cached, cached: true, lookupSource: "device_cache" };
       }
     }
-    if (cached?.status === "none" && age < BARCODE_CLIENT_RULES.missTtlMs) return { status: "none", ean };
+    if (cached?.status === "none" && age < BARCODE_CLIENT_RULES.missTtlMs) {
+      return { status: "none", ean, lookupSource: "device_cache" };
+    }
     return remote(ean, cached && entry ? { answer: cached, savedAt: entry.savedAt } : undefined);
   }
 
@@ -94,7 +121,7 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
     const ean = canonicalEan(code);
     if (!ean) return Promise.resolve({ status: "error", ean: code, code: "invalid" });
     const own = mine.find((entry) => sameEan(entry.ean, ean));
-    if (own) return Promise.resolve({ status: "mine", ean, item: own });
+    if (own) return Promise.resolve({ status: "mine", ean, item: own, lookupSource: "my_products" });
     const running = inFlight.get(ean);
     if (running) return running;
     const promise = lookup(ean).finally(() => inFlight.delete(ean));

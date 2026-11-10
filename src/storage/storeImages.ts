@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { trackProductImageResult } from "../services/analyticsHelpers";
 import { storeImageClient, type StoreImage, type StoreImageClient, type StoreImageOutcome } from "../services/images/storeImage";
 import { readKv, writeKv } from "./db";
 import { createLookupStore, LOOKUP_RULES, nextEntry, type LookupEntry, type LookupStatus } from "./lookupStore";
@@ -27,8 +28,17 @@ export function createStoreImageStore(deps: {
   load: () => Promise<Record<string, StoreImageEntry> | undefined>;
   save: (entries: Record<string, StoreImageEntry>) => Promise<void>;
   online: (listener: () => void) => void;
+  onSettled?: (info: { key: string; outcome: "found" | "not_found" | "error" }) => void;
 }) {
-  return createLookupStore<StoreImage>({ ...deps, rules: STORE_IMAGE_RULES });
+  return createLookupStore<StoreImage>({
+    client: deps.client,
+    now: deps.now,
+    load: deps.load,
+    save: deps.save,
+    online: deps.online,
+    rules: STORE_IMAGE_RULES,
+    ...(deps.onSettled && { onSettled: deps.onSettled }),
+  });
 }
 
 export type StoreImageStore = ReturnType<typeof createStoreImageStore>;
@@ -47,6 +57,7 @@ export const storeImages = createStoreImageStore({
   load: () => readKv<Record<string, StoreImageEntry>>(KV_KEY),
   save: (entries) => writeKv(KV_KEY, entries),
   online: (listener) => window.addEventListener("online", listener, { once: true }),
+  onSettled: ({ key, outcome }) => trackProductImageResult("store", key, outcome),
 });
 
 export function useStoreImage(ean: string | undefined): StoreImage | null {

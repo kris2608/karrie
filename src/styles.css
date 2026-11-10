@@ -108,6 +108,30 @@ h1, h2, p { margin: 0; }
 }
 .splash-mascot { width: min(220px, 60vw); }
 
+.storage-error {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  text-align: center;
+}
+.storage-error-mascot { width: min(160px, 42vw); }
+.storage-error-text {
+  max-width: 22rem;
+  margin: 0;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.toast-warn {
+  background: var(--orange);
+  box-shadow: 0 3px 0 var(--orange-shade), var(--shadow-float);
+}
+
 /* Buttons */
 
 .pbtn {

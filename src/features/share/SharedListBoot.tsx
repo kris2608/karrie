@@ -28,13 +28,21 @@ export function SharedListBoot() {
     void shareListClient.fetch(id).then((result) => {
       if (result.status === "ok") {
         setBoot({ status: "preview", list: result.list });
+        trackEvent({ name: "shared_list_open_result", data: { outcome: "preview" } }, `share-open:${id}`);
         return;
       }
       if (result.code === "expired") {
         setBoot({ status: "expired" });
+        trackEvent({ name: "shared_list_open_result", data: { outcome: "expired" } }, `share-open:${id}`);
+        return;
+      }
+      if (result.code === "not-found") {
+        setBoot({ status: "error" });
+        trackEvent({ name: "shared_list_open_result", data: { outcome: "invalid" } }, `share-open:${id}`);
         return;
       }
       setBoot({ status: "error" });
+      trackEvent({ name: "shared_list_open_result", data: { outcome: "network_error" } }, `share-open:${id}`);
     });
   }, [location.pathname]);
 

@@ -158,7 +158,7 @@ describe("collectRefreshEans", () => {
 describe("runRefreshEanPacks", () => {
   it("dispatches refresh actions for found answers and reports updated", async () => {
     const dispatch = vi.fn();
-    const refresh = vi.fn(async () => ({ status: "found" as const, ean: CALVE, answer: OFF, cached: false }));
+    const refresh = vi.fn(async () => ({ status: "found" as const, ean: CALVE, answer: OFF, cached: false, lookupSource: "open_food_facts" as const }));
     const images = { accept: vi.fn(), request: vi.fn() };
     await expect(runRefreshEanPacks({ eans: [CALVE], dispatch, refresh, storeImages: images, online: () => true })).resolves.toBe("updated");
     expect(dispatch).toHaveBeenCalledWith(refreshActionFromAnswer(CALVE, OFF));
@@ -176,7 +176,7 @@ describe("runRefreshEanPacks", () => {
         sourceUrl: "https://www.jumbo.com/producten/calve",
       },
     };
-    const refresh = vi.fn(async () => ({ status: "found" as const, ean: CALVE, answer: withStore, cached: false }));
+    const refresh = vi.fn(async () => ({ status: "found" as const, ean: CALVE, answer: withStore, cached: false, lookupSource: "open_food_facts" as const }));
     const images = { accept: vi.fn(), request: vi.fn() };
     await runRefreshEanPacks({ eans: [CALVE], dispatch, refresh, storeImages: images, online: () => true });
     expect(images.accept).toHaveBeenCalledWith(
