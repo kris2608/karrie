@@ -238,10 +238,162 @@ describe("interpret", () => {
     if (!result.ok) return;
     expect(result.recognitionOutcome).toBe("multiple");
     expect(result.needsSelection).toBe(true);
-    expect(result.candidates.map((c) => c.variant)).toEqual(["Salame", "Speciale"]);
+    // Distinct flavours and a mixed-brand neighbour stay selectable; never drop for brand mismatch alone.
+    expect(result.candidates.map((c) => c.variant ?? c.brand)).toEqual(["Salame", "Speciale", "Blue Band"]);
   });
 
-  it("collapses clear produce to a single candidate and merges near-duplicate same-SKU rows", () => {
+  it("preserves drinkyoghurt flavours, Lay's flavours, and mixed-brand packs without merging", () => {
+    const drink = interpret(
+      completed(
+        JSON.stringify({
+          recognitionOutcome: "multiple",
+          needsSelection: true,
+          primary: { ...PEANUT, productName: "Milbona drinkyoghurt", brand: "Milbona", variant: null, catalogType: "yoghurt", category: "koeling", subcategory: "drinkyoghurt", packageSize: "1 l" },
+          candidates: [
+            {
+              observedCandidateId: "c1",
+              productName: "Milbona drinkyoghurt aardbei-kers",
+              genericName: "drinkyoghurt",
+              catalogType: "yoghurt",
+              specificProduct: true,
+              brand: "Milbona",
+              variant: "aardbei-kers",
+              packageSize: "1 l",
+              category: "koeling",
+              subcategory: "drinkyoghurt",
+              ean: null,
+              inferredFields: [],
+              confidence: "high",
+            },
+            {
+              observedCandidateId: "c2",
+              productName: "Milbona drinkyoghurt mango-passievrucht",
+              genericName: "drinkyoghurt",
+              catalogType: "yoghurt",
+              specificProduct: true,
+              brand: "Milbona",
+              variant: "mango-passievrucht",
+              packageSize: "1 l",
+              category: "koeling",
+              subcategory: "drinkyoghurt",
+              ean: null,
+              inferredFields: [],
+              confidence: "high",
+            },
+          ],
+        }),
+      ),
+    );
+    expect(drink.ok && drink.needsSelection).toBe(true);
+    expect(drink.ok && drink.candidates.map((c) => c.variant)).toEqual(["aardbei-kers", "mango-passievrucht"]);
+
+    const chips = interpret(
+      completed(
+        JSON.stringify({
+          recognitionOutcome: "multiple",
+          needsSelection: true,
+          primary: { ...PEANUT, productName: "Lay's Flatchips", brand: "Lay's", variant: null, catalogType: "chips", category: "houdbaar", subcategory: "chips", packageSize: "200 g" },
+          candidates: [
+            {
+              observedCandidateId: "c1",
+              productName: "Lay's Flatchips Naturel",
+              genericName: "chips",
+              catalogType: "chips",
+              specificProduct: true,
+              brand: "Lay's",
+              variant: "Naturel",
+              packageSize: "200 g",
+              category: "houdbaar",
+              subcategory: "chips",
+              ean: null,
+              inferredFields: [],
+              confidence: "high",
+            },
+            {
+              observedCandidateId: "c2",
+              productName: "Lay's Flatchips Paprika",
+              genericName: "chips",
+              catalogType: "chips",
+              specificProduct: true,
+              brand: "Lay's",
+              variant: "Paprika",
+              packageSize: "200 g",
+              category: "houdbaar",
+              subcategory: "chips",
+              ean: null,
+              inferredFields: [],
+              confidence: "high",
+            },
+            {
+              observedCandidateId: "c3",
+              productName: "Lay's Flatchips Oven Baked",
+              genericName: "chips",
+              catalogType: "chips",
+              specificProduct: true,
+              brand: "Lay's",
+              variant: "Oven Baked",
+              packageSize: "150 g",
+              category: "houdbaar",
+              subcategory: "chips",
+              ean: null,
+              inferredFields: [],
+              confidence: "medium",
+            },
+          ],
+        }),
+      ),
+    );
+    expect(chips.ok && chips.candidates.map((c) => `${c.variant}|${c.packageSize}`)).toEqual([
+      "Naturel|200 g",
+      "Paprika|200 g",
+      "Oven Baked|150 g",
+    ]);
+
+    const mixed = interpret(
+      completed(
+        JSON.stringify({
+          recognitionOutcome: "multiple",
+          needsSelection: true,
+          primary: { ...PEANUT, productName: "Milbona kaas", brand: "Milbona", catalogType: "kaas", category: "koeling", subcategory: "kaas" },
+          candidates: [
+            {
+              observedCandidateId: "c1",
+              productName: "Milbona Goudse oud",
+              genericName: "kaas",
+              catalogType: "kaas",
+              specificProduct: true,
+              brand: "Milbona",
+              variant: "oud",
+              packageSize: "450 g",
+              category: "koeling",
+              subcategory: "kaas",
+              ean: null,
+              inferredFields: [],
+              confidence: "high",
+            },
+            {
+              observedCandidateId: "c2",
+              productName: "Beemster belegen",
+              genericName: "kaas",
+              catalogType: "kaas",
+              specificProduct: true,
+              brand: "Beemster",
+              variant: "belegen",
+              packageSize: "450 g",
+              category: "koeling",
+              subcategory: "kaas",
+              ean: null,
+              inferredFields: [],
+              confidence: "high",
+            },
+          ],
+        }),
+      ),
+    );
+    expect(mixed.ok && mixed.candidates.map((c) => c.brand)).toEqual(["Milbona", "Beemster"]);
+  });
+
+  it("collapses clear loose produce to a single candidate without merging distinct flavours", () => {
     const produce = interpret(
       completed(
         JSON.stringify({
@@ -339,8 +491,9 @@ describe("interpret", () => {
         }),
       ),
     );
-    expect(syrup.ok && syrup.candidates).toHaveLength(1);
-    expect(syrup.ok && syrup.needsSelection).toBe(false);
+    // Explicit flavours stay distinct even when names overlap.
+    expect(syrup.ok && syrup.candidates.map((c) => c.variant)).toEqual(["Original", "Aardbei"]);
+    expect(syrup.ok && syrup.needsSelection).toBe(true);
   });
 
   it("keeps only barcode-shaped EANs and flags low confidence for confirmation", () => {

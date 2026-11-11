@@ -27,6 +27,8 @@ export function sameProduct(draft: ProductDraft, items: readonly AdventureItem[]
 /** confirmed: the child said yes to "Is dit een …?", which settles an unsure catalog match. */
 export function discoveryVerdict(draft: ProductDraft | null, items: readonly AdventureItem[], confirmed = false): Verdict {
   if (!draft || !draft.recognized || !draft.name.trim()) return { kind: "parent" };
+  // Ambiguous multi-candidate photos need an explicit parent choice before anything is collected.
+  if (draft.needsSelection && (draft.identityCandidates?.length ?? 0) > 1) return { kind: "parent" };
   const sure = !draft.unsure || confirmed;
   const twin = sameProduct(draft, items);
   if (twin && (sure || (draft.ean && twin.ean === draft.ean))) return { kind: "duplicate", item: twin };

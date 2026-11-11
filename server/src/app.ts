@@ -342,6 +342,7 @@ export function createHandler(deps: AppDeps) {
         candidateCount: enrichment.candidates.length,
         identityLookups: enrichment.lookups,
         identityFailures: enrichment.failures,
+        identityCacheHits: enrichment.cacheHits,
         identityMs: now() - enrichStarted,
       });
       return send(200, {

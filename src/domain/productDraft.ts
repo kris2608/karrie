@@ -41,6 +41,8 @@ export type ProductDraft = {
   identityCandidates?: VisualCandidate[];
   recognitionOutcome?: RecognitionOutcome;
   needsSelection?: boolean;
+  /** True when the capture showed several products; do not save that photo as this pack's image. */
+  omitCapturePhoto?: boolean;
 };
 
 /**
@@ -97,9 +99,11 @@ export type NewItem = { name: string; category: CategoryId; icon: string; produc
 export function newItemFor(draft: ProductDraft | null, name: string, category: CategoryId): { item: NewItem; withPhoto: boolean } {
   const matched = draft?.match && draft.match.category === category ? draft.match : null;
   const via: AddVia = draft?.from.photo ? "photo" : draft?.from.barcode || draft?.from.mine ? "barcode" : "manual";
+  const wantPhoto = !draft || draft.keepPhoto || !matched;
   return {
     item: { name, category, icon: matched ? matched.id : categoryIcon(category), productId: matched?.id, pack: draft?.pack, via },
-    withPhoto: !draft || draft.keepPhoto || !matched,
+    // A multi-product capture must not become the chosen pack's personal photo.
+    withPhoto: wantPhoto && !draft?.omitCapturePhoto,
   };
 }
 
@@ -120,21 +124,56 @@ export type DraftInput = {
 export function selectIdentityCandidate(draft: ProductDraft, candidateId: string): ProductDraft {
   const candidate = draft.identityCandidates?.find((entry) => entry.observedCandidateId === candidateId);
   if (!candidate) return draft;
-  const photo = productFromCandidate(candidate, draft.from.photo);
+  const fromMulti = Boolean(draft.needsSelection && (draft.identityCandidates?.length ?? 0) > 1);
+  const photo = productFromCandidate(candidate);
   const next = mergeDraft({
-    ean: draft.ean,
-    mine: draft.from.mine,
-    barcode: draft.from.barcode,
+    // A neighbouring barcode must not stick to a differently chosen flavour.
+    ean: fromMulti ? undefined : draft.ean,
+    mine: fromMulti ? undefined : draft.from.mine,
+    barcode: fromMulti ? undefined : draft.from.barcode,
     photo,
     identityCandidates: [candidate],
     recognitionOutcome: "single",
     needsSelection: false,
   });
-  // Prefer a reliable provider pack photo for the chosen flavour when the parent has no new capture.
-  if (!next.imageUrl && candidate.imageUrl) {
-    return { ...next, imageUrl: candidate.imageUrl };
-  }
-  return next;
+  return {
+    ...next,
+    // Prefer the selected candidate's own identity image; never keep another product's evidence.
+    imageUrl: candidate.imageUrl ?? next.imageUrl,
+    omitCapturePhoto: fromMulti || draft.omitCapturePhoto,
+    fields: {
+      ...next.fields,
+      ...(candidate.productName || candidate.genericName
+        ? { name: { value: (candidate.productName || candidate.genericName)!, source: "photo", verified: false } }
+        : {}),
+      ...(candidate.brand ? { brand: { value: candidate.brand, source: "photo", verified: false } } : {}),
+      ...(candidate.variant ? { variant: { value: candidate.variant, source: "photo", verified: false } } : {}),
+      ...(candidate.packageSize ? { packageSize: { value: candidate.packageSize, source: "photo", verified: false } } : {}),
+    },
+    name: candidate.productName || candidate.genericName || next.name,
+    pack: {
+      ...next.pack,
+      brand: candidate.brand ?? undefined,
+      packageSize: candidate.packageSize ?? undefined,
+      recognition: {
+        ...next.pack.recognition,
+        genericName: candidate.genericName ?? undefined,
+        variant: candidate.variant ?? undefined,
+        subcategory: candidate.subcategory ?? undefined,
+        // Candidate-specific: do not inherit primary claims/ingredients/nutri/alternative.
+        claims: undefined,
+        nutriScoreSeen: undefined,
+        ingredientsSeen: undefined,
+        confidence: candidate.confidence,
+        inferred: candidate.inferredFields.length ? candidate.inferredFields : undefined,
+        specific: candidate.specificProduct,
+        eanCandidate: candidate.ean ?? undefined,
+      },
+      alternative: undefined,
+      ingredients: undefined,
+      nutrition: undefined,
+    },
+  };
 }
 
 export function mergeDraft({ ean, mine, barcode, photo, identityCandidates, recognitionOutcome, needsSelection }: DraftInput): ProductDraft {

@@ -409,7 +409,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
           </>
         )}
 
-        {step.kind === "result" && discovering && !parentView && step.draft && (
+        {step.kind === "result" && discovering && !parentView && step.draft && !(step.draft.needsSelection && (step.draft.identityCandidates?.length ?? 0) > 1) && (
           <DiscoveryResult
             key={`${step.draft.ean ?? ""}|${step.draft.name}`}
             draft={step.draft}
@@ -424,7 +424,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
           />
         )}
 
-        {step.kind === "result" && (!discovering || parentView || !step.draft) && (
+        {step.kind === "result" && (!discovering || parentView || !step.draft || (step.draft.needsSelection && (step.draft.identityCandidates?.length ?? 0) > 1)) && (
           <PhotoResultSheet
             key={step.draft ? `${step.draft.ean ?? ""}|${step.draft.name}` : "manual"}
             draft={step.draft}

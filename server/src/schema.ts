@@ -297,10 +297,6 @@ export function dedupeCandidates(candidates: VisualCandidate[]): VisualCandidate
   return out;
 }
 
-function normBrand(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
 function nameBlob(candidate: Pick<VisualCandidate, "productName" | "genericName" | "variant">): string {
   return [candidate.productName, candidate.genericName, candidate.variant]
     .filter(Boolean)
@@ -310,69 +306,43 @@ function nameBlob(candidate: Pick<VisualCandidate, "productName" | "genericName"
     .trim();
 }
 
+function alignedWithPrimary(primary: RecognizedProduct, candidate: VisualCandidate): boolean {
+  const primaryBrand = (primary.brand || "").trim().toLowerCase();
+  const candidateBrand = (candidate.brand || "").trim().toLowerCase();
+  if (primaryBrand && candidateBrand && (primaryBrand === candidateBrand || primaryBrand.includes(candidateBrand) || candidateBrand.includes(primaryBrand))) {
+    return true;
+  }
+  const family = (primary.catalogType || primary.genericName || "").toLowerCase();
+  if (family && (candidate.catalogType === primary.catalogType || nameBlob(candidate).includes(family))) return true;
+  const primaryName = (primary.productName || "").trim().toLowerCase();
+  const candidateName = (candidate.productName || "").trim().toLowerCase();
+  return Boolean(primaryName && candidateName && (candidateName.includes(primaryName) || primaryName.includes(candidateName)));
+}
+
 /**
- * Keep only visually intended choices: drop neighbouring ads with another brand,
- * collapse loose produce to one result, and merge near-duplicate same-SKU rows.
+ * Preserve distinct visually intended products.
+ * Never merge different explicit flavours/variants/sizes, and never drop a candidate
+ * merely because its brand differs from the primary. Only collapse clear loose produce
+ * when every candidate is also non-specific produce of the same family.
+ * Primary-aligned candidates are listed first; other brands stay selectable after them.
  */
 export function filterIntendedCandidates(primary: RecognizedProduct, candidates: VisualCandidate[]): VisualCandidate[] {
-  let list = [...candidates];
-  const primaryBrand = normBrand(primary.brand);
-
-  // Clear loose produce / unbranded staples: do not open a chooser for adjacent shelf items.
-  if (primary.recognized && primary.confidence !== "low" && !primary.specificProduct) {
+  const list = candidates.slice(0, 5);
+  const allLoose = list.length > 0 && list.every((candidate) => !candidate.specificProduct);
+  if (primary.recognized && primary.confidence !== "low" && !primary.specificProduct && allLoose) {
     const family = (primary.catalogType || primary.genericName || primary.productName || "").toLowerCase();
     const same = list.filter((candidate) => {
       const blob = nameBlob(candidate);
       return family && (blob.includes(family) || (candidate.catalogType && candidate.catalogType === primary.catalogType));
     });
-    return same.slice(0, 1);
+    return (same.length ? same : list).slice(0, 1);
   }
-
-  // When the primary brand is clear, neighbouring ads from other brands are noise.
-  if (primaryBrand) {
-    const sameBrand = list.filter((candidate) => {
-      const brand = normBrand(candidate.brand);
-      return !brand || brand === primaryBrand || brand.includes(primaryBrand) || primaryBrand.includes(brand);
-    });
-    if (sameBrand.length > 0) list = sameBrand;
-  }
-
-  const NEUTRAL_VARIANT = /^(original|origineel|originele|classic|klassiek|klassieke)$/i;
-
-  // Merge near-duplicates: "Original" vs "Original Aardbei" with the same size.
-  const merged: VisualCandidate[] = [];
+  const aligned: VisualCandidate[] = [];
+  const other: VisualCandidate[] = [];
   for (const candidate of list) {
-    const title = (candidate.productName || candidate.genericName || "").toLowerCase().trim();
-    const nest = merged.findIndex((other) => {
-      if (normBrand(other.brand) !== normBrand(candidate.brand)) return false;
-      if ((other.packageSize || "") !== (candidate.packageSize || "")) return false;
-      const otherTitle = (other.productName || other.genericName || "").toLowerCase().trim();
-      if (!title || !otherTitle) return false;
-      if (otherTitle.includes(title) || title.includes(otherTitle)) return true;
-      // Same brand+size where one variant is only "Original" and the other is a real flavour.
-      const a = (candidate.variant || "").trim();
-      const b = (other.variant || "").trim();
-      return Boolean(a && b && ((NEUTRAL_VARIANT.test(a) && !NEUTRAL_VARIANT.test(b)) || (NEUTRAL_VARIANT.test(b) && !NEUTRAL_VARIANT.test(a))));
-    });
-    if (nest < 0) {
-      merged.push(candidate);
-      continue;
-    }
-    // Keep the more specific name/variant (prefer a real flavour over "Original").
-    const current = merged[nest];
-    const candidateNeutral = NEUTRAL_VARIANT.test(candidate.variant || "");
-    const currentNeutral = NEUTRAL_VARIANT.test(current.variant || "");
-    const prefer =
-      candidateNeutral && !currentNeutral
-        ? current
-        : !candidateNeutral && currentNeutral
-          ? candidate
-          : (candidate.productName || "").length > (current.productName || "").length || (candidate.variant && !current.variant)
-            ? candidate
-            : current;
-    merged[nest] = prefer;
+    (alignedWithPrimary(primary, candidate) ? aligned : other).push(candidate);
   }
-  return merged.slice(0, 5);
+  return [...aligned, ...other].slice(0, 5);
 }
 
 /**
@@ -406,8 +376,11 @@ const EMPTY_ALTERNATIVE: Alternative = {
   childPrompt: null,
 };
 
-/** Lift a visual candidate into the RecognizedProduct shape used by mergeDraft. */
-export function productFromCandidate(candidate: VisualCandidate, template?: RecognizedProduct): RecognizedProduct {
+/**
+ * Lift a visual candidate into the RecognizedProduct shape used by mergeDraft.
+ * Never copy another product's nutrition, claims, ingredients or healthier-alternative.
+ */
+export function productFromCandidate(candidate: VisualCandidate): RecognizedProduct {
   return sanitize({
     recognized: true,
     productName: candidate.productName,
@@ -420,14 +393,14 @@ export function productFromCandidate(candidate: VisualCandidate, template?: Reco
     category: candidate.category,
     subcategory: candidate.subcategory,
     ean: candidate.ean,
-    visibleNutriScore: template?.visibleNutriScore ?? null,
-    visibleClaims: template?.visibleClaims ?? [],
-    visibleIngredients: template?.visibleIngredients ?? null,
+    visibleNutriScore: null,
+    visibleClaims: [],
+    visibleIngredients: null,
     inferredFields: candidate.inferredFields,
     confidence: candidate.confidence,
     needsConfirmation: candidate.confidence === "low",
     containsPeople: false,
-    alternative: template?.alternative ?? EMPTY_ALTERNATIVE,
+    alternative: EMPTY_ALTERNATIVE,
   });
 }
 

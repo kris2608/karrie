@@ -76,11 +76,53 @@ describe("what the child sees after the camera", () => {
     expect(discoveryVerdict(draft, [], true)).toEqual({ kind: "collect" });
   });
 
-  it("an unknown photo, a barcode only a web page knows, or nothing at all goes to a parent", () => {
+  it("an unknown photo or bare barcode goes to a parent; a named web-page identity can collect", () => {
     expect(discoveryVerdict(mergeDraft({ photo: NOTHING }), [])).toEqual({ kind: "parent" });
-    expect(discoveryVerdict(mergeDraft({ ean: MILK_EAN, barcode: WEB_MILK }), [])).toEqual({ kind: "parent" });
+    expect(discoveryVerdict(mergeDraft({ ean: MILK_EAN, barcode: WEB_MILK }), [])).toEqual({ kind: "collect" });
     expect(discoveryVerdict(mergeDraft({ ean: MILK_EAN }), [])).toEqual({ kind: "parent" });
     expect(discoveryVerdict(null, [])).toEqual({ kind: "parent" });
+  });
+
+  it("never silently collects when several product candidates still need a choice", () => {
+    const draft = mergeDraft({
+      photo: { ...BANANA, productName: "Casa di Mama", brand: "Dr. Oetker", catalogType: "pizza", category: "diepvries", subcategory: "pizza", specificProduct: true, genericName: "pizza" },
+      needsSelection: true,
+      recognitionOutcome: "multiple",
+      identityCandidates: [
+        {
+          observedCandidateId: "c1",
+          productName: "Casa di Mama Salame",
+          genericName: "pizza",
+          catalogType: "pizza",
+          specificProduct: true,
+          brand: "Dr. Oetker",
+          variant: "Salame",
+          packageSize: null,
+          category: "diepvries",
+          subcategory: "pizza",
+          ean: null,
+          inferredFields: [],
+          confidence: "high",
+        },
+        {
+          observedCandidateId: "c2",
+          productName: "Casa di Mama Speciale",
+          genericName: "pizza",
+          catalogType: "pizza",
+          specificProduct: true,
+          brand: "Dr. Oetker",
+          variant: "Speciale",
+          packageSize: null,
+          category: "diepvries",
+          subcategory: "pizza",
+          ean: null,
+          inferredFields: [],
+          confidence: "high",
+        },
+      ],
+    });
+    expect(discoveryVerdict(draft, [])).toEqual({ kind: "parent" });
+    expect(discoveryVerdict(draft, [], true)).toEqual({ kind: "parent" });
   });
 
   it("a product already on the list is a duplicate, by drawing or by barcode", () => {

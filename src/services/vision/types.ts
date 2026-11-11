@@ -76,6 +76,7 @@ export type VisualCandidate = {
     imageUrl: string;
     confidence: "high" | "medium";
     source: "prijsprofeet" | "off";
+    score?: number;
   };
 };
 
@@ -141,8 +142,8 @@ const EMPTY_ALTERNATIVE: RecognizedAlternative = {
   childPrompt: null,
 };
 
-/** Turn a selected visual candidate into the RecognizedProduct shape mergeDraft expects. */
-export function productFromCandidate(candidate: VisualCandidate, template?: RecognizedProduct): RecognizedProduct {
+/** Turn a selected visual candidate into RecognizedProduct without borrowing another product's evidence. */
+export function productFromCandidate(candidate: VisualCandidate): RecognizedProduct {
   return {
     recognized: true,
     productName: candidate.productName,
@@ -155,13 +156,13 @@ export function productFromCandidate(candidate: VisualCandidate, template?: Reco
     category: candidate.category,
     subcategory: candidate.subcategory,
     ean: candidate.ean,
-    visibleNutriScore: template?.visibleNutriScore ?? null,
-    visibleClaims: template?.visibleClaims ?? [],
-    visibleIngredients: template?.visibleIngredients ?? null,
+    visibleNutriScore: null,
+    visibleClaims: [],
+    visibleIngredients: null,
     inferredFields: candidate.inferredFields,
     confidence: candidate.confidence,
     needsConfirmation: candidate.confidence === "low",
     containsPeople: false,
-    alternative: template?.alternative ?? EMPTY_ALTERNATIVE,
+    alternative: EMPTY_ALTERNATIVE,
   };
 }

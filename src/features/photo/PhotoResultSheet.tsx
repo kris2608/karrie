@@ -91,7 +91,9 @@ export function PhotoResultSheet({ draft: initialDraft, photoUrl, photo, items, 
   const store = useStoreImage(lookStore ? draft?.ean : undefined);
   const usable = useBroken();
   const hinted = draft?.from.barcode?.storeImage?.imageUrl;
-  const picture = photoUrl ?? earlier ?? usable(store?.imageUrl) ?? usable(hinted) ?? usable(draft?.imageUrl);
+  const picture = draft?.omitCapturePhoto
+    ? usable(draft.imageUrl) ?? earlier ?? usable(store?.imageUrl) ?? usable(hinted)
+    : photoUrl ?? earlier ?? usable(store?.imageUrl) ?? usable(hinted) ?? usable(draft?.imageUrl);
   const storeShown = Boolean((store && picture === store.imageUrl) || (hinted && picture === hinted));
   const nutriScore = draft?.from.barcode?.product.nutriScore ?? draft?.pack.nutrition?.nutriscore?.toUpperCase();
 
@@ -131,11 +133,12 @@ export function PhotoResultSheet({ draft: initialDraft, photoUrl, photo, items, 
 
   /** withInfo: the parent confirmed this item is the recognised product, so its details may be stored too. */
   function attachTo(item: AdventureItem, withInfo: boolean) {
+    const saveCapture = Boolean(photo) && !draft?.omitCapturePhoto;
     void commit((photoId) => {
       if (withInfo && draft) dispatch({ type: "apply-recognition", itemId: item.id, photoId, pack: draft.pack });
       else if (photoId) dispatch({ type: "set-photo", itemId: item.id, photoId });
-      return photo ? `Jouw foto staat bij ${item.name}` : `${item.name} is bijgewerkt`;
-    }, true);
+      return saveCapture ? `Jouw foto staat bij ${item.name}` : `${item.name} is bijgewerkt`;
+    }, saveCapture);
   }
 
   function addOne(item: AdventureItem) {

@@ -245,9 +245,30 @@ describe("multi-candidate photo selection", () => {
     imageUrl: "https://example.com/speciale.jpg",
   };
 
-  it("asks for a choice when several flavours are visible, then keeps only the selected one", () => {
+  it("asks for a choice when several flavours are visible, then keeps only the selected one's evidence", () => {
     const draft = mergeDraft({
-      photo: { ...PHOTO, productName: "Casa di Mama", brand: "Dr. Oetker", variant: null, catalogType: "pizza", category: "diepvries", subcategory: "pizza" },
+      photo: {
+        ...PHOTO,
+        productName: "Casa di Mama",
+        brand: "Dr. Oetker",
+        variant: null,
+        catalogType: "pizza",
+        category: "diepvries",
+        subcategory: "pizza",
+        visibleClaims: ["Primary claim"],
+        visibleIngredients: "Primary ingredients",
+        visibleNutriScore: "C",
+        alternative: {
+          status: "possible",
+          evidence: "inferred",
+          criteria: ["less-saturated-fat"],
+          alternativeType: "dunnere pizza",
+          targetType: "pizza",
+          reason: "Minder vet",
+          parentExplanation: "Waarschijnlijk minder vet.",
+          childPrompt: "Kun jij een dunnere pizza vinden?",
+        },
+      },
       identityCandidates: [salame, speciale],
       recognitionOutcome: "multiple",
       needsSelection: true,
@@ -261,8 +282,16 @@ describe("multi-candidate photo selection", () => {
     expect(chosen.recognitionOutcome).toBe("single");
     expect(chosen.name).toMatch(/Speciale/);
     expect(chosen.fields.variant?.value).toBe("Speciale");
+    expect(chosen.fields.brand?.value).toBe("Dr. Oetker");
     expect(chosen.identityCandidates).toEqual([speciale]);
     expect(chosen.imageUrl).toBe("https://example.com/speciale.jpg");
+    expect(chosen.omitCapturePhoto).toBe(true);
     expect(chosen.pack.ean).toBeUndefined();
+    expect(chosen.pack.nutrition).toBeUndefined();
+    expect(chosen.pack.ingredients).toBeUndefined();
+    expect(chosen.pack.alternative).toBeUndefined();
+    expect(chosen.pack.recognition?.claims).toBeUndefined();
+    expect(chosen.pack.recognition?.ingredientsSeen).toBeUndefined();
+    expect(newItemFor(chosen, chosen.name, chosen.category).withPhoto).toBe(false);
   });
 });
