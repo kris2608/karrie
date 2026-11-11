@@ -72,7 +72,7 @@ describe("ShareListSheet", () => {
         expect.objectContaining({
           url: "https://www.karrie.eu/s/abcdefghijklmnop",
           title: "Week",
-          text: "🛒 Ik heb een boodschappenlijstje met Karrie gemaakt! Week · Albert Heijn · 1 product",
+          text: "🛒 Ik heb een boodschappenlijstje met Karrie gemaakt! Week · 1 product",
         }),
       ),
     );

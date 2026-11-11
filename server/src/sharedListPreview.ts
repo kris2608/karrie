@@ -1,11 +1,5 @@
 import type { SharedListPayload } from "./sharedLists.js";
 
-const RETAILER_LABEL: Record<string, string> = {
-  albert_heijn: "Albert Heijn",
-  jumbo: "Jumbo",
-  lidl: "Lidl",
-};
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -15,14 +9,13 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Short Dutch summary for OG / share cards: name · shop · N producten. */
+/** Short Dutch summary for OG / share cards: name · N producten (no retailer in the message). */
 export function sharedListSummary(list: SharedListPayload): { title: string; description: string } {
-  const store = list.retailer ? RETAILER_LABEL[list.retailer] ?? list.retailer : undefined;
   const count = list.items.length === 1 ? "1 product" : `${list.items.length} producten`;
   const name = list.name?.trim() || undefined;
-  const bits = [name, store, count].filter((part): part is string => Boolean(part));
+  const bits = [name, count].filter((part): part is string => Boolean(part));
   return {
-    title: name || store || "Boodschappenlijstje",
+    title: name || "Boodschappenlijstje",
     description: bits.join(" · ") || "Boodschappenlijstje via Karrie",
   };
 }

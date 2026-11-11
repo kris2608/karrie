@@ -1,6 +1,20 @@
 import type { OfferRow } from "./prijsprofeet.js";
 
-export const PRODUCT_CATEGORIES = ["produce", "bakery", "meat", "breakfast", "pantry", "dairy", "drinks", "frozen", "household"] as const;
+export const PRODUCT_CATEGORIES = [
+  "produce",
+  "bakery",
+  "meat",
+  "breakfast",
+  "deli",
+  "dairy",
+  "snacks",
+  "pantry",
+  "meals",
+  "drinks",
+  "frozen",
+  "care",
+  "household",
+] as const;
 export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 
 /** What the app knows about one list item. `generic` items ("Banaan") have no brand or barcode. */
@@ -25,23 +39,18 @@ export type OfferMatch =
 /** PrijsProfeet's unified categories that may hold each app category. */
 export const CATEGORY_MAP: Record<ProductCategory, readonly string[]> = {
   produce: ["groente-fruit", "aardappelen-groente-fruit"],
-  dairy: ["zuivel-eieren", "kaas", "zuivel", "eieren"],
+  dairy: ["zuivel-eieren", "zuivel", "eieren"],
+  deli: ["kaas", "vleeswaren"],
   bakery: ["brood-bakkerij", "brood", "bakkerij"],
   frozen: ["diepvries"],
-  meat: ["vlees", "vis", "kaas", "vega", "maaltijden"],
-  breakfast: ["ontbijt", "ontbijtgranen-beleg", "snoep-koek-chips"],
+  meat: ["vlees", "vis", "vega"],
+  breakfast: ["ontbijt", "ontbijtgranen-beleg"],
+  snacks: ["snoep-koek-chips"],
+  meals: ["maaltijden"],
   drinks: ["frisdrank", "koffie-thee"],
-  pantry: [
-    "ontbijt",
-    "pasta-rijst-wereldkeuken",
-    "soepen-conserven-sauzen",
-    "snoep-koek-chips",
-    "frisdrank",
-    "koffie-thee",
-    "ontbijtgranen-beleg",
-    "conserven",
-  ],
-  household: ["huishouden", "schoonmaak", "wasmiddel", "papier", "baby-kind"],
+  pantry: ["pasta-rijst-wereldkeuken", "soepen-conserven-sauzen", "conserven"],
+  care: ["drogisterij", "huidverzorging", "haarverzorging", "deodorant", "mondverzorging", "baby-kind"],
+  household: ["huishouden", "schoonmaak", "wasmiddel", "papier"],
 };
 
 /** Words that do not change what a generic product is. */

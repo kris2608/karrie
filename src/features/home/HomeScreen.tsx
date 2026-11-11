@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Karrie } from "../../components/mascot/Karrie";
-import { ItemArt } from "../../components/ItemArt";
 import { HomeScene } from "../../components/scenery/HomeScene";
 import { StickerBadge } from "../../components/StickerBadge";
 import { DiscoverySwitch } from "../../components/ui/DiscoverySwitch";
@@ -11,24 +10,19 @@ import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
 import { Toast, useNotice } from "../../components/ui/Toast";
-import { useLongPress } from "../../components/ui/useLongPress";
 import { softSpring } from "../../motion/variants";
 import { appVersionLabel } from "../../domain/appVersion";
-import { homeShelf } from "../../domain/homeShelf";
 import { retailerName } from "../../domain/retailers";
 import { stickerPreview } from "../../domain/stickers";
 import { RetailerPicker } from "../offers/RetailerPicker";
-import type { SavedList } from "../../domain/types";
 import { useAdventure } from "../../state/AdventureContext";
-import { listName } from "../../state/reducer";
 import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
 import { shareKarrie } from "../../domain/share";
 import { trackEvent } from "../../services/analytics";
-import { ShareIcon } from "../../components/ui/ShareIcon";
-import { ShareListSheet } from "../share/ShareListSheet";
+import { ListsSheet } from "../lists/ListsSheet";
 import { AboutKarrie } from "./AboutKarrie";
-import { ForgetListSheet } from "./ForgetListSheet";
+import { CategoryOrderEditor } from "./CategoryOrderEditor";
 import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
 import { StickerBook } from "./StickerBook";
@@ -48,50 +42,6 @@ const linkLabels: Record<Exclude<ParentView, "settings">, string> = {
   privacy: "Privacy en gegevens",
 };
 
-function ListCard({
-  list,
-  label: fallback,
-  onOpen,
-  onForget,
-  onShare,
-}: {
-  list: SavedList;
-  label: string;
-  onOpen: () => void;
-  onForget: () => void;
-  onShare: () => void;
-}) {
-  const { pressing, handlers } = useLongPress(onForget);
-  const label = listName(list) ?? fallback;
-  const detail = [`${list.items.length} producten`, list.store].filter(Boolean).join(" · ");
-  return (
-    <div className={pressing ? "list-card is-pressing" : "list-card"}>
-      <motion.button
-        type="button"
-        className="list-card-main"
-        aria-label={`${label}, ${detail}. Lang drukken om te wissen`}
-        data-testid="list-card"
-        whileTap={{ scale: 0.96 }}
-        onClick={onOpen}
-        {...handlers}
-      >
-        <span className="list-card-art">
-          {list.items.slice(0, 3).map((item, index) => (
-            <ItemArt key={`${item.productId}-${index}`} item={item} />
-          ))}
-        </span>
-        <span className="list-card-text">
-          <strong>{label}</strong>
-          <small>{detail}</small>
-        </span>
-      </motion.button>
-      <button type="button" className="list-card-share" data-testid="share-list-card" aria-label={`Deel ${label}`} onClick={onShare}>
-        <ShareIcon />
-      </button>
-    </div>
-  );
-}
-
 export function HomeScreen() {
   const state = useAdventure();
   const { adventure, saved, stickers, settings, dispatch } = state;
@@ -99,8 +49,7 @@ export function HomeScreen() {
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [shareList, setShareList] = useState<SavedList | null>(null);
-  const [forgetting, setForgetting] = useState<SavedList | null>(null);
+  const [listsOpen, setListsOpen] = useState(false);
   const [stickersOpen, setStickersOpen] = useState(false);
   const preview = stickerPreview(stickers);
   const previewRef = useRef<HTMLButtonElement>(null);
@@ -175,24 +124,6 @@ export function HomeScreen() {
 
   const shopping = adventure?.phase === "shopping";
   const draft = adventure?.phase === "draft" && adventure.items.length > 0;
-  const shelf = homeShelf(saved, adventure);
-
-  function openList(list: SavedList) {
-    dispatch({ type: "open-saved", id: list.id });
-    navigate("/controleren");
-  }
-
-  function askForget(list: SavedList) {
-    if (list.favorite) setForgetting(list);
-    else forgetList(list);
-  }
-
-  function forgetList(list: SavedList) {
-    setForgetting(null);
-    const index = saved.findIndex((entry) => entry.id === list.id);
-    dispatch({ type: "forget-saved", id: list.id });
-    undo.show("Lijstje gewist", { label: "Ongedaan maken", run: () => dispatch({ type: "restore-saved", list, index }) });
-  }
 
   return (
     <main className="screen home">
@@ -263,22 +194,10 @@ export function HomeScreen() {
         )}
       </motion.div>
 
-      {shelf.length > 0 && (
-        <section className="home-shelf" aria-label="Eerdere lijstjes">
-          <ul>
-            {shelf.map(({ list, label }) => (
-              <li key={list.id}>
-                <ListCard
-                  list={list}
-                  label={label}
-                  onOpen={() => openList(list)}
-                  onForget={() => askForget(list)}
-                  onShare={() => setShareList(list)}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
+      {saved.length > 0 && (
+        <PressButton type="button" variant="quiet" wide data-testid="open-lists-home" onClick={() => setListsOpen(true)}>
+          Lijstjes ({saved.length})
+        </PressButton>
       )}
 
       {preview.count > 0 && (
@@ -352,6 +271,7 @@ export function HomeScreen() {
               </span>
               <RetailerPicker value={settings.retailer} onChange={(retailer) => dispatch({ type: "set-default-retailer", retailer })} />
             </div>
+            <CategoryOrderEditor />
             {saved.length > 0 &&
               (confirmClear ? (
                 <div className="clear-saved" data-testid="clear-saved-confirm">
@@ -475,8 +395,7 @@ export function HomeScreen() {
         )}
       </Sheet>
 
-      <ShareListSheet open={Boolean(shareList)} source={shareList} onClose={() => setShareList(null)} />
-      <ForgetListSheet list={forgetting} onCancel={() => setForgetting(null)} onConfirm={forgetList} />
+      <ListsSheet open={listsOpen} onClose={() => setListsOpen(false)} />
     </main>
   );
 }

@@ -6,10 +6,14 @@ export const CATEGORY_ICONS: Record<CategoryId, string> = {
   bakery: "brood",
   meat: "gehakt",
   breakfast: "pindakaas",
-  pantry: "pakket",
+  deli: "kaas",
   dairy: "melk",
+  snacks: "chips",
+  pantry: "pakket",
+  meals: "kant-en-klaar",
   drinks: "water",
   frozen: "ijs",
+  care: "shampoo",
   household: "handzeep",
 };
 

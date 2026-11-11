@@ -60,7 +60,7 @@ describe("supermarket per list", () => {
     const keys = (state: AppState) => offerQueries(state.adventure!.items, state.adventure!.retailer).map((query) => query.key);
     expect(keys(jumbo)).toEqual(["jumbo|g|banaan", "jumbo|g|melk"]);
     expect(keys(ah)).toEqual(["albert_heijn|g|banaan", "albert_heijn|g|melk"]);
-    expect(ah.adventure?.items).toBe(jumbo.adventure?.items);
+    expect(ah.adventure?.items.map((item) => item.id)).toEqual(jumbo.adventure?.items.map((item) => item.id));
   });
 
   it("9. a saved list keeps its supermarket when reopened, even after another was picked", () => {
@@ -99,8 +99,9 @@ describe("supermarket per list", () => {
   });
 
   it("14. the shopping adventure is the same with or without a supermarket", () => {
-    const plain = reducer(withDraft(), { type: "start-shopping" });
-    const picked = reducer(reducer(withDraft(), { type: "set-retailer", retailer: "jumbo" }), { type: "start-shopping" });
+    const draft = withDraft();
+    const plain = reducer(draft, { type: "start-shopping" });
+    const picked = reducer(reducer(draft, { type: "set-retailer", retailer: "jumbo" }), { type: "start-shopping" });
     const strip = (state: AppState) => state.adventure!.items.map(({ id: _id, ...item }) => item);
     expect(strip(picked)).toEqual(strip(plain));
     expect(picked.adventure?.phase).toBe("shopping");

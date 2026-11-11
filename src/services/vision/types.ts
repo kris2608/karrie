@@ -5,10 +5,14 @@ export const SHOP_SECTIONS = [
   "bakker",
   "vlees-vis-vega",
   "ontbijt",
-  "houdbaar",
+  "kaas-vleeswaren",
   "koeling",
+  "snacks-snoep",
+  "houdbaar",
+  "maaltijden",
   "dranken",
   "diepvries",
+  "verzorging",
   "huishouden",
 ] as const;
 export type ShopSection = (typeof SHOP_SECTIONS)[number];

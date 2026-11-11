@@ -92,10 +92,10 @@ describe("SharedListBoot", () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getByTestId("import-shared-list")).toBeTruthy());
-    expect(screen.getByTestId("import-confirm").textContent).toMatch(/Gebruik dit lijstje/);
-    fireEvent.click(screen.getByTestId("import-confirm"));
+    expect(screen.getByTestId("import-create").textContent).toMatch(/Nieuw lijstje/);
+    fireEvent.click(screen.getByTestId("import-create"));
     expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "import-shared-list", mode: "open" }),
+      expect.objectContaining({ type: "import-shared-list", mode: "create" }),
     );
   });
 
@@ -131,11 +131,11 @@ describe("SharedListBoot", () => {
     );
     await waitFor(() => expect(screen.getByTestId("import-shared-list")).toBeTruthy());
     expect(screen.getByTestId("import-shared-list").textContent).toMatch(/2 producten/);
-    fireEvent.click(screen.getByTestId("import-confirm"));
+    fireEvent.click(screen.getByTestId("import-create"));
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "import-shared-list",
-        mode: "open",
+        mode: "create",
         list: expect.objectContaining({
           items: [
             expect.objectContaining({ name: "Melk", quantity: 3 }),
@@ -146,7 +146,7 @@ describe("SharedListBoot", () => {
     );
   });
 
-  it("saves only and returns home with a confirmation toast", async () => {
+  it("merges into the current list when the parent chooses add", async () => {
     adventure = unfinishedAdventure;
     fetchList.mockResolvedValue({
       status: "ok",
@@ -159,16 +159,15 @@ describe("SharedListBoot", () => {
       <MemoryRouter initialEntries={["/l/abcdefghijklmnop"]}>
         <Routes>
           <Route path="/l/:id" element={<SharedListBoot />} />
-          <Route path="/" element={<LocationProbe />} />
+          <Route path="/controleren" element={<LocationProbe />} />
         </Routes>
       </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getByTestId("import-shared-list")).toBeTruthy());
-    fireEvent.click(screen.getByTestId("import-save-only"));
+    fireEvent.click(screen.getByTestId("import-merge"));
     expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "import-shared-list", mode: "save-only" }),
+      expect.objectContaining({ type: "import-shared-list", mode: "merge" }),
     );
-    await waitFor(() => expect(screen.getByTestId("location-probe").getAttribute("data-pathname")).toBe("/"));
-    expect(screen.getByTestId("location-probe").getAttribute("data-notice")).toBe("Lijstje bewaard");
+    await waitFor(() => expect(screen.getByTestId("location-probe").getAttribute("data-pathname")).toBe("/controleren"));
   });
 });

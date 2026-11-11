@@ -52,7 +52,7 @@ describe("custom product client", () => {
   it("keeps refusals final and everything else for a later try", async () => {
     expect(await client(() => json(422, { status: "error", code: "not-a-product" })).api.normalize("Calvé")).toEqual({ status: "refused" });
     expect(await client(() => json(429, { status: "error", code: "rate-limited" })).api.normalize("Komijn")).toEqual({ status: "retry" });
-    expect(await client(() => json(200, { status: "ok", product: { ...PRODUCT, category: "snacks" } })).api.normalize("Komijn")).toEqual({ status: "retry" });
+    expect(await client(() => json(200, { status: "ok", product: { ...PRODUCT, category: "aisle" } })).api.normalize("Komijn")).toEqual({ status: "retry" });
     expect(await client(() => Promise.reject(new TypeError("offline"))).api.normalize("Komijn")).toEqual({ status: "retry" });
     const offline = client(() => json(200, {}), false);
     expect(await offline.api.normalize("Komijn")).toEqual({ status: "retry" });

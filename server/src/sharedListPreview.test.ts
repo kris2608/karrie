@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sharedListPreviewHtml, sharedListSummary } from "./sharedListPreview.js";
 
 describe("sharedListPreview", () => {
-  it("summarises name, retailer and product count for Open Graph", () => {
+  it("summarises name and product count for Open Graph without the retailer", () => {
     expect(
       sharedListSummary({
         version: 1,
@@ -13,7 +13,7 @@ describe("sharedListPreview", () => {
           { name: "Brood", quantity: 1, category: "bakery" },
         ],
       }),
-    ).toEqual({ title: "Weekend", description: "Weekend · Albert Heijn · 2 producten" });
+    ).toEqual({ title: "Weekend", description: "Weekend · 2 producten" });
   });
 
   it("renders escaped Open Graph HTML that opens the SPA list URL", () => {
@@ -23,7 +23,8 @@ describe("sharedListPreview", () => {
       "https://www.karrie.eu",
     );
     expect(html).toContain('property="og:title" content="A&amp;B &quot;lijst&quot; · Karrie"');
-    expect(html).toContain("Jumbo · 1 product");
+    expect(html).toContain("A&amp;B &quot;lijst&quot; · 1 product");
+    expect(html).not.toContain("Jumbo");
     expect(html).toContain("https://www.karrie.eu/l/abcdefghijklmnop");
     expect(html).toContain("noindex");
   });

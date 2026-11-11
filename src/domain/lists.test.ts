@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { ART } from "../components/art";
 import { BESPOKE_IDS } from "../components/ProductArt";
-import { products } from "../data/catalog";
+import { artIdOf, products } from "../data/catalog";
 import { createSampleAdventure } from "../data/sample";
 import { matchProduct } from "./matchProduct";
 import { parseList } from "./parseList";
@@ -22,7 +22,7 @@ function item(partial: Pick<AdventureItem, "id" | "category"> & Partial<Adventur
 it("heeft een catalogus van minstens 80 unieke producten", () => {
   expect(products.length).toBeGreaterThanOrEqual(80);
   expect(new Set(products.map((product) => product.id)).size).toBe(products.length);
-  expect(products.filter((product) => !ART[product.id]).map((product) => product.id)).toEqual([]);
+  expect(products.filter((product) => !ART[artIdOf(product)]).map((product) => product.id)).toEqual([]);
   expect(BESPOKE_IDS).toHaveLength(31);
   expect(BESPOKE_IDS.filter((id) => !products.some((product) => product.id === id))).toEqual([]);
 });

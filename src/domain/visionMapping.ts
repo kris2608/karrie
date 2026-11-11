@@ -5,6 +5,7 @@ import { categoryIcon } from "./categoryIcon";
 import { resolveAssessment } from "./discovery";
 import { canonicalEan, isValidEan } from "./ean";
 import { normalize } from "./matchProduct";
+import { resolveCategory } from "./resolveCategory";
 import type { CategoryId, Product } from "./types";
 
 export const SECTION_CATEGORY: Record<ShopSection, CategoryId> = {
@@ -12,10 +13,14 @@ export const SECTION_CATEGORY: Record<ShopSection, CategoryId> = {
   bakker: "bakery",
   "vlees-vis-vega": "meat",
   ontbijt: "breakfast",
-  houdbaar: "pantry",
+  "kaas-vleeswaren": "deli",
   koeling: "dairy",
+  "snacks-snoep": "snacks",
+  houdbaar: "pantry",
+  maaltijden: "meals",
   dranken: "drinks",
   diepvries: "frozen",
+  verzorging: "care",
   huishouden: "household",
 };
 
@@ -61,8 +66,14 @@ export type VisionDraft = {
 
 export function draftFromVision(product: RecognizedProduct): VisionDraft {
   const match = catalogMatch(product);
+  const section = product.category ? SECTION_CATEGORY[product.category] : undefined;
+  /** Cheese read as chilled dairy still belongs with deli when the name says so. */
+  const named =
+    product.category === "koeling"
+      ? resolveCategory({ name: product.productName ?? product.genericName ?? undefined })
+      : undefined;
   /** Prefer the catalog department when we matched a drawing; otherwise use the shop section from the photo. */
-  const category = match?.category ?? (product.category && SECTION_CATEGORY[product.category]) ?? "pantry";
+  const category = match?.category ?? named ?? section ?? "pantry";
   const inferred = new Set(product.inferredFields);
   const ingredients = product.visibleIngredients ?? undefined;
   return {

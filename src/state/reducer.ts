@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORY_ORDER, mergeCategoryOrder } from "../domain/categories";
+import { DEFAULT_CATEGORY_ORDER, mergeCategoryOrder, orderForRetailer } from "../domain/categories";
 import { matchProduct, normalize } from "../domain/matchProduct";
 import { parseList } from "../domain/parseList";
 import {
@@ -6,6 +6,7 @@ import {
   isComplete,
   markFound,
   moveAmongOpen,
+  focusItem,
   moveItemWithinCategory,
   skipItem,
   sortByCategory,
@@ -139,6 +140,7 @@ export type Action =
   /** Drop every open (non-found) line; found items and list metadata stay. */
   | { type: "clear-open-items" }
   | { type: "move-item"; itemId: string; direction: -1 | 1 }
+  | { type: "focus-item"; itemId: string }
   | { type: "set-category-order"; order: CategoryId[] }
   | { type: "restore-generic"; itemId: string }
   | {
@@ -218,12 +220,16 @@ export type Action =
   | { type: "forget-saved"; id: string }
   | { type: "restore-saved"; list: SavedList; index: number }
   | { type: "clear-saved" }
-  /** Import a shared list: `open` replaces the current draft; `save-only` keeps the active adventure. */
-  | { type: "import-shared-list"; list: SharedListV1; mode: "open" | "save-only" }
+  /** Import a shared list: `merge` appends into the current list; `create` opens a new named list. */
+  | { type: "import-shared-list"; list: SharedListV1; mode: "merge" | "create"; name?: string }
   | { type: "feedback-asked" };
 
 function touch(adventure: Adventure, patch: Partial<Adventure>): Adventure {
   return { ...adventure, ...patch, updatedAt: Date.now() };
+}
+
+function sameCategoryOrder(a: CategoryId[], b: CategoryId[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
 }
 
 export const DEFAULT_LIST_NAME = "Boodschappenlijst";
@@ -308,6 +314,31 @@ function mergeLines(items: AdventureItem[], lines: { product: Product; quantity:
       );
     } else {
       next = [...next, createItem(line.product, line.quantity)];
+    }
+  }
+  return next;
+}
+
+/** Same SKU/EAN/catalog id bumps quantity; different brand/variant stays a separate line. */
+function importIdentity(item: Pick<SavedItem | AdventureItem, "productId" | "ean" | "catalogProductId" | "brand" | "recognition">): string {
+  if (item.catalogProductId) return `c:${item.catalogProductId}`;
+  if (item.ean) return `e:${item.ean}`;
+  const variant = item.recognition?.variant?.trim().toLowerCase() ?? "";
+  const brand = item.brand?.trim().toLowerCase() ?? "";
+  return `p:${item.productId}|${brand}|${variant}`;
+}
+
+function mergeImportedItems(existing: AdventureItem[], incoming: SavedItem[]): AdventureItem[] {
+  let next = existing;
+  for (const saved of incoming) {
+    const key = importIdentity(saved);
+    const match = next.find((item) => item.status !== "found" && importIdentity(item) === key);
+    if (match) {
+      next = next.map((item) =>
+        item.id === match.id ? { ...item, quantity: Math.min(24, item.quantity + saved.quantity) } : item,
+      );
+    } else {
+      next = [...next, itemFromSaved(saved)];
     }
   }
   return next;
@@ -413,12 +444,14 @@ function enriched<T extends SavedItem | AdventureItem>(item: T, result: CustomEn
   const name = singularKey(result.displayName) === singularKey(item.name) ? result.displayName.trim().slice(0, 40) : item.name;
   const aliases = [...new Set([result.singularName, result.pluralName, result.childFriendlyLabel, result.displayName].map((alias) => alias?.trim() ?? ""))]
     .filter((alias) => alias && normalize(alias) !== normalize(name));
-  const icon = result.drawing && productById(result.drawing) ? result.drawing : categoryIcon(result.category);
+  const lockCategory = item.categorySource === "parent";
+  const category = lockCategory ? item.category : result.category;
+  const icon = result.drawing && productById(result.drawing) ? result.drawing : categoryIcon(category);
   return {
     ...item,
     name,
     canonicalName: result.canonicalName,
-    category: result.category,
+    category,
     icon,
     ...(result.subcategory && { subcategory: result.subcategory }),
     ...(aliases.length && { aliases }),
@@ -528,7 +561,18 @@ export function reducer(state: AppState, action: Action): AppState {
     case "set-discovery": {
       const settings = { ...state.settings, smartDiscovery: action.enabled };
       if (action.enabled || state.adventure?.phase !== "shopping") return { ...state, settings };
-      const items = state.adventure.items.map((item) => (item.mission && item.mission.status !== "done" ? { ...item, mission: undefined } : item));
+      const items = state.adventure.items.map((item) => {
+        let next = item;
+        if (next.mission && next.mission.status !== "done") {
+          const { mission: _drop, ...rest } = next;
+          next = rest as AdventureItem;
+        }
+        if (next.play && next.play.status !== "done" && next.play.status !== "skipped") {
+          const { play: _drop, ...rest } = next;
+          next = rest as AdventureItem;
+        }
+        return next;
+      });
       return { ...state, settings, adventure: touch(state.adventure, { items }) };
     }
     case "set-reference-images":
@@ -540,8 +584,23 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, adventure: touch(withRetailer(base, retailer), {}) };
     }
     case "set-default-retailer": {
+      const previous = state.settings.retailer;
       const { retailer: _previous, ...rest } = state.settings;
-      return { ...state, settings: action.retailer ? { ...rest, retailer: action.retailer } : rest };
+      const settings = action.retailer ? { ...rest, retailer: action.retailer } : rest;
+      const wasDefault =
+        !previous ||
+        sameCategoryOrder(state.categoryOrder, orderForRetailer(previous)) ||
+        sameCategoryOrder(state.categoryOrder, DEFAULT_CATEGORY_ORDER);
+      if (!wasDefault || !action.retailer) return { ...state, settings };
+      const categoryOrder = orderForRetailer(action.retailer);
+      return {
+        ...state,
+        settings,
+        categoryOrder,
+        adventure: state.adventure
+          ? touch(state.adventure, { categoryOrder, items: sortByCategory(state.adventure.items, categoryOrder) })
+          : state.adventure,
+      };
     }
     case "intro-seen":
       return state.settings.introSeen ? state : { ...state, settings: { ...state.settings, introSeen: true } };
@@ -668,6 +727,12 @@ export function reducer(state: AppState, action: Action): AppState {
           : moveItemWithinCategory(state.adventure.items, action.itemId, action.direction);
       return { ...state, adventure: touch(state.adventure, { items }) };
     }
+    case "focus-item": {
+      if (!state.adventure || state.adventure.phase !== "shopping") return state;
+      const items = focusItem(state.adventure.items, action.itemId);
+      if (items === state.adventure.items) return state;
+      return { ...state, adventure: touch(state.adventure, { items }) };
+    }
     case "set-category-order":
       return {
         ...state,
@@ -738,11 +803,13 @@ export function reducer(state: AppState, action: Action): AppState {
       return updateItem(state, action.itemId, (item) => {
         const custom = item.kind === "custom_generic";
         const renamed = Boolean(action.name?.trim() && action.name.trim() !== item.name);
+        const categoryLocked = Boolean(action.category && action.category !== item.category);
         const edited: AdventureItem = {
           ...item,
           name: action.name?.trim().slice(0, 40) || item.name,
           ...(renamed && { fieldSources: { ...item.fieldSources, name: "parent" as const } }),
           category: action.category ?? item.category,
+          ...(categoryLocked && { categorySource: "parent" as const }),
           icon: action.icon ?? item.icon,
           productId: custom ? item.productId : (action.productId ?? item.productId),
           ...(item.enrichment?.status === "pending" && (action.category || action.icon) && { enrichment: { ...item.enrichment, status: "done" as const } }),
@@ -785,7 +852,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return updateCustom(state, action.productId, (item) => {
         const untouched = item.enrichment?.status === "pending";
         if (item.brand === brand && !untouched) return item;
-        const moved = untouched && action.category && action.category !== item.category ? { category: action.category, icon: categoryIcon(action.category) } : {};
+        const mayMove = untouched && item.categorySource !== "parent" && action.category && action.category !== item.category;
+        const moved = mayMove ? { category: action.category!, icon: categoryIcon(action.category!) } : {};
         return { ...item, brand, ...moved, enrichment: { status: "done" as const, tries: item.enrichment?.tries ?? 0, at: Date.now() } };
       });
     }
@@ -911,10 +979,30 @@ export function reducer(state: AppState, action: Action): AppState {
     case "open-saved": {
       const list = state.saved.find((entry) => entry.id === action.id);
       if (!list) return state;
-      const adventure = createAdventure(list.name, [], state.categoryOrder, "draft");
-      const items = sortByCategory(list.items.map(itemFromSaved), state.categoryOrder);
-      const retailer = isRetailer(list.retailer) ? list.retailer : state.settings.retailer;
-      return { ...state, adventure: withRetailer({ ...adventure, id: list.id, ...(list.store && { store: list.store }), items }, retailer) };
+      if (state.adventure?.id === list.id) {
+        const retailer = isRetailer(list.retailer) ? list.retailer : state.settings.retailer;
+        return {
+          ...state,
+          adventure: withRetailer(
+            touch(state.adventure, {
+              items: sortByCategory(state.adventure.items, state.categoryOrder),
+              phase: state.adventure.phase === "done" ? "draft" : state.adventure.phase,
+            }),
+            retailer,
+          ),
+        };
+      }
+      /** Keep the current list in `saved` before replacing the active adventure. */
+      const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
+      const target = saved.find((entry) => entry.id === action.id) ?? list;
+      const adventure = createAdventure(target.name, [], state.categoryOrder, "draft");
+      const items = sortByCategory(target.items.map(itemFromSaved), state.categoryOrder);
+      const retailer = isRetailer(target.retailer) ? target.retailer : state.settings.retailer;
+      return {
+        ...state,
+        saved,
+        adventure: withRetailer({ ...adventure, id: target.id, ...(target.store && { store: target.store }), items }, retailer),
+      };
     }
     case "forget-saved":
       return { ...state, saved: state.saved.filter((list) => list.id !== action.id), adventure: forget(state.adventure, [action.id]) };
@@ -926,24 +1014,28 @@ export function reducer(state: AppState, action: Action): AppState {
     case "clear-saved":
       return { ...state, saved: [], adventure: forget(state.adventure, state.saved.map((list) => list.id)) };
     case "import-shared-list": {
-      const items = toImportSavedItems(action.list);
-      if (!items.length) return state;
-      const name = action.list.name?.trim().slice(0, 40) || SHARED_IMPORT_LIST_NAME;
+      const incoming = toImportSavedItems(action.list);
+      if (!incoming.length) return state;
       const retailer = isRetailer(action.list.retailer) ? action.list.retailer : undefined;
+      if (action.mode === "merge") {
+        const adventure = ensureDraft(state);
+        const merged = mergeImportedItems(adventure.items, incoming);
+        const sorted = sortByCategory(merged, state.categoryOrder);
+        const next = touch(adventure, { items: sorted, ...(retailer && !adventure.retailer && { retailer }) });
+        return { ...state, adventure: next, saved: upsertSaved(state.saved, next) };
+      }
+      const name = (action.name ?? action.list.name)?.trim().slice(0, 40) || SHARED_IMPORT_LIST_NAME;
       const entry: SavedList = {
         id: crypto.randomUUID(),
         name,
         ...(retailer && { retailer }),
-        items,
+        items: incoming,
         favorite: false,
         updatedAt: Date.now(),
       };
-      if (action.mode === "save-only") {
-        return { ...state, saved: [entry, ...state.saved].slice(0, 40) };
-      }
       const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
       const adventure = createAdventure(name, [], state.categoryOrder, "draft");
-      const sorted = sortByCategory(items.map(itemFromSaved), state.categoryOrder);
+      const sorted = sortByCategory(incoming.map(itemFromSaved), state.categoryOrder);
       return {
         ...state,
         saved: [entry, ...saved.filter((list) => list.id !== entry.id)].slice(0, 40),

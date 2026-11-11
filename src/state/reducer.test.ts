@@ -229,7 +229,7 @@ it("importeert een gedeeld lijstje als nieuw avontuur met verse ids", () => {
       { name: "Cashewnoten", quantity: 1, category: "produce" as const, kind: "custom_generic" as const, productId: "custom:cashewnoten" },
     ],
   };
-  state = reducer(state, { type: "import-shared-list", list: shared, mode: "open" });
+  state = reducer(state, { type: "import-shared-list", list: shared, mode: "create" });
   expect(state.adventure?.id).not.toBe(previousId);
   expect(state.adventure).toMatchObject({ name: "Van oma", retailer: "lidl", phase: "draft" });
   expect(state.adventure?.items.map((item) => [item.name, item.quantity, item.status])).toEqual([
@@ -242,7 +242,21 @@ it("importeert een gedeeld lijstje als nieuw avontuur met verse ids", () => {
   expect(state.settings.retailer).not.toBe("lidl");
 });
 
-it("bewaart een gedeeld lijstje zonder het actieve avontuur te overschrijven", () => {
+it("bewaart het huidige draft bij open-saved zodat wisselen niets weggooit", () => {
+  const banaan = recognizeList("banaan")[0].product!;
+  const melk = recognizeList("melk")[0].product!;
+  let state = reducer(initialState, { type: "add-product", product: banaan });
+  state = reducer(state, { type: "save-favorite", name: "Melklijst" });
+  const milkId = state.adventure!.id;
+  state = reducer(state, { type: "new-draft" });
+  state = reducer(state, { type: "add-product", product: melk });
+  const draftId = state.adventure!.id;
+  state = reducer(state, { type: "open-saved", id: milkId });
+  expect(state.adventure?.id).toBe(milkId);
+  expect(state.saved.some((list) => list.id === draftId && list.items.some((item) => item.productId === "melk"))).toBe(true);
+});
+
+it("voegt een gedeeld lijstje toe aan het huidige lijstje zonder duplicaten te mergen", () => {
   const banaan = recognizeList("banaan")[0].product!;
   let state = reducer(initialState, { type: "add-product", product: banaan });
   const currentId = state.adventure!.id;
@@ -251,14 +265,18 @@ it("bewaart een gedeeld lijstje zonder het actieve avontuur te overschrijven", (
     list: {
       version: 1,
       name: "Buurvrouw",
-      items: [{ name: "Brood", quantity: 1, category: "bakery", productId: "brood" }],
+      items: [
+        { name: "Banaan", quantity: 2, category: "produce", productId: "banaan" },
+        { name: "Brood", quantity: 1, category: "bakery", productId: "brood" },
+      ],
     },
-    mode: "save-only",
+    mode: "merge",
   });
   expect(state.adventure?.id).toBe(currentId);
-  expect(state.adventure?.items.map((item) => item.productId)).toEqual(["banaan"]);
-  expect(state.saved[0]).toMatchObject({ name: "Buurvrouw", favorite: false });
-  expect(state.saved[0].items[0]).toMatchObject({ name: "Brood", imageKind: "generic" });
+  expect(state.adventure?.items.map((item) => [item.productId, item.quantity])).toEqual([
+    ["banaan", 3],
+    ["brood", 1],
+  ]);
 });
 
 it("geeft naamloze gedeelde imports de titel Gedeeld lijstje", () => {
@@ -266,11 +284,11 @@ it("geeft naamloze gedeelde imports de titel Gedeeld lijstje", () => {
     version: 1 as const,
     items: [{ name: "Melk", quantity: 1, category: "dairy" as const, productId: "melk" }],
   };
-  let state = reducer(initialState, { type: "import-shared-list", list: unnamed, mode: "save-only" });
+  let state = reducer(initialState, { type: "import-shared-list", list: unnamed, mode: "create", name: "Gedeeld lijstje" });
   expect(state.saved[0]?.name).toBe("Gedeeld lijstje");
   expect(listName(state.saved[0]!)).toBe("Gedeeld lijstje");
 
-  state = reducer(initialState, { type: "import-shared-list", list: unnamed, mode: "open" });
+  state = reducer(initialState, { type: "import-shared-list", list: unnamed, mode: "create" });
   expect(state.adventure?.name).toBe("Gedeeld lijstje");
   expect(state.saved[0]?.name).toBe("Gedeeld lijstje");
 });

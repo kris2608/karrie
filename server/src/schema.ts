@@ -5,10 +5,14 @@ export const SHOP_SECTIONS = [
   "bakker",
   "vlees-vis-vega",
   "ontbijt",
-  "houdbaar",
+  "kaas-vleeswaren",
   "koeling",
+  "snacks-snoep",
+  "houdbaar",
+  "maaltijden",
   "dranken",
   "diepvries",
+  "verzorging",
   "huishouden",
 ] as const;
 export const INFERABLE_FIELDS = ["productName", "genericName", "brand", "variant", "packageSize", "category", "subcategory"] as const;
@@ -20,12 +24,12 @@ export const FOOD_TYPES = [
   "sperziebonen", "prei", "verse-spinazie", "wokgroenten", "pastagroenten",
   "brood", "bolletjes", "krentenbollen", "croissant", "stokbrood",
   "kipfilet", "gehakt", "zalm", "vegaburger",
-  "beschuit", "crackers", "havermout", "pindakaas", "noten", "jam", "hagelslag", "muesli", "honing", "appelstroop",
-  "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "bloem", "suiker", "koekjes", "chips", "pastasaus", "mais",
+  "beschuit", "crackers", "havermout", "pindakaas", "noten", "jam", "hagelslag", "muesli", "honing", "appelstroop", "ontbijtkoek",
+  "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "bloem", "suiker", "koekjes", "chips", "chocoladereep", "pastasaus", "mais",
   "augurk", "olijven", "babyvoeding",
-  "melk", "yoghurt", "kwark", "kaas", "mozzarella", "feta", "boter", "eieren", "vla", "karnemelk", "roomkaas",
+  "melk", "yoghurt", "kwark", "kaas", "ham", "salami", "mozzarella", "feta", "boter", "eieren", "vla", "karnemelk", "roomkaas", "eiersalade",
   "koffie", "thee", "sinaasappelsap", "water", "drinkpakje", "frisdrank", "siroop",
-  "ijs", "pizza", "vissticks", "spinazie", "bessen", "kant-en-klaar",
+  "ijs", "pizza", "vissticks", "spinazie", "bessen", "kant-en-klaar", "maaltijdsalade",
 ] as const;
 export const HOUSEHOLD_TYPES = [
   "toiletpapier", "keukenpapier", "afwasmiddel", "wasmiddel", "vuilniszakken", "handzeep", "tandpasta", "shampoo", "schoonmaakmiddel", "vaatwastabletten", "luiers",

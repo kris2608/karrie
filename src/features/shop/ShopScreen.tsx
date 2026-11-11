@@ -37,6 +37,7 @@ export function ShopScreen() {
   const { adventure, dispatch } = useAdventure();
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
+  const [listOpen, setListOpen] = useState(false);
   const [parentOpen, setParentOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
@@ -201,9 +202,22 @@ export function ShopScreen() {
       <ShopScene />
 
       <header className="shop-bar">
-        <button type="button" className="round-button round-s round-quiet" aria-label="Overzicht voor ouders" onClick={() => setParentOpen(true)}>
+        <button type="button" className="round-button round-s" data-testid="bekijk-lijstje" aria-label="Bekijk lijstje" onClick={() => setListOpen(true)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+            <path d="M7 5h10v14H7z" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
+            <path d="M10 9h4M10 13h4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button type="button" className="round-button round-s round-quiet" data-testid="shop-parent" aria-label="Voor ouders" onClick={() => setParentOpen(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path
+              d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={found} aria-label={`${found} van ${total} gevonden`}>
@@ -502,36 +516,46 @@ export function ShopScreen() {
         )}
       </Sheet>
 
-      <Sheet open={parentOpen} onClose={() => setParentOpen(false)} label="Overzicht voor ouders">
-        <h2>Nog te vinden</h2>
-        <ul className="parent-list">
-          {openItems.map((item, index) => (
-            <li key={item.id}>
-              <ItemArt item={item} />
-              <span>
-                {item.quantity > 1 ? `${item.quantity}× ` : ""}
-                {item.name}
-                {item.status === "skipped" && <small> · later</small>}
-              </span>
-              <button type="button" className="round-button round-s" aria-label="Omhoog" disabled={index === 0} onClick={() => dispatch({ type: "move-item", itemId: item.id, direction: -1 })}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6 14.5L12 8.5l6 6" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="round-button round-s"
-                aria-label="Omlaag"
-                disabled={index === openItems.length - 1}
-                onClick={() => dispatch({ type: "move-item", itemId: item.id, direction: 1 })}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6 9.5l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </li>
-          ))}
-        </ul>
+      <Sheet open={listOpen} onClose={() => setListOpen(false)} label="Bekijk lijstje">
+        <div className="bekijk-lijstje" data-testid="bekijk-lijstje-sheet">
+          <h2>Nog te vinden</h2>
+          <p className="sheet-note">Tik op wat je ziet in de winkel.</p>
+          <ul className="bekijk-lijstje-grid" aria-label="Nog te vinden">
+            {openItems.map((item) => {
+              const heading = productHeading(item);
+              const active = current?.id === item.id;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={active ? "bekijk-card is-active" : "bekijk-card"}
+                    data-testid="bekijk-card"
+                    aria-current={active ? "true" : undefined}
+                    aria-label={`${heading.title}${item.status === "skipped" ? ", later" : ""}${active ? ", nu zoeken" : ""}`}
+                    onClick={() => {
+                      dispatch({ type: "focus-item", itemId: item.id });
+                      setListOpen(false);
+                    }}
+                  >
+                    <ItemArt item={item} />
+                    <strong>
+                      {item.quantity > 1 ? `${item.quantity}× ` : ""}
+                      {heading.title}
+                    </strong>
+                    {item.status === "skipped" && <small>later</small>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <PressButton variant="secondary" wide onClick={() => setListOpen(false)}>
+            Verder speuren
+          </PressButton>
+        </div>
+      </Sheet>
+
+      <Sheet open={parentOpen} onClose={() => setParentOpen(false)} label="Voor ouders">
+        <h2>Voor ouders</h2>
         <SoundSwitch />
         <DiscoverySwitch />
         <div className="sheet-actions">

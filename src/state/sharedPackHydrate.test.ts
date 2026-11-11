@@ -41,7 +41,7 @@ describe("shared pack hydrate", () => {
   it("apply-shared-pack attaches OFF image when the EAN matches and never overwrites a parent photo", () => {
     let state = reducer(initialState, {
       type: "import-shared-list",
-      mode: "open",
+      mode: "create",
       list: {
         version: 1,
         items: [{ name: "Hagelslag", quantity: 1, category: "breakfast", ean: "8710496978722", brand: "De Ruijter", productId: "hagelslag" }],
@@ -98,7 +98,7 @@ describe("shared pack hydrate", () => {
 
     let state = reducer(initialState, {
       type: "import-shared-list",
-      mode: "open",
+      mode: "create",
       list: {
         version: 1,
         items: [

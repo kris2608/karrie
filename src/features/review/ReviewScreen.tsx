@@ -24,20 +24,13 @@ import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ShareIcon } from "../../components/ui/ShareIcon";
+import { ListsSheet } from "../lists/ListsSheet";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
 import { useHealthierPreflight } from "./useHealthierPreflight";
 
 const NO_ITEMS: AdventureItem[] = [];
-
-function Arrow({ up }: { up?: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d={up ? "M6 14.5L12 8.5l6 6" : "M6 9.5l6 6 6-6"} fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 export function ReviewScreen() {
   const { adventure, saved, settings, dispatch } = useAdventure();
@@ -46,6 +39,7 @@ export function ReviewScreen() {
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [listsOpen, setListsOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
@@ -132,7 +126,24 @@ export function ReviewScreen() {
 
   return (
     <main className="screen screen-review">
-      <TopBar title={named ?? "Klopt het lijstje?"} to="/toevoegen" />
+      <TopBar
+        title={named ?? "Klopt het lijstje?"}
+        to="/toevoegen"
+        leading={
+          <button type="button" className="round-button" data-testid="open-lists" aria-label="Lijstjes" onClick={() => setListsOpen(true)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 7h14M5 12h14M5 17h10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+            </svg>
+          </button>
+        }
+        action={
+          <Link to="/toevoegen" className="round-button" aria-label="Producten toevoegen">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 6v12M6 12h12" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+            </svg>
+          </Link>
+        }
+      />
       {adventure.store && (
         <p className="list-name" data-testid="list-store">
           {adventure.store}
@@ -176,12 +187,10 @@ export function ReviewScreen() {
           </header>
           <ul>
             <AnimatePresence initial={false}>
-              {group.items.map((item, index) => (
+              {group.items.map((item) => (
                 <ItemRow
                   key={item.id}
                   item={item}
-                  first={index === 0}
-                  last={index === group.items.length - 1}
                   offer={views.get(item.id)}
                   onEdit={() => setEditId(item.id)}
                   onRemove={() => remove(item)}
@@ -242,6 +251,7 @@ export function ReviewScreen() {
         onSaveAsNew={saveAsNew}
       />
       <ShareListSheet open={sharing} source={adventure} onClose={() => setSharing(false)} />
+      <ListsSheet open={listsOpen} onClose={() => setListsOpen(false)} />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <Toast notice={notice} onDismiss={dismiss} />
     </main>
@@ -250,15 +260,13 @@ export function ReviewScreen() {
 
 type ItemRowProps = {
   item: AdventureItem;
-  first: boolean;
-  last: boolean;
   offer?: OfferView;
   onEdit: () => void;
   onRemove: () => void;
   onOffer: (view: OfferView) => void;
 };
 
-function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
+function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
   const { adventure, settings, declined, dispatch } = useAdventure();
   const retailer = adventure?.retailer;
   const { pressing, handlers } = useLongPress(onRemove);
@@ -311,12 +319,6 @@ function ItemRow({ item, first, last, offer, onEdit, onRemove, onOffer }: ItemRo
         </div>
       </div>
       <div className="row-actions" data-no-long-press>
-        <button type="button" className="round-button round-s" aria-label="Omhoog" disabled={first} onClick={() => dispatch({ type: "move-item", itemId: item.id, direction: -1 })}>
-          <Arrow up />
-        </button>
-        <button type="button" className="round-button round-s" aria-label="Omlaag" disabled={last} onClick={() => dispatch({ type: "move-item", itemId: item.id, direction: 1 })}>
-          <Arrow />
-        </button>
         <button type="button" className="round-button round-s round-danger" aria-label="Verwijder" onClick={onRemove}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />

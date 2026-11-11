@@ -1,4 +1,4 @@
-import { retailerName, type RetailerId } from "./retailers";
+import type { RetailerId } from "./retailers";
 
 /** The public site parents send to friends; never a list or local data. */
 export const SHARE_URL = "https://www.karrie.eu";
@@ -13,16 +13,15 @@ export type ListShareInfo = {
   itemCount: number;
 };
 
-/** Title and message for sharing a saved/current list — name, shop and size so multiple links stay distinct. */
+/** Title and message for sharing a saved/current list — name and size only (no retailer in the message). */
 export function listShareCopy(info: ListShareInfo): { title: string; text: string } {
-  const store = info.retailer ? retailerName(info.retailer) : undefined;
   const count =
     info.itemCount > 0 ? (info.itemCount === 1 ? "1 product" : `${info.itemCount} producten`) : undefined;
-  const bits = [info.name?.trim() || undefined, store, count].filter((part): part is string => Boolean(part));
+  const bits = [info.name?.trim() || undefined, count].filter((part): part is string => Boolean(part));
   if (!bits.length) return { title: LIST_SHARE_TITLE, text: LIST_SHARE_TEXT };
   const summary = bits.join(" · ");
   return {
-    title: info.name?.trim() || store || LIST_SHARE_TITLE,
+    title: info.name?.trim() || LIST_SHARE_TITLE,
     text: `${LIST_SHARE_TEXT} ${summary}`,
   };
 }

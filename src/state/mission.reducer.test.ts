@@ -120,7 +120,11 @@ describe("bonus missions", () => {
     expect(plays.length).toBeGreaterThanOrEqual(1);
     expect(plays.every((item) => !item.mission)).toBe(true);
 
-    const off = reducer(reducer(state, { type: "set-discovery", enabled: false }), { type: "new-draft" });
+    const cleared = reducer(state, { type: "set-discovery", enabled: false });
+    expect(items(cleared).every((item) => !item.mission || item.mission.status === "done")).toBe(true);
+    expect(items(cleared).every((item) => !item.play || item.play.status === "done" || item.play.status === "skipped")).toBe(true);
+
+    const off = reducer(cleared, { type: "new-draft" });
     let plain = off;
     plain = reducer(plain, { type: "add-recognized", name: "Banaan", category: "produce", icon: "banaan", productId: "banaan", pack: { recognition: { confidence: "high" } } });
     plain = reducer(plain, { type: "start-shopping" });

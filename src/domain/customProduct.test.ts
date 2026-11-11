@@ -92,7 +92,7 @@ describe("suggestion", () => {
     expect(suggestion("prei", [])).toMatchObject({ kind: "catalog", product: { id: "prei" }, close: false });
     expect(suggestion("Courgettes", [])).toMatchObject({ kind: "catalog", product: { id: "courgette" }, close: false });
     expect(suggestion("tomaten", [])).toMatchObject({ kind: "catalog", product: { id: "tomaat" }, close: false });
-    expect(suggestion("walnoten", [])).toBeNull();
+    expect(suggestion("komijn", [])).toBeNull();
   });
 
   it("offers a typo match only as a close suggestion", () => {
@@ -105,9 +105,9 @@ describe("suggestion", () => {
   });
 
   it("has nothing for a product that does not exist yet", () => {
-    expect(suggestion("cashewnoten", [])).toBeNull();
     expect(suggestion("komijn", [])).toBeNull();
     expect(suggestion("rozijnen", [])).toBeNull();
+    expect(suggestion("tahin", [])).toBeNull();
   });
 });
 

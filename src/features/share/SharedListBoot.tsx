@@ -51,17 +51,13 @@ export function SharedListBoot() {
     if (shareIdFromPath(location.pathname)) navigate("/", { replace: true });
   }
 
-  function importList(mode: "open" | "save-only") {
+  function importList(mode: "merge" | "create", name?: string) {
     if (boot.status !== "preview") return;
     const { list } = boot;
-    dispatch({ type: "import-shared-list", list, mode });
+    dispatch({ type: "import-shared-list", list, mode, ...(name && { name }) });
     trackEvent({ name: "shared_list_imported", data: { item_count: list.items.length, entry: "link" } });
     setBoot({ status: "idle" });
-    if (mode === "open") {
-      navigate("/controleren", { replace: true });
-      return;
-    }
-    navigate("/", { replace: true, state: { notice: "Lijstje bewaard" } });
+    navigate("/controleren", { replace: true, ...(mode === "merge" ? { state: { notice: "Producten toegevoegd" } } : {}) });
   }
 
   return (

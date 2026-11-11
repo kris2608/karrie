@@ -17,11 +17,15 @@ const DEPARTMENT: Record<Candidate["category"], string> = {
   bakery: "bakery product",
   meat: "meat, fish or vegetarian product",
   breakfast: "breakfast or spread product",
-  pantry: "pantry product",
-  drinks: "drink",
+  deli: "cheese or cold-cut product",
   dairy: "dairy product",
+  snacks: "snack or sweets product",
+  pantry: "pantry product",
+  meals: "ready meal or salad",
+  drinks: "drink",
   frozen: "frozen food",
-  household: "household or care product",
+  care: "personal-care product",
+  household: "household product",
 };
 
 /** A fixed style so every drawing looks like the rest of Karrie; only the product's own names vary. */

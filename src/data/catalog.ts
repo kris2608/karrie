@@ -1,8 +1,8 @@
 import { isCategoryId } from "../domain/categories";
 import type { CategoryId, Product } from "../domain/types";
 
-function product(id: string, name: string, category: CategoryId, groupId: string, aliases: string[] = []): Product {
-  return { id, name, category, groupId, aliases };
+function product(id: string, name: string, category: CategoryId, groupId: string, aliases: string[] = [], illustration?: string): Product {
+  return { id, name, category, groupId, aliases, ...(illustration && { illustration }) };
 }
 
 export const products: Product[] = [
@@ -47,7 +47,7 @@ export const products: Product[] = [
   product("crackers", "Crackers", "breakfast", "crackers", ["cracker"]),
   product("havermout", "Havermout", "breakfast", "oats", ["havervlokken"]),
   product("pindakaas", "Pindakaas", "breakfast", "peanut-butter"),
-  product("noten", "Noten", "breakfast", "nuts", ["ongezouten noten", "gezouten noten", "pinda's", "cashewnoten", "amandelen"]),
+  product("noten", "Noten", "snacks", "nuts", ["ongezouten noten", "gezouten noten", "pinda's", "amandelen"]),
   product("jam", "Jam", "breakfast", "jam", ["confituur", "aardbeienjam"]),
   product("hagelslag", "Hagelslag", "breakfast", "sprinkles"),
   product("muesli", "Muesli", "breakfast", "cereal", ["cruesli"]),
@@ -60,8 +60,10 @@ export const products: Product[] = [
   product("olijfolie", "Olijfolie", "pantry", "olive-oil", ["olie"]),
   product("bloem", "Bloem", "pantry", "flour", ["tarwebloem"]),
   product("suiker", "Suiker", "pantry", "sugar"),
-  product("koekjes", "Koekjes", "pantry", "cookies", ["koek", "biscuit", "biscuits"]),
-  product("chips", "Chips", "pantry", "crisps", ["chipjes"]),
+  product("koekjes", "Koekjes", "snacks", "cookies", ["koek", "biscuit", "biscuits"]),
+  product("chips", "Chips", "snacks", "crisps", ["chipjes"]),
+  product("chocoladereep", "Chocoladereep", "snacks", "chocolate-bar", ["chocolade", "chocola", "reep"], "koekjes"),
+  product("ontbijtkoek", "Ontbijtkoek", "breakfast", "breakfast-cake", ["peperkoek"], "koekjes"),
   product("pastasaus", "Pastasaus", "pantry", "pasta-sauce", ["pastasausje", "saus"]),
   product("mais", "Mais", "pantry", "corn", ["maïs", "maisblik"]),
   product("augurk", "Augurk", "pantry", "pickle", ["augurken", "zure bom"]),
@@ -70,9 +72,11 @@ export const products: Product[] = [
   product("melk", "Melk", "dairy", "milk", ["melkpak", "halfvolle melk"]),
   product("yoghurt", "Yoghurt", "dairy", "yogurt", ["yogurt"]),
   product("kwark", "Kwark", "dairy", "yogurt"),
-  product("kaas", "Kaas", "dairy", "cheese", ["kaasplakken"]),
-  product("mozzarella", "Mozzarella", "dairy", "mozzarella", ["mozarella"]),
-  product("feta", "Feta", "dairy", "feta"),
+  product("kaas", "Kaas", "deli", "cheese", ["kaasplakken"]),
+  product("ham", "Ham", "deli", "ham", ["achterham", "beenham", "kipfilet plakken"], "kipfilet"),
+  product("salami", "Salami", "deli", "salami", [], "kipfilet"),
+  product("mozzarella", "Mozzarella", "deli", "mozzarella", ["mozarella"]),
+  product("feta", "Feta", "deli", "feta"),
   product("boter", "Boter", "dairy", "butter"),
   product("eieren", "Eieren", "dairy", "eggs", ["ei", "eierdoos"]),
   product("vla", "Vla", "dairy", "custard", ["vanillevla"]),
@@ -91,17 +95,19 @@ export const products: Product[] = [
   product("spinazie", "Spinazie", "frozen", "spinach", ["diepvriesspinazie"]),
   product("bessen", "Bessen", "frozen", "berries", ["bosbessen", "diepvriesfruit"]),
   product("kant-en-klaar", "Kant-en-klaar", "frozen", "ready-meal", ["ovenschotel", "diepvriesmaaltijd"]),
+  product("maaltijdsalade", "Maaltijdsalade", "meals", "meal-salad", ["maaltijd salade", "salade maaltijd"], "sla"),
+  product("eiersalade", "Eiersalade", "deli", "egg-salad", ["eiersla"], "eieren"),
   product("toiletpapier", "Toiletpapier", "household", "toilet-paper", ["wc papier", "wc-papier"]),
   product("keukenpapier", "Keukenpapier", "household", "kitchen-roll", ["keukenrol"]),
   product("afwasmiddel", "Afwasmiddel", "household", "dish-soap", ["afwas"]),
   product("wasmiddel", "Wasmiddel", "household", "detergent", ["waspoeder"]),
   product("vuilniszakken", "Vuilniszakken", "household", "trash-bags", ["vuilniszak", "pedaalzakken"]),
-  product("handzeep", "Handzeep", "household", "soap", ["zeep"]),
-  product("tandpasta", "Tandpasta", "household", "toothpaste"),
-  product("shampoo", "Shampoo", "household", "shampoo"),
   product("schoonmaakmiddel", "Schoonmaakmiddel", "household", "cleaner", ["allesreiniger"]),
   product("vaatwastabletten", "Vaatwastabletten", "household", "dishwasher", ["vaatwastablet", "vaatwas"]),
-  product("luiers", "Luiers", "household", "diapers", ["luier"]),
+  product("handzeep", "Handzeep", "care", "soap", ["zeep"]),
+  product("tandpasta", "Tandpasta", "care", "toothpaste"),
+  product("shampoo", "Shampoo", "care", "shampoo"),
+  product("luiers", "Luiers", "care", "diapers", ["luier"]),
 ];
 
 export function productById(id: string): Product | undefined {

@@ -47,10 +47,14 @@ const TINT: Record<CategoryId, string> = {
   bakery: "#ffe9c2",
   meat: "#ffd5d0",
   breakfast: "#ffe8c8",
-  pantry: "#ffe0da",
+  deli: "#ffe3c8",
   dairy: "#d9f0ff",
+  snacks: "#ffd9e8",
+  pantry: "#ffe0da",
+  meals: "#e8f5d9",
   drinks: "#d4e8ff",
   frozen: "#dcf3f6",
+  care: "#e8dff8",
   household: "#ece3ff",
 };
 

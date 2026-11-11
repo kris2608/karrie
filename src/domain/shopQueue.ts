@@ -64,3 +64,15 @@ export function moveAmongOpen(items: AdventureItem[], id: string, direction: -1 
   [next[open[position].index], next[target.index]] = [next[target.index], next[open[position].index]];
   return next;
 }
+
+/** Bring an open item to the front of the remaining queue without marking it found. */
+export function focusItem(items: AdventureItem[], id: string): AdventureItem[] {
+  const index = items.findIndex((item) => item.id === id);
+  if (index < 0 || items[index].status === "found") return items;
+  const current = activeItem(items);
+  if (current?.id === id) return items;
+  const chosen = items[index];
+  const open = items.filter((item) => item.status !== "found" && item.id !== id);
+  const found = items.filter((item) => item.status === "found");
+  return [chosen, ...open, ...found];
+}

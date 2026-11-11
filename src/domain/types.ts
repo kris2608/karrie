@@ -5,10 +5,14 @@ export type CategoryId =
   | "bakery"
   | "meat"
   | "breakfast"
-  | "pantry"
+  | "deli"
   | "dairy"
+  | "snacks"
+  | "pantry"
+  | "meals"
   | "drinks"
   | "frozen"
+  | "care"
   | "household";
 
 export type ItemStatus = "pending" | "found" | "skipped";
@@ -132,6 +136,8 @@ export type PackInfo = {
   /** Unresolved pack-size disagreement between sources; cleared when the parent confirms. */
   packConflict?: { choices: string[]; raw: string[] };
   fieldSources?: FieldSources;
+  /** When "parent", automated enrichment must not move the shop department. */
+  categorySource?: FieldSource;
   recognition?: Recognition;
   alternative?: AlternativeAssessment;
   /** The parent's choice for the bonus mission; undefined means the evidence-based default. */
