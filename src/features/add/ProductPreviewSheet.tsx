@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { NutriScoreMark } from "../../components/NutriScoreLogo";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
@@ -28,6 +28,10 @@ export type ProductPreviewSheetProps = {
   offer?: RetailerId;
   quantity: number;
   onAdd: () => void;
+  /** Accessible quantity decrease without long-press. */
+  onDecrease?: () => void;
+  /** Explicit forget from Mijn producten (never from long-press). */
+  onForgetMine?: () => void;
   onClose: () => void;
 };
 
@@ -36,7 +40,23 @@ function sparsePack(pack?: PreviewPack) {
 }
 
 /** Read-only look at a user-added product; editing stays on Controleren. */
-export function ProductPreviewSheet({ open, name, category, art, pack, mine, offer, quantity, onAdd, onClose }: ProductPreviewSheetProps) {
+export function ProductPreviewSheet({
+  open,
+  name,
+  category,
+  art,
+  pack,
+  mine,
+  offer,
+  quantity,
+  onAdd,
+  onDecrease,
+  onForgetMine,
+  onClose,
+}: ProductPreviewSheetProps) {
+  const [moreInfo, setMoreInfo] = useState(false);
+  const [options, setOptions] = useState(false);
+  const [forgetConfirm, setForgetConfirm] = useState(false);
   const heading = productHeading({
     name,
     brand: pack?.brand,
@@ -64,7 +84,16 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
     : null;
 
   return (
-    <Sheet open={open} onClose={onClose} label={`Informatie over ${heading.title}`}>
+    <Sheet
+      open={open}
+      onClose={() => {
+        setMoreInfo(false);
+        setOptions(false);
+        setForgetConfirm(false);
+        onClose();
+      }}
+      label={`Informatie over ${heading.title}`}
+    >
       <div className="product-preview" data-testid="product-preview">
         <div className="item-sheet-head">
           <div className="item-sheet-art product-preview-art">{art}</div>
@@ -74,28 +103,68 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
             <NutriScoreMark grade={nutrition?.nutriscore} />
             <span>{categoryLabel(category)}</span>
             {mine && <small>Uit Mijn producten</small>}
-            {pack?.ean && <small data-testid="preview-ean">EAN {pack.ean}</small>}
-            {pack?.barcode?.sourceName && (
-              <small data-testid="preview-source">
-                Via {pack.barcode.sourceName}
-                {pack.barcode.sourceUrl ? (
-                  <>
-                    {" · "}
-                    <a href={pack.barcode.sourceUrl} target="_blank" rel="noreferrer noopener">
-                      Bron
-                    </a>
-                  </>
-                ) : null}
-              </small>
-            )}
             {offer && <OfferTag shown="deal" retailer={offer} />}
-            {quantity > 0 && <small>{quantity} op de lijst</small>}
+            {quantity > 0 && <small data-testid="preview-qty">{quantity} op de lijst</small>}
           </div>
         </div>
-        {factsItem && <ProductInfo item={factsItem} />}
-        {sparsePack(pack) && (
+
+        {quantity > 0 && onDecrease && (
+          <div className="qty-stepper" data-testid="preview-qty-stepper">
+            <button type="button" className="qty-btn" data-testid="preview-qty-minus" aria-label="Eén minder" onClick={onDecrease}>
+              −
+            </button>
+            <span aria-live="polite">{quantity}</span>
+            <button
+              type="button"
+              className="qty-btn"
+              data-testid="preview-qty-plus"
+              aria-label="Nog één"
+              onClick={() => {
+                onAdd();
+              }}
+            >
+              +
+            </button>
+          </div>
+        )}
+
+        {factsItem && moreInfo && <ProductInfo item={factsItem} hideNutriScore />}
+        {factsItem && (
+          <button type="button" className="text-button" data-testid="preview-more-info" onClick={() => setMoreInfo((value) => !value)}>
+            {moreInfo ? "Minder informatie" : "Meer informatie"}
+          </button>
+        )}
+
+        {sparsePack(pack) && !factsItem && (
           <p className="sheet-note">Tik Op de lijst om dit product mee te nemen. Meer details kun je later aanpassen onder Controleren.</p>
         )}
+
+        {mine && onForgetMine && (
+          <div className="preview-options">
+            <button type="button" className="text-button" data-testid="preview-options" onClick={() => setOptions((value) => !value)}>
+              {options ? "Minder opties" : "Aanpassen"}
+            </button>
+            {options && !forgetConfirm && (
+              <PressButton variant="quiet" wide className="pbtn-danger" data-testid="preview-forget-mine" onClick={() => setForgetConfirm(true)}>
+                Vergeet uit Mijn producten
+              </PressButton>
+            )}
+            {options && forgetConfirm && (
+              <>
+                <p className="sheet-note">Dit product verdwijnt uit Mijn producten op dit apparaat.</p>
+                <div className="sheet-actions">
+                  <PressButton variant="quiet" onClick={() => setForgetConfirm(false)}>
+                    Annuleren
+                  </PressButton>
+                  <PressButton variant="primary" data-testid="preview-forget-confirm" onClick={onForgetMine}>
+                    Vergeten
+                  </PressButton>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="sheet-actions">
           <PressButton variant="quiet" data-testid="preview-close" onClick={onClose}>
             Sluiten
@@ -105,7 +174,7 @@ export function ProductPreviewSheet({ open, name, category, art, pack, mine, off
             data-testid="preview-add"
             onClick={() => {
               onAdd();
-              onClose();
+              if (quantity === 0) onClose();
             }}
           >
             {quantity > 0 ? "Nog één" : "Op de lijst"}

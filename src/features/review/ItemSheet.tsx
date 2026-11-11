@@ -77,6 +77,7 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const { dispatch, adventure } = useAdventure();
   const [name, setName] = useState(item.name);
   const [editing, setEditing] = useState(false);
+  const [moreInfo, setMoreInfo] = useState(false);
   const [preview, setPreview] = useState<NamePhoto | null>(null);
   const parentPhoto = item.imageSource === "parent" && Boolean(item.photoId);
   const shown = useArt(item).pick;
@@ -132,11 +133,14 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
           {heading.subtitle && <span>{heading.subtitle}</span>}
           <NutriScoreMark grade={nutrition?.nutriscore} />
           <span>{categoryLabel(item.category)}</span>
-          {item.ean && <small>EAN {item.ean}</small>}
-          {item.source === "vision" && <small>Herkend van een foto</small>}
         </div>
       </div>
-      {item.offAttribution && <p className="scan-attribution">Gegevens: Open Food Facts (ODbL){shown?.source === "off" ? ", foto's CC BY-SA" : ""}</p>}
+      {item.offAttribution && (
+        <p className="scan-attribution">
+          Gegevens: Open Food Facts (ODbL)
+          {shown?.source === "off" ? ", foto's CC BY-SA" : ""}
+        </p>
+      )}
       {item.packConflict && item.fieldSources?.packageSize !== "parent" && (
         <PackConflict
           choices={item.packConflict.choices}
@@ -160,11 +164,19 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
           )}
         </p>
       )}
-      <PictureBlock item={item} />
-      <ProductInfo item={item} />
+
       <MissionBlock item={item} />
 
-      {editing ? (
+      <button type="button" className="text-button" data-testid="item-more-info" onClick={() => setMoreInfo((value) => !value)}>
+        {moreInfo ? "Minder informatie" : "Meer informatie"}
+      </button>
+      {moreInfo && <ProductInfo item={item} hideNutriScore />}
+
+      <button type="button" className="text-button" data-testid="item-edit-open" onClick={() => setEditing((value) => !value)}>
+        {editing ? "Minder opties" : "Aanpassen"}
+      </button>
+
+      {editing && (
         <div className="item-edit" data-testid="item-edit">
           <label className="scan-field">
             <span>Naam</span>
@@ -202,29 +214,26 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
               onPick={(id) => dispatch({ type: "edit-item", itemId: item.id, icon: id, productId: productById(id) ? id : undefined })}
             />
           )}
+          <PictureBlock item={item} />
+          <div className="item-sheet-actions">
+            {!item.ean && (
+              <PressButton variant="secondary" wide data-testid="photo-pack" onClick={onPhoto}>
+                <CameraIcon />
+                {parentPhoto ? "Nieuwe foto" : "Maak foto"}
+              </PressButton>
+            )}
+            {!item.ean && hasPhoto(item) && (
+              <PressButton variant="quiet" wide data-testid="restore-generic" onClick={onRestore}>
+                Gebruik Karrie-tekening
+              </PressButton>
+            )}
+            <PressButton variant="quiet" wide className="pbtn-danger" data-testid="remove-item" onClick={onRemove}>
+              Verwijder van lijst
+            </PressButton>
+          </div>
         </div>
-      ) : (
-        <button type="button" className="text-button" data-testid="item-edit-open" onClick={() => setEditing(true)}>
-          {item.ean ? "Naam of afdeling aanpassen" : "Naam, afdeling of tekening aanpassen"}
-        </button>
       )}
 
-      <div className="item-sheet-actions">
-        {!item.ean && (
-          <PressButton variant="secondary" wide data-testid="photo-pack" onClick={onPhoto}>
-            <CameraIcon />
-            {parentPhoto ? "Nieuwe foto" : "Maak foto"}
-          </PressButton>
-        )}
-        {!item.ean && hasPhoto(item) && (
-          <PressButton variant="quiet" wide data-testid="restore-generic" onClick={onRestore}>
-            Gebruik Karrie-tekening
-          </PressButton>
-        )}
-        <PressButton variant="quiet" wide className="pbtn-danger" data-testid="remove-item" onClick={onRemove}>
-          Verwijder van lijst
-        </PressButton>
-      </div>
       <PressButton variant="primary" wide onClick={done}>
         Klaar
       </PressButton>

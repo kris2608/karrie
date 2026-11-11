@@ -1,13 +1,20 @@
+import { coverLayout } from "./barcodeGeometry";
+
 export type Size = { width: number; height: number };
 
 export type CropRect = { sx: number; sy: number; sw: number; sh: number };
+
+export type GuideInset = { top: number; right: number; bottom: number; left: number };
+
+/** Must match `.camera-frame .scanner-corners { inset: 7% 8%; }` in styles.css. */
+export const CAMERA_GUIDE_INSET: GuideInset = { top: 0.07, right: 0.08, bottom: 0.07, left: 0.08 };
 
 export const PHOTO_RULES = {
   uploadMaxSide: 1024,
   uploadQuality: 0.82,
   savedMaxSide: 512,
   savedQuality: 0.8,
-  /** Width / height of the camera frame guide. */
+  /** Width / height of the outer camera frame (CSS aspect-ratio). */
   frameAspect: 3 / 4,
   stillTimeoutMs: 3000,
 };
@@ -24,18 +31,44 @@ export function centerCrop(size: Size, aspect: number): CropRect {
 }
 
 /**
- * A full-resolution still usually has the video's horizontal field of view with
- * more height. Cropping the same width fraction keeps what the parent saw.
+ * Source pixels that fill the corner-marker guide inside a cover-fitted preview box.
+ * Falls back to a full-frame center crop when the box size is unknown.
+ */
+export function guideCrop(video: Size, frameBox: Size | null | undefined, inset: GuideInset = CAMERA_GUIDE_INSET): CropRect {
+  if (!frameBox?.width || !frameBox.height) {
+    const outer = centerCrop(video, PHOTO_RULES.frameAspect);
+    return insetCrop(outer, inset);
+  }
+  const layout = coverLayout(video.width, video.height, frameBox.width, frameBox.height);
+  if (!layout) return centerCrop(video, PHOTO_RULES.frameAspect);
+
+  const guideX = frameBox.width * inset.left;
+  const guideY = frameBox.height * inset.top;
+  const guideW = frameBox.width * (1 - inset.left - inset.right);
+  const guideH = frameBox.height * (1 - inset.top - inset.bottom);
+
+  const sx = ((guideX - layout.offsetX) / layout.renderW) * video.width;
+  const sy = ((guideY - layout.offsetY) / layout.renderH) * video.height;
+  const sw = (guideW / layout.renderW) * video.width;
+  const sh = (guideH / layout.renderH) * video.height;
+
+  return clampRect({ sx, sy, sw, sh }, video);
+}
+
+/** Scale a video-space crop onto a still that shares the same field of view. */
+export function mapCropToStill(videoCrop: CropRect, video: Size, still: Size): CropRect {
+  const sx = (videoCrop.sx / video.width) * still.width;
+  const sy = (videoCrop.sy / video.height) * still.height;
+  const sw = (videoCrop.sw / video.width) * still.width;
+  const sh = (videoCrop.sh / video.height) * still.height;
+  return clampRect({ sx, sy, sw, sh }, still);
+}
+
+/**
+ * @deprecated Prefer guideCrop + mapCropToStill. Kept for callers that still pass aspect alone.
  */
 export function matchCrop(video: Size, still: Size, aspect: number): CropRect {
-  const fraction = centerCrop(video, aspect).sw / video.width;
-  let sw = still.width * fraction;
-  let sh = sw / aspect;
-  if (sh > still.height) {
-    sh = still.height;
-    sw = sh * aspect;
-  }
-  return { sx: (still.width - sw) / 2, sy: (still.height - sh) / 2, sw, sh };
+  return mapCropToStill(centerCrop(video, aspect), video, still);
 }
 
 export function fullRect(size: Size): CropRect {
@@ -126,19 +159,46 @@ async function takeStill(track: MediaStreamTrack | null): Promise<HTMLImageEleme
   }
 }
 
-/** Sharper full-resolution still where the browser offers it (Android Chrome), otherwise the current video frame. */
-export async function capturePhoto(video: HTMLVideoElement, track: MediaStreamTrack | null): Promise<ProcessedPhoto> {
+function insetCrop(outer: CropRect, inset: GuideInset): CropRect {
+  const sx = outer.sx + outer.sw * inset.left;
+  const sy = outer.sy + outer.sh * inset.top;
+  const sw = outer.sw * (1 - inset.left - inset.right);
+  const sh = outer.sh * (1 - inset.top - inset.bottom);
+  return { sx, sy, sw, sh };
+}
+
+function clampRect(rect: CropRect, size: Size): CropRect {
+  const sx = Math.max(0, Math.min(size.width - 1, rect.sx));
+  const sy = Math.max(0, Math.min(size.height - 1, rect.sy));
+  const sw = Math.max(1, Math.min(size.width - sx, rect.sw));
+  const sh = Math.max(1, Math.min(size.height - sy, rect.sh));
+  return { sx, sy, sw, sh };
+}
+
+/**
+ * Crop to the corner-marker guide. Uses a sharper ImageCapture still when the
+ * browser offers one with matching orientation; otherwise the live video frame.
+ */
+export async function capturePhoto(
+  video: HTMLVideoElement,
+  track: MediaStreamTrack | null,
+  frameEl?: HTMLElement | null,
+): Promise<ProcessedPhoto> {
   const frame = { width: video.videoWidth, height: video.videoHeight };
   if (!frame.width || !frame.height) throw new PhotoDecodeError("no frame");
+  const box = frameEl?.getBoundingClientRect();
+  const frameBox = box && box.width > 0 && box.height > 0 ? { width: box.width, height: box.height } : null;
+  const videoCrop = guideCrop(frame, frameBox);
+
   const still = await takeStill(track);
   if (still) {
     const size = { width: still.naturalWidth, height: still.naturalHeight };
     const sameOrientation = size.width > size.height === frame.width > frame.height;
     try {
-      if (sameOrientation) return await processPhoto(still, matchCrop(frame, size, PHOTO_RULES.frameAspect));
+      if (sameOrientation) return await processPhoto(still, mapCropToStill(videoCrop, frame, size));
     } finally {
       releasePhoto(still);
     }
   }
-  return processPhoto(video, centerCrop(frame, PHOTO_RULES.frameAspect));
+  return processPhoto(video, videoCrop);
 }

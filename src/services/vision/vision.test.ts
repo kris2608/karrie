@@ -68,6 +68,21 @@ describe("visionMapping", () => {
     expect("ean" in draft.pack).toBe(false);
   });
 
+  it("keeps Olvarit baby meals in pantry even when spinach is in the name", () => {
+    const draft = draftFromVision({
+      ...PEANUT,
+      productName: "Olvarit Spinazie Kip Aardappel",
+      brand: "Olvarit",
+      genericName: "spinazie",
+      subcategory: "spinazie",
+      catalogType: "verse-spinazie",
+      category: "groente-fruit",
+      specificProduct: true,
+    });
+    expect(draft.category).toBe("pantry");
+    expect(draft.match?.id).toBe("babyvoeding");
+  });
+
   it("prefers the catalog type the model picked, else matches only exact names or aliases", () => {
     expect(catalogMatch({ ...PEANUT, catalogType: "brood", productName: "Wit casinobrood", subcategory: "casinobrood", genericName: "brood" })?.id).toBe("brood");
     expect(catalogMatch({ ...PEANUT, catalogType: "brood", productName: "Volkoren casino", subcategory: "volkorenbrood", genericName: null })?.id).toBe("brood");

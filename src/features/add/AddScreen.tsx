@@ -77,10 +77,10 @@ type GridTileProps = {
   quantity: number;
   pop: { token: number } | null;
   onAdd: () => void;
+  /** Long-press: decrement qty or confirm list removal — never forgetMine. */
   onRemove: () => void;
-  /** Only for user-added products (Mijn producten / extras); catalog tiles stay without info. */
+  /** Info for listed tiles (qty > 0) and Mijn producten — accessible qty without long-press. */
   onInfo?: () => void;
-  /** Mijn producten can always be long-pressed: that also forgets them. */
   mine?: boolean;
   /** Only reliable offers show on a tile; doubtful ones stay on the parent's list screen. */
   offer?: RetailerId;
@@ -89,14 +89,15 @@ type GridTileProps = {
 };
 
 function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo, mine = false, offer, subtitle }: GridTileProps) {
-  const { pressing, handlers } = useLongPress(onRemove, quantity === 0 && !mine);
+  const { pressing, handlers } = useLongPress(onRemove, quantity === 0);
   const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : ""].filter(Boolean).join(" ");
   const deal = offer && quantity ? `, in de aanbieding bij ${retailerName(offer)}` : "";
   const genericHint = subtitle ? `, ${subtitle}` : "";
+  const longHint = quantity > 1 ? "Lang drukken om er één af te halen" : quantity === 1 ? "Lang drukken om van de lijst te halen" : "";
   const label = mine
-    ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}. Lang drukken om te vergeten`
+    ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}${longHint ? `. ${longHint}` : ""}`
     : quantity
-      ? `${name}${genericHint}, ${quantity} op de lijst${deal}. Lang drukken om te verwijderen`
+      ? `${name}${genericHint}, ${quantity} op de lijst${deal}. ${longHint}`
       : `${name}${genericHint}`;
   const corner = infoCorner(quantity);
   return (
@@ -193,9 +194,10 @@ export function AddScreen() {
   const [burst, setBurst] = useState<{ id: string; token: number } | null>(null);
   const [pickingStore, setPickingStore] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<{ tile: string; name: string } | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
-  const sheetOpen = newName !== null || pasteOpen || pickingStore || preview !== null;
+  const sheetOpen = newName !== null || pasteOpen || pickingStore || preview !== null || removeConfirm !== null;
   const onPullRefresh = useCallback(async () => {
     const eans = collectRefreshEans(mine, adventure);
     const [result] = await Promise.all([
@@ -336,10 +338,22 @@ export function AddScreen() {
   function removeProduct(tile: string) {
     const removed = takeOff(tile);
     if (!removed.length) return;
-    show(`${removed[0].item.name} verwijderd`, {
+    show(`${removed[0].item.name} van de lijst gehaald`, {
       label: "Ongedaan maken",
       run: () => removed.forEach(({ item, index }) => dispatch({ type: "insert-item", item, index })),
     });
+  }
+
+  /** Long-press / preview − : one less on the list, or confirm when quantity is one. Never forgets Mijn producten. */
+  function adjustTile(tile: string) {
+    const listed = onList.get(tile);
+    if (!listed) return;
+    if (listed.quantity > 1) {
+      dispatch({ type: "set-quantity", itemId: listed.item.id, quantity: listed.quantity - 1 });
+      buzz(8);
+      return;
+    }
+    setRemoveConfirm({ tile, name: listed.item.name });
   }
 
   function forgetMine(entry: SavedItem) {
@@ -348,6 +362,7 @@ export function AddScreen() {
     const removed = takeOff(key);
     dispatch({ type: "forget-mine", key });
     buzz(12);
+    setPreview(null);
     show(`${entry.name} vergeten`, {
       label: "Ongedaan maken",
       run: () => {
@@ -454,6 +469,7 @@ export function AddScreen() {
   const mineTile = (entry: SavedItem) => {
     const key = mineKey(entry);
     const listed = onList.get(key);
+    const qty = listed?.quantity ?? 0;
     const offer = offerOn(listed?.item);
     const heading = productHeading({ name: entry.name, brand: entry.brand, packageSize: entry.packageSize });
     return (
@@ -462,11 +478,11 @@ export function AddScreen() {
         name={heading.title}
         category={entry.category}
         art={<ItemArt item={listed ? listed.item : entry} />}
-        quantity={listed?.quantity ?? 0}
+        quantity={qty}
         pop={burst?.id === key ? burst : null}
         onAdd={() => addMine(entry)}
-        onRemove={() => forgetMine(entry)}
-        onInfo={() => setPreview({ kind: "mine", entry, listed: listed?.item, quantity: listed?.quantity ?? 0, offer })}
+        onRemove={() => adjustTile(key)}
+        onInfo={() => setPreview({ kind: "mine", entry, listed: listed?.item, quantity: qty, offer })}
         mine
         offer={offer}
         subtitle={heading.subtitle}
@@ -477,6 +493,7 @@ export function AddScreen() {
   const extraTile = (entry: OnList) => {
     const offer = offerOn(entry.item);
     const heading = productHeading({ name: entry.item.name, brand: entry.item.brand, packageSize: entry.item.packageSize });
+    const tile = tileOf(entry.item);
     return (
       <GridTile
         key={entry.item.id}
@@ -486,7 +503,7 @@ export function AddScreen() {
         quantity={entry.quantity}
         pop={burst?.id === entry.item.productId ? burst : null}
         onAdd={() => addMore(entry.item)}
-        onRemove={() => removeProduct(tileOf(entry.item))}
+        onRemove={() => adjustTile(tile)}
         onInfo={() => setPreview({ kind: "extra", item: entry.item, quantity: entry.quantity, offer })}
         offer={offer}
         subtitle={heading.subtitle}
@@ -496,6 +513,7 @@ export function AddScreen() {
 
   const productTile = (product: Product) => {
     const entry = onList.get(product.id);
+    const qty = entry?.quantity ?? 0;
     const offer = offerOn(entry?.item);
     const generic = Boolean(needle && pinned && product.id === pinned.id);
     return (
@@ -504,10 +522,15 @@ export function AddScreen() {
         name={product.name}
         category={product.category}
         art={<ItemArt item={entry ? entry.item : { icon: artIdOf(product), name: product.name }} />}
-        quantity={entry?.quantity ?? 0}
+        quantity={qty}
         pop={burst?.id === product.id ? burst : null}
         onAdd={() => addProduct(product)}
-        onRemove={() => removeProduct(product.id)}
+        onRemove={() => adjustTile(product.id)}
+        onInfo={
+          qty > 0
+            ? () => setPreview({ kind: "catalog", product, listed: entry?.item, quantity: qty, offer })
+            : undefined
+        }
         offer={offer}
         subtitle={generic ? "merk maakt niet uit" : undefined}
       />
@@ -633,11 +656,9 @@ export function AddScreen() {
       {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er meteen een foto of plaatje bij.</p>}
       {(count > 0 || mineVisible.length > 0) && (
         <p className="add-hint">
-          {count > 0 && mineVisible.length > 0
-            ? "Lang drukken haalt een product van de lijst of vergeet iets uit Mijn producten."
-            : count > 0
-              ? "Lang drukken haalt een product van de lijst."
-              : "Producten die je zelf hebt toegevoegd onthoudt Karrie. Lang drukken vergeet ze."}
+          {count > 0
+            ? "Tik voor +1. Lang drukken haalt er één af. Via i pas je aantallen aan of vergeet je iets uit Mijn producten."
+            : "Producten die je zelf hebt toegevoegd onthoudt Karrie. Via i kun je ze vergeten."}
         </p>
       )}
 
@@ -732,10 +753,55 @@ export function AddScreen() {
         offer={preview?.offer}
         quantity={preview ? previewQuantity(preview) : 0}
         onAdd={() => {
-          if (preview) addFromPreview(preview);
+          if (!preview) return;
+          addFromPreview(preview);
+          if (preview.quantity > 0) setPreview({ ...preview, quantity: preview.quantity + 1 });
         }}
+        onDecrease={() => {
+          if (!preview) return;
+          const tile =
+            preview.kind === "catalog" ? preview.product.id : preview.kind === "mine" ? mineKey(preview.entry) : tileOf(preview.item);
+          const listed = onList.get(tile);
+          if (!listed) return;
+          if (listed.quantity > 1) {
+            const nextQty = listed.quantity - 1;
+            dispatch({ type: "set-quantity", itemId: listed.item.id, quantity: nextQty });
+            if (preview.kind === "extra") setPreview({ ...preview, item: { ...preview.item, quantity: nextQty }, quantity: nextQty });
+            else setPreview({ ...preview, listed: { ...listed.item, quantity: nextQty }, quantity: nextQty });
+            return;
+          }
+          setPreview(null);
+          setRemoveConfirm({ tile, name: listed.item.name });
+        }}
+        onForgetMine={
+          preview?.kind === "mine"
+            ? () => {
+                forgetMine(preview.entry);
+              }
+            : undefined
+        }
         onClose={() => setPreview(null)}
       />
+
+      <Sheet open={!!removeConfirm} onClose={() => setRemoveConfirm(null)} label="Van de lijst halen">
+        <h2>Van de lijst halen?</h2>
+        <p className="sheet-note">{removeConfirm ? `${removeConfirm.name} verdwijnt van dit lijstje, niet uit Mijn producten.` : ""}</p>
+        <div className="sheet-actions">
+          <PressButton variant="quiet" onClick={() => setRemoveConfirm(null)}>
+            Annuleren
+          </PressButton>
+          <PressButton
+            variant="primary"
+            data-testid="confirm-remove-from-list"
+            onClick={() => {
+              if (removeConfirm) removeProduct(removeConfirm.tile);
+              setRemoveConfirm(null);
+            }}
+          >
+            Van de lijst
+          </PressButton>
+        </div>
+      </Sheet>
 
       <PhotoFlow
         ref={photo}

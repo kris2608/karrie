@@ -30,7 +30,13 @@ const compact = (value: string) => normalize(value).replace(/\s/g, "");
  * A catalog product whose name or alias equals the recognised type exactly,
  * else the type the model picked. Used for the drawing and list suggestions only.
  */
+const BABY_PACK = /\b(olvarit|babyvoeding|babypotje|fruithapje|groentehapje)\b/i;
+
 export function catalogMatch(product: RecognizedProduct): Product | null {
+  const packText = [product.brand, product.productName].filter(Boolean).join(" ");
+  // Ingredient generics (spinazie) must not win over branded baby / jar meals.
+  if (BABY_PACK.test(packText)) return productById("babyvoeding") ?? null;
+
   const wanted = [product.subcategory, product.genericName]
     .filter((value): value is string => Boolean(value))
     .map(compact)
@@ -67,13 +73,20 @@ export type VisionDraft = {
 export function draftFromVision(product: RecognizedProduct): VisionDraft {
   const match = catalogMatch(product);
   const section = product.category ? SECTION_CATEGORY[product.category] : undefined;
-  /** Cheese read as chilled dairy still belongs with deli when the name says so. */
-  const named =
-    product.category === "koeling"
-      ? resolveCategory({ name: product.productName ?? product.genericName ?? undefined })
-      : undefined;
-  /** Prefer the catalog department when we matched a drawing; otherwise use the shop section from the photo. */
-  const category = match?.category ?? named ?? section ?? "pantry";
+  const nameText = [product.productName, product.brand, product.genericName].filter(Boolean).join(" ");
+  /** Name rules for all sections (baby food, cheese in koeling, drinks, …). */
+  const named = resolveCategory({ name: nameText || undefined });
+  /**
+   * Prefer explicit name/baby pantry over a produce drawing matched from an ingredient,
+   * then catalog match, then the shop section from the photo.
+   */
+  const category =
+    (match?.id === "babyvoeding" ? match.category : undefined) ??
+    (named && named !== "produce" ? named : undefined) ??
+    (match && !(match.category === "produce" && named === "pantry") ? match.category : undefined) ??
+    named ??
+    section ??
+    "pantry";
   const inferred = new Set(product.inferredFields);
   const ingredients = product.visibleIngredients ?? undefined;
   return {
@@ -81,7 +94,7 @@ export function draftFromVision(product: RecognizedProduct): VisionDraft {
     category,
     icon: match?.id ?? categoryIcon(category),
     match,
-    keepPhoto: product.specificProduct || !match,
+    keepPhoto: product.specificProduct || !match || match?.id === "babyvoeding",
     pack: {
       brand: product.brand && !inferred.has("brand") ? product.brand : undefined,
       packageSize: product.packageSize && !inferred.has("packageSize") ? product.packageSize : undefined,

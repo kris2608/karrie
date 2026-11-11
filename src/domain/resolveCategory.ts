@@ -38,11 +38,11 @@ const TAG_CATEGORY: [RegExp, CategoryId][] = [
   [/^en:(milks?|yogurts?|eggs|creams?|fresh-desserts|custards?|puddings?)/, "dairy"],
   [/^en:(cheeses?|hams?|sausages?|cured-meats?)/, "deli"],
   [/^en:(breads|pastries|cakes|viennoiseries)$/, "bakery"],
+  [/^en:(prepared-salads|prepared-meals|meals|baby-foods?)/, "meals"],
   [/^en:(fresh-fruits|fresh-vegetables)$/, "produce"],
   [/^en:(meats?|fresh-meats?|poultries?|fishes?|seafood)/, "meat"],
   [/^en:(breakfast-cereals|jams?|honeys?)/, "breakfast"],
   [/^en:(chips|crisps|candies|chocolates|cookies|biscuits|salty-snacks)/, "snacks"],
-  [/^en:(prepared-salads|prepared-meals|meals)/, "meals"],
   [/^en:(bodycare|dental-care|shampoos|baby-diapers|personal-care)/, "care"],
   [/^en:(non-food-products|household-products|cleaning-products|detergents)$/, "household"],
 ];
@@ -53,6 +53,8 @@ const SNACK_NAME = /\b(chips|snoep|chocolade(?!\s*pasta)|chocoladereep|zoutjes|k
 const BREAKFAST_NAME = /\b(ontbijtkoek|peperkoek|hagelslag|pindakaas|chocopasta|chocoladepasta|jam|honing)\b/i;
 const CARE_NAME = /\b(tandpasta|shampoo|deodorant|luiers?|douchegel|bodylotion|handzeep)\b/i;
 const MEAL_NAME = /\b(maaltijdsalade|maaltijd|kant-en-klaar|eiersalade|huzarensalade|wraps?)\b/i;
+/** Jar meals / baby food in the pantry aisle — not produce, even when spinach is in the name. */
+const BABY_FOOD_NAME = /\b(olvarit|babyvoeding|babypotje|fruithapje|groentehapje)\b/i;
 const DRINK_NAME =
   /\b(cola|frisdrank|limonade|sinas|sap|jus|sinaasappelsap|appelsap|water|bronwater|spa|koffie|thee|bier|wijn|ranja|siroop|iced\s*tea|energydrink|energy\s*drink)\b/i;
 const FROZEN_NAME = /\b(diepvries|ijsjes?|ijslolly|pizza\s*diepvries)\b/i;
@@ -90,6 +92,7 @@ export function resolveCategory({ tags, name }: ResolveCategoryInput): CategoryI
     if (/household|schoonmaak/.test(joined)) return "household";
   }
   if (name) {
+    if (BABY_FOOD_NAME.test(name)) return "pantry";
     if (DRINK_NAME.test(name)) return "drinks";
     if (BREAKFAST_NAME.test(name)) return "breakfast";
     if (DELI_NAME.test(name)) return "deli";

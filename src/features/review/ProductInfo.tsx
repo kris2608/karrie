@@ -14,12 +14,12 @@ const VALUES: { key: keyof Omit<NonNullable<ProductFacts["per100"]>, "unit">; la
 const amount = (value: number) => value.toLocaleString("nl-NL", { maximumFractionDigits: 2 });
 
 /** Parent-only: shop-page facts when known, else OFF/barcode pack nutrition and ingredients. */
-export function ProductInfo({ item }: { item: AdventureItem }) {
+export function ProductInfo({ item, hideNutriScore = false }: { item: AdventureItem; hideNutriScore?: boolean }) {
   const pageFacts = useFacts(item);
   const facts = displayFacts(item, pageFacts);
   if (!facts) return null;
   const rows = VALUES.filter((row) => facts.per100?.[row.key] !== undefined);
-  const grade = nutriScoreGrade(facts.nutriScore);
+  const grade = hideNutriScore ? null : nutriScoreGrade(facts.nutriScore);
   const logo = grade && nutriScoreLogosEnabled() ? <NutriScoreLogo grade={grade} /> : null;
   if (!rows.length && !facts.ingredients && !facts.claims && !grade) return null;
 

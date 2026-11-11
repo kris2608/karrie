@@ -6,6 +6,7 @@ import { PressButton } from "../../components/ui/PressButton";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { categoryIcon } from "../../domain/categoryIcon";
 import { declineKey, missionOn } from "../../domain/discovery";
+import { candidateHeading } from "../../domain/candidateLabel";
 import { newItemFor, selectIdentityCandidate, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem, AlternativeAssessment, CategoryId } from "../../domain/types";
 import { trackEvent } from "../../services/analytics";
@@ -218,11 +219,17 @@ export function PhotoResultSheet({ draft: initialDraft, photoUrl, photo, items, 
     return (
       <>
         <h2>Welke bedoel je?</h2>
-        <p className="sheet-note">Karrie ziet meerdere producten of smaken. Tik op wat je wilt toevoegen.</p>
+        <p className="sheet-note">Tik op het product dat je wilt toevoegen.</p>
         <ul className="scan-pick" data-testid="identity-pick">
           {identityChoices.map((choice) => {
-            const label = [choice.brand, choice.productName ?? choice.genericName].filter(Boolean).join(" · ") || "Onbekend product";
-            const detail = [choice.variant, choice.packageSize].filter(Boolean).join(" · ");
+            const heading = candidateHeading({
+              productName: choice.productName,
+              genericName: choice.genericName,
+              brand: choice.brand,
+              variant: choice.variant,
+              packageSize: choice.packageSize,
+            });
+            const label = [heading.title, heading.subtitle].filter(Boolean).join(" · ");
             const thumb = usable(choice.imageUrl);
             return (
               <li key={choice.observedCandidateId}>
@@ -235,34 +242,17 @@ export function PhotoResultSheet({ draft: initialDraft, photoUrl, photo, items, 
                     <ProductArt id={draft?.icon ?? categoryIcon(category)} />
                   )}
                   <span>
-                    <strong>{label}</strong>
-                    {detail && <small>{detail}</small>}
+                    <strong>{heading.title}</strong>
+                    {heading.subtitle && <small>{heading.subtitle}</small>}
                   </span>
                 </button>
               </li>
             );
           })}
         </ul>
-        <PressButton
-          variant="quiet"
-          wide
-          data-testid="identity-manual"
-          onClick={() => {
-            setChoseIdentity(true);
-            trackEvent({
-              name: "recognition_chooser",
-              data: { action: "manual", candidate_count: Math.min(identityChoices.length, 5) },
-            });
-          }}
-        >
-          Zelf invullen
-        </PressButton>
-        <div className="sheet-actions scan-actions">
-          <PressButton variant="quiet" onClick={onCancel}>
-            Annuleren
-          </PressButton>
-          <PressButton variant="quiet" data-testid="photo-retake" onClick={onRetake}>
-            {retakeLabel}
+        <div className="scan-pick-actions">
+          <PressButton variant="quiet" wide data-testid="identity-back" onClick={onRetake}>
+            Terug
           </PressButton>
         </div>
       </>

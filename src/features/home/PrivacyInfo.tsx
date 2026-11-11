@@ -49,7 +49,7 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
       <section>
         <h3>Zelf de controle houden</h3>
         <p>
-          Je kunt bewaarde lijstjes verwijderen in de instellingen, en Mijn producten vergeten door lang te drukken. Gegevens die lokaal in je browser
+          Je kunt bewaarde lijstjes verwijderen in de instellingen, en Mijn producten vergeten via de i-knop en Aanpassen. Gegevens die lokaal in je browser
           staan, kun je ook via de browserinstellingen wissen.
         </p>
       </section>

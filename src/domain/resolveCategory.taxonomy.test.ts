@@ -47,4 +47,9 @@ describe("supermarket category taxonomy", () => {
     expect(jumbo).not.toEqual(ah);
     expect(lidl).not.toEqual(ah);
   });
+
+  it("places Olvarit baby meals in pantry, not produce", () => {
+    expect(resolveCategory({ name: "Olvarit spinazie kip aardappel" })).toBe("pantry");
+    expect(resolveCategory({ name: "Babyvoeding wortel" })).toBe("pantry");
+  });
 });

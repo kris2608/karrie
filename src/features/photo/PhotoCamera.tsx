@@ -76,7 +76,7 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
     setStatus("capturing");
     buzz(12);
     try {
-      onCapture(await capturePhoto(video, track.current));
+      onCapture(await capturePhoto(video, track.current, frameRef.current));
     } catch {
       setStatus("opening");
       setAttempt((value) => value + 1);
@@ -115,7 +115,11 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
         ) : (
           <>
             <video ref={videoRef} className="scanner-video" playsInline muted autoPlay aria-hidden="true" />
-            {preview && busy && <img className="camera-still" src={preview} alt="" />}
+            {preview && busy && (
+              <span className="camera-still-guide" aria-hidden="true">
+                <img className="camera-still" src={preview} alt="" />
+              </span>
+            )}
             <span className={sighting || barcodeStatus === "looking" ? "scanner-corners is-detecting" : "scanner-corners"} aria-hidden="true" />
             {scanning && <BarcodeHighlight frameRef={frameRef} sighting={sighting} confirmed={barcodeStatus === "looking"} />}
           </>

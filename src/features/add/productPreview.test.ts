@@ -33,14 +33,15 @@ const mineEntry: SavedItem = {
 };
 
 describe("tile gestures", () => {
-  it("keeps tap-add, info preview, and long-press remove on separate paths", () => {
+  it("keeps tap-add, info preview, and long-press adjust on separate paths", () => {
     expect(tileGesture("add")).toBe("add");
     expect(tileGesture("info")).toBe("preview");
-    expect(tileGesture("long-press")).toBe("remove");
+    expect(tileGesture("long-press")).toBe("adjust");
   });
 
-  it("shows info only on user-added tiles", () => {
+  it("shows info on user-added tiles and listed catalog tiles", () => {
     expect(showsTileInfo("catalog")).toBe(false);
+    expect(showsTileInfo("catalog", 2)).toBe(true);
     expect(showsTileInfo("mine")).toBe(true);
     expect(showsTileInfo("extra")).toBe(true);
   });

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { centerCrop, matchCrop, outputSize } from "./imageProcessing";
+import { CAMERA_GUIDE_INSET, centerCrop, guideCrop, mapCropToStill, matchCrop, outputSize } from "./imageProcessing";
 
 const portraitVideo = { width: 1080, height: 1920 };
 const landscapeVideo = { width: 1920, height: 1080 };
+/** CSS box matching .camera-frame aspect 3:4. */
+const frameBox = { width: 300, height: 400 };
 
 describe("crop math", () => {
   it("takes the centred 3:4 part a cover-fitted frame shows", () => {
@@ -10,14 +12,38 @@ describe("crop math", () => {
     expect(centerCrop(landscapeVideo, 3 / 4)).toEqual({ sx: 555, sy: 0, sw: 810, sh: 1080 });
   });
 
-  it("maps the visible part of the video onto a taller full-resolution still", () => {
-    const rect = matchCrop(portraitVideo, { width: 3024, height: 4032 }, 3 / 4);
-    expect(rect.sw).toBe(3024);
-    expect(rect.sh).toBe(4032);
-    const narrow = matchCrop(landscapeVideo, { width: 4032, height: 3024 }, 3 / 4);
-    expect(narrow.sw / 4032).toBeCloseTo(810 / 1920);
-    expect(narrow.sw / narrow.sh).toBeCloseTo(0.75);
-    expect(narrow.sx).toBeCloseTo((4032 - narrow.sw) / 2);
+  it("crops inside the corner markers, tighter than the full 3:4 cover region", () => {
+    const full = centerCrop(portraitVideo, 3 / 4);
+    const guide = guideCrop(portraitVideo, frameBox);
+    expect(guide.sw).toBeLessThan(full.sw);
+    expect(guide.sh).toBeLessThan(full.sh);
+    expect(guide.sx).toBeGreaterThan(full.sx - 0.5);
+    expect(guide.sy).toBeGreaterThan(full.sy - 0.5);
+    expect(guide.sx + guide.sw).toBeLessThan(full.sx + full.sw + 0.5);
+    expect(guide.sy + guide.sh).toBeLessThan(full.sy + full.sh + 0.5);
+    // Insets match CSS 7% / 8% of the cover region when the box is exactly 3:4.
+    expect(guide.sw / full.sw).toBeCloseTo(1 - CAMERA_GUIDE_INSET.left - CAMERA_GUIDE_INSET.right, 2);
+    expect(guide.sh / full.sh).toBeCloseTo(1 - CAMERA_GUIDE_INSET.top - CAMERA_GUIDE_INSET.bottom, 2);
+  });
+
+  it("maps a video guide crop proportionally onto a taller still", () => {
+    const videoCrop = guideCrop(portraitVideo, frameBox);
+    const still = { width: 3024, height: 5376 };
+    const mapped = mapCropToStill(videoCrop, portraitVideo, still);
+    expect(mapped.sw / still.width).toBeCloseTo(videoCrop.sw / portraitVideo.width);
+    expect(mapped.sh / still.height).toBeCloseTo(videoCrop.sh / portraitVideo.height);
+    expect(mapped.sy).toBeGreaterThan(0);
+    expect(mapped.sy + mapped.sh).toBeLessThan(still.height);
+    // Not the entire still — the old matchCrop width-fraction path could keep full height.
+    expect(mapped.sh).toBeLessThan(still.height);
+  });
+
+  it("keeps matchCrop proportional for landscape video onto a still", () => {
+    const videoCrop = centerCrop(landscapeVideo, 3 / 4);
+    const still = { width: 4032, height: 3024 };
+    const mapped = matchCrop(landscapeVideo, still, 3 / 4);
+    expect(mapped.sw / still.width).toBeCloseTo(videoCrop.sw / landscapeVideo.width);
+    expect(mapped.sh / still.height).toBeCloseTo(videoCrop.sh / landscapeVideo.height);
   });
 
   it("downscales to the size limit without upscaling small crops", () => {

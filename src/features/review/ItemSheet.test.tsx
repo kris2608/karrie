@@ -107,14 +107,13 @@ describe("AlternativePreviewSheet", () => {
 });
 
 describe("ItemSheet EAN simplification", () => {
-  it("hides picture toggles and photo actions for EAN items, keeps naam/afdeling", () => {
+  it("hides advanced controls until Aanpassen, then keeps naam/afdeling without drawings for EAN items", () => {
     render(
       <ItemSheet item={eanItem} onClose={() => undefined} onRestore={() => undefined} onPhoto={() => undefined} onRemove={() => undefined} />,
     );
     expect(screen.queryByTestId("picture-block")).toBeNull();
     expect(screen.queryByTestId("photo-pack")).toBeNull();
-    expect(screen.queryByTestId("restore-generic")).toBeNull();
-    expect(screen.getByTestId("item-edit-open").textContent).toBe("Naam of afdeling aanpassen");
+    expect(screen.getByTestId("item-edit-open").textContent).toBe("Aanpassen");
     fireEvent.click(screen.getByTestId("item-edit-open"));
     expect(screen.getByTestId("item-edit")).toBeTruthy();
     expect(screen.getByTestId("item-name")).toBeTruthy();
@@ -123,14 +122,15 @@ describe("ItemSheet EAN simplification", () => {
     expect(screen.getByTestId("remove-item")).toBeTruthy();
   });
 
-  it("keeps picture block and drawing edit for non-EAN items", () => {
+  it("keeps picture block and drawing edit under Aanpassen for non-EAN items", () => {
     render(
       <ItemSheet item={sampleItem} onClose={() => undefined} onRestore={() => undefined} onPhoto={() => undefined} onRemove={() => undefined} />,
     );
+    expect(screen.queryByTestId("picture-block")).toBeNull();
+    expect(screen.getByTestId("item-edit-open").textContent).toBe("Aanpassen");
+    fireEvent.click(screen.getByTestId("item-edit-open"));
     expect(screen.getByTestId("picture-block")).toBeTruthy();
     expect(screen.getByTestId("photo-pack")).toBeTruthy();
-    expect(screen.getByTestId("item-edit-open").textContent).toBe("Naam, afdeling of tekening aanpassen");
-    fireEvent.click(screen.getByTestId("item-edit-open"));
     expect(screen.getByText("Kies een tekening")).toBeTruthy();
   });
 });
