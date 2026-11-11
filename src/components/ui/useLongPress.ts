@@ -56,6 +56,8 @@ export function useLongPress(onLongPress: () => void, disabled = false) {
   press.current ??= createLongPress(
     () => {
       buzz(30);
+      // Drop any native selection so Android Translate / search does not steal the confirm sheet.
+      window.getSelection()?.removeAllRanges();
       latest.current();
     },
     setPressing,

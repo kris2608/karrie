@@ -1,17 +1,19 @@
 import { useState, type ReactNode } from "react";
+import { useArt } from "../../components/ItemArt";
 import { NutriScoreMark } from "../../components/NutriScoreLogo";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { categoryLabel } from "../../domain/categories";
 import { productHeading } from "../../domain/productHeading";
 import { retailerName, type RetailerId } from "../../domain/retailers";
-import type { AdventureItem, CategoryId, PackInfo } from "../../domain/types";
-import { ProductInfo } from "../review/ProductInfo";
+import type { CategoryId, PackInfo } from "../../domain/types";
+import { namePhotoCredit } from "../../services/images/nameImage";
+import { storeCredit } from "../../services/images/storeImage";
 import { OfferTag } from "../offers/OfferTag";
 import { useOffNutrition } from "./useOffNutrition";
 
 /** Enough pack fields for art, Nutri-Score, barcode and facts when the tile has a remembered or listed item. */
-export type PreviewPack = Pick<PackInfo, "brand" | "packageSize" | "source" | "recognition" | "nutrition" | "ean" | "barcode"> & {
+export type PreviewPack = Pick<PackInfo, "brand" | "packageSize" | "source" | "recognition" | "nutrition" | "ean" | "barcode" | "offAttribution" | "namePhoto" | "imageChoice" | "imageUrl" | "imageKind" | "photoId" | "imageSource"> & {
   name: string;
   icon?: string;
   productId?: string;
@@ -39,6 +41,44 @@ function sparsePack(pack?: PreviewPack) {
   return !pack?.brand && !pack?.nutrition && !pack?.recognition && !pack?.packageSize && !pack?.ean && !pack?.barcode;
 }
 
+function PreviewAttribution({ pack }: { pack: PreviewPack }) {
+  const art = useArt({
+    name: pack.name,
+    icon: pack.icon ?? "unknown",
+    ean: pack.ean,
+    brand: pack.brand,
+    packageSize: pack.packageSize,
+    source: pack.source,
+    recognition: pack.recognition,
+    namePhoto: pack.namePhoto,
+    imageChoice: pack.imageChoice,
+    imageUrl: pack.imageUrl,
+    imageKind: pack.imageKind,
+    photoId: pack.photoId,
+    imageSource: pack.imageSource,
+  });
+  const photoCredit =
+    art.pick?.source === "prijsprofeet" && art.store
+      ? storeCredit(art.store)
+      : art.pick?.source === "name" && art.name
+        ? namePhotoCredit(art.name)
+        : null;
+  const offLine = pack.offAttribution
+    ? `Gegevens: Open Food Facts (ODbL)${art.pick?.source === "off" ? ", foto's CC BY-SA" : ""}`
+    : pack.barcode?.sourceName === "Open Food Facts"
+      ? "Gegevens: Open Food Facts (ODbL)"
+      : art.pick?.source === "off"
+        ? "Foto: Open Food Facts (CC BY-SA)."
+        : null;
+  const line = [offLine, photoCredit].filter(Boolean).join(" ");
+  if (!line) return null;
+  return (
+    <p className="scan-attribution" data-testid="preview-attribution">
+      {line}
+    </p>
+  );
+}
+
 /** Read-only look at a user-added product; editing stays on Controleren. */
 export function ProductPreviewSheet({
   open,
@@ -54,7 +94,6 @@ export function ProductPreviewSheet({
   onForgetMine,
   onClose,
 }: ProductPreviewSheetProps) {
-  const [moreInfo, setMoreInfo] = useState(false);
   const [options, setOptions] = useState(false);
   const [forgetConfirm, setForgetConfirm] = useState(false);
   const heading = productHeading({
@@ -64,30 +103,11 @@ export function ProductPreviewSheet({
     variant: pack?.recognition?.variant,
   });
   const nutrition = useOffNutrition(pack?.ean, pack?.nutrition);
-  const factsItem = pack
-    ? ({
-        id: "preview",
-        productId: pack.productId ?? "preview",
-        name: pack.name,
-        icon: pack.icon ?? "unknown",
-        category: pack.category ?? category,
-        quantity: 1,
-        status: "pending" as const,
-        brand: pack.brand,
-        packageSize: pack.packageSize,
-        source: pack.source,
-        recognition: pack.recognition,
-        nutrition,
-        ean: pack.ean,
-        barcode: pack.barcode,
-      } satisfies AdventureItem)
-    : null;
 
   return (
     <Sheet
       open={open}
       onClose={() => {
-        setMoreInfo(false);
         setOptions(false);
         setForgetConfirm(false);
         onClose();
@@ -107,6 +127,8 @@ export function ProductPreviewSheet({
             {quantity > 0 && <small data-testid="preview-qty">{quantity} op de lijst</small>}
           </div>
         </div>
+
+        {pack && <PreviewAttribution pack={pack} />}
 
         {quantity > 0 && onDecrease && (
           <div className="qty-stepper" data-testid="preview-qty-stepper">
@@ -128,40 +150,33 @@ export function ProductPreviewSheet({
           </div>
         )}
 
-        {factsItem && moreInfo && <ProductInfo item={factsItem} hideNutriScore />}
-        {factsItem && (
-          <button type="button" className="text-button" data-testid="preview-more-info" onClick={() => setMoreInfo((value) => !value)}>
-            {moreInfo ? "Minder informatie" : "Meer informatie"}
-          </button>
-        )}
-
-        {sparsePack(pack) && !factsItem && (
+        {sparsePack(pack) && (
           <p className="sheet-note">Tik Op de lijst om dit product mee te nemen. Meer details kun je later aanpassen onder Controleren.</p>
         )}
 
-        {mine && onForgetMine && (
+        {mine && onForgetMine && !options && (
+          <button type="button" className="text-button" data-testid="preview-options" onClick={() => setOptions(true)}>
+            Aanpassen
+          </button>
+        )}
+        {mine && onForgetMine && options && !forgetConfirm && (
           <div className="preview-options">
-            <button type="button" className="text-button" data-testid="preview-options" onClick={() => setOptions((value) => !value)}>
-              {options ? "Minder opties" : "Aanpassen"}
-            </button>
-            {options && !forgetConfirm && (
-              <PressButton variant="quiet" wide className="pbtn-danger" data-testid="preview-forget-mine" onClick={() => setForgetConfirm(true)}>
-                Vergeet uit Mijn producten
+            <PressButton variant="quiet" wide className="pbtn-danger" data-testid="preview-forget-mine" onClick={() => setForgetConfirm(true)}>
+              Vergeet uit Mijn producten
+            </PressButton>
+          </div>
+        )}
+        {mine && onForgetMine && options && forgetConfirm && (
+          <div className="preview-options">
+            <p className="sheet-note">Dit product verdwijnt uit Mijn producten op dit apparaat.</p>
+            <div className="sheet-actions">
+              <PressButton variant="quiet" onClick={() => setForgetConfirm(false)}>
+                Annuleren
               </PressButton>
-            )}
-            {options && forgetConfirm && (
-              <>
-                <p className="sheet-note">Dit product verdwijnt uit Mijn producten op dit apparaat.</p>
-                <div className="sheet-actions">
-                  <PressButton variant="quiet" onClick={() => setForgetConfirm(false)}>
-                    Annuleren
-                  </PressButton>
-                  <PressButton variant="primary" data-testid="preview-forget-confirm" onClick={onForgetMine}>
-                    Vergeten
-                  </PressButton>
-                </div>
-              </>
-            )}
+              <PressButton variant="primary" data-testid="preview-forget-confirm" onClick={onForgetMine}>
+                Vergeten
+              </PressButton>
+            </div>
           </div>
         )}
 

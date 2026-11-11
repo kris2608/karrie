@@ -18,7 +18,7 @@ vi.mock("../../state/AdventureContext", () => ({
 
 vi.mock("../../components/ItemArt", () => ({
   ItemArt: () => <span data-testid="item-art" />,
-  useArt: () => ({ pick: null }),
+  useArt: () => ({ pick: { source: "prijsprofeet", url: "https://example/photo.jpg" }, store: { retailer: "albert_heijn", imageUrl: "https://example/photo.jpg" }, name: null, drawing: null }),
   hasPhoto: (item: { photoId?: string }) => Boolean(item.photoId),
 }));
 
@@ -28,10 +28,6 @@ vi.mock("../add/useOffNutrition", () => ({
 
 vi.mock("./PictureBlock", () => ({
   PictureBlock: ({ item }: { item: AdventureItem }) => (item.ean ? null : <section data-testid="picture-block" />),
-}));
-
-vi.mock("./ProductInfo", () => ({
-  ProductInfo: () => null,
 }));
 
 vi.mock("../../storage/nameImages", () => ({
@@ -107,14 +103,20 @@ describe("AlternativePreviewSheet", () => {
 });
 
 describe("ItemSheet EAN simplification", () => {
-  it("hides advanced controls until Aanpassen, then keeps naam/afdeling without drawings for EAN items", () => {
+  it("shows OFF and PrijsProfeet credits, only Aanpassen, then edit without Meer informatie / Minder opties", () => {
     render(
       <ItemSheet item={eanItem} onClose={() => undefined} onRestore={() => undefined} onPhoto={() => undefined} onRemove={() => undefined} />,
     );
+    expect(screen.getByTestId("item-attribution").textContent).toMatch(/Open Food Facts/);
+    expect(screen.getByTestId("item-attribution").textContent).toMatch(/PrijsProfeet/);
+    expect(screen.queryByText("Meer informatie")).toBeNull();
     expect(screen.queryByTestId("picture-block")).toBeNull();
     expect(screen.queryByTestId("photo-pack")).toBeNull();
     expect(screen.getByTestId("item-edit-open").textContent).toBe("Aanpassen");
     fireEvent.click(screen.getByTestId("item-edit-open"));
+    expect(screen.queryByTestId("item-edit-open")).toBeNull();
+    expect(screen.queryByText("Meer informatie")).toBeNull();
+    expect(screen.queryByText("Minder opties")).toBeNull();
     expect(screen.getByTestId("item-edit")).toBeTruthy();
     expect(screen.getByTestId("item-name")).toBeTruthy();
     expect(screen.getByText("Afdeling")).toBeTruthy();
@@ -129,6 +131,7 @@ describe("ItemSheet EAN simplification", () => {
     expect(screen.queryByTestId("picture-block")).toBeNull();
     expect(screen.getByTestId("item-edit-open").textContent).toBe("Aanpassen");
     fireEvent.click(screen.getByTestId("item-edit-open"));
+    expect(screen.queryByText("Minder opties")).toBeNull();
     expect(screen.getByTestId("picture-block")).toBeTruthy();
     expect(screen.getByTestId("photo-pack")).toBeTruthy();
     expect(screen.getByText("Kies een tekening")).toBeTruthy();

@@ -66,7 +66,7 @@ function ListsRow({
       </button>
       <button type="button" className="lists-row-action lists-row-forget" data-testid="lists-forget" aria-label={`Wis ${label}`} data-no-long-press onClick={onForget}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
         </svg>
       </button>
     </li>

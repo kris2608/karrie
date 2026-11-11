@@ -15,18 +15,18 @@ export type BootstrapProduct = {
 
 export const BOOTSTRAP_CATEGORIES: BootstrapCategory[] = [
   { id: "produce", label: "Groente en fruit", short: "Groente", sortOrder: 0 },
-  { id: "bakery", label: "Bakkerij", short: "Bakker", sortOrder: 1 },
+  { id: "meals", label: "Maaltijden en salades", short: "Maaltijd", sortOrder: 1 },
   { id: "meat", label: "Vlees, vis en vega", short: "Vlees", sortOrder: 2 },
-  { id: "breakfast", label: "Ontbijt en broodbeleg", short: "Ontbijt", sortOrder: 3 },
-  { id: "deli", label: "Kaas en vleeswaren", short: "Kaas", sortOrder: 4 },
-  { id: "dairy", label: "Zuivel en eieren", short: "Zuivel", sortOrder: 5 },
-  { id: "snacks", label: "Snacks en snoep", short: "Snack", sortOrder: 6 },
+  { id: "deli", label: "Kaas en vleeswaren", short: "Kaas", sortOrder: 3 },
+  { id: "bakery", label: "Bakkerij", short: "Bakker", sortOrder: 4 },
+  { id: "breakfast", label: "Ontbijt en broodbeleg", short: "Ontbijt", sortOrder: 5 },
+  { id: "dairy", label: "Zuivel", short: "Zuivel", sortOrder: 6 },
   { id: "pantry", label: "Houdbaar", short: "Houdbaar", sortOrder: 7 },
-  { id: "meals", label: "Maaltijden en salades", short: "Maaltijd", sortOrder: 8 },
-  { id: "drinks", label: "Dranken", short: "Drank", sortOrder: 9 },
-  { id: "frozen", label: "Diepvries", short: "Vries", sortOrder: 10 },
-  { id: "care", label: "Verzorging", short: "Zorg", sortOrder: 11 },
-  { id: "household", label: "Huishouden", short: "Huis", sortOrder: 12 },
+  { id: "snacks", label: "Snacks en snoep", short: "Snack", sortOrder: 8 },
+  { id: "household", label: "Huishouden", short: "Huis", sortOrder: 9 },
+  { id: "care", label: "Verzorging", short: "Zorg", sortOrder: 10 },
+  { id: "drinks", label: "Dranken", short: "Drank", sortOrder: 11 },
+  { id: "frozen", label: "Diepvries", short: "Vries", sortOrder: 12 },
 ];
 
 function p(id: string, name: string, category: string, groupId: string, aliases: string[] = []): BootstrapProduct {

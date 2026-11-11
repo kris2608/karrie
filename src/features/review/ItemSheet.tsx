@@ -13,6 +13,8 @@ import { retailerName } from "../../domain/retailers";
 import type { AdventureItem, NamePhoto } from "../../domain/types";
 import { productById } from "../../data/catalog";
 import { confirmPackSize } from "../../services/barcode/pack";
+import { namePhotoCredit } from "../../services/images/nameImage";
+import { storeCredit } from "../../services/images/storeImage";
 import { useAdventure } from "../../state/AdventureContext";
 import { privateLabelImages, usePrivateLabelAnswer } from "../../storage/nameImages";
 import { PackConflict } from "../photo/PackConflict";
@@ -20,7 +22,6 @@ import { useOffNutrition } from "../add/useOffNutrition";
 import { AlternativePreviewSheet } from "./AlternativePreviewSheet";
 import { DrawingPicker } from "./DrawingPicker";
 import { PictureBlock } from "./PictureBlock";
-import { ProductInfo } from "./ProductInfo";
 
 type ItemSheetProps = {
   item: AdventureItem | null;
@@ -77,10 +78,9 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const { dispatch, adventure } = useAdventure();
   const [name, setName] = useState(item.name);
   const [editing, setEditing] = useState(false);
-  const [moreInfo, setMoreInfo] = useState(false);
   const [preview, setPreview] = useState<NamePhoto | null>(null);
   const parentPhoto = item.imageSource === "parent" && Boolean(item.photoId);
-  const shown = useArt(item).pick;
+  const art = useArt(item);
   const heading = productHeading({
     name: item.name,
     brand: item.brand,
@@ -95,6 +95,18 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
   const altAnswer = usePrivateLabelAnswer(plKey);
   const jumboAlt = altAnswer?.privateLabelAlternatives?.[0] ?? null;
   const nutrition = useOffNutrition(item.ean, item.nutrition);
+  const photoCredit =
+    art.pick?.source === "prijsprofeet" && art.store
+      ? storeCredit(art.store)
+      : art.pick?.source === "name" && art.name
+        ? namePhotoCredit(art.name)
+        : null;
+  const offLine = item.offAttribution
+    ? `Gegevens: Open Food Facts (ODbL)${art.pick?.source === "off" ? ", foto's CC BY-SA" : ""}`
+    : art.pick?.source === "off"
+      ? "Foto: Open Food Facts (CC BY-SA)."
+      : null;
+  const attribution = [offLine, photoCredit].filter(Boolean).join(" ");
 
   useEffect(() => {
     if (plKey) privateLabelImages.request(plKey);
@@ -135,10 +147,9 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
           <span>{categoryLabel(item.category)}</span>
         </div>
       </div>
-      {item.offAttribution && (
-        <p className="scan-attribution">
-          Gegevens: Open Food Facts (ODbL)
-          {shown?.source === "off" ? ", foto's CC BY-SA" : ""}
+      {attribution && (
+        <p className="scan-attribution" data-testid="item-attribution">
+          {attribution}
         </p>
       )}
       {item.packConflict && item.fieldSources?.packageSize !== "parent" && (
@@ -167,14 +178,11 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
 
       <MissionBlock item={item} />
 
-      <button type="button" className="text-button" data-testid="item-more-info" onClick={() => setMoreInfo((value) => !value)}>
-        {moreInfo ? "Minder informatie" : "Meer informatie"}
-      </button>
-      {moreInfo && <ProductInfo item={item} hideNutriScore />}
-
-      <button type="button" className="text-button" data-testid="item-edit-open" onClick={() => setEditing((value) => !value)}>
-        {editing ? "Minder opties" : "Aanpassen"}
-      </button>
+      {!editing && (
+        <button type="button" className="text-button" data-testid="item-edit-open" onClick={() => setEditing(true)}>
+          Aanpassen
+        </button>
+      )}
 
       {editing && (
         <div className="item-edit" data-testid="item-edit">

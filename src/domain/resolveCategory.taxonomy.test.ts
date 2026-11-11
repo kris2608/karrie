@@ -20,32 +20,32 @@ describe("supermarket category taxonomy", () => {
     expect(resolveCategory({ tags: ["drogisterij"] })).toBe("care");
   });
 
-  it("appends new departments to an older stored category order", () => {
+  it("locks any stored category order to the shared walk order", () => {
     expect(mergeCategoryOrder(["produce", "dairy", "household"])).toEqual([
       "produce",
-      "dairy",
-      "household",
-      "bakery",
-      "meat",
-      "breakfast",
-      "deli",
-      "snacks",
-      "pantry",
       "meals",
+      "meat",
+      "deli",
+      "bakery",
+      "breakfast",
+      "dairy",
+      "pantry",
+      "snacks",
+      "household",
+      "care",
       "drinks",
       "frozen",
-      "care",
     ]);
   });
 
-  it("keeps retailer walk orders distinct while covering every department", () => {
+  it("uses the same walk order for every retailer", () => {
     const ah = orderForRetailer("albert_heijn");
     const jumbo = orderForRetailer("jumbo");
     const lidl = orderForRetailer("lidl");
     expect(new Set(ah).size).toBe(ah.length);
     expect(ah).toEqual(expect.arrayContaining(["deli", "snacks", "meals", "care"]));
-    expect(jumbo).not.toEqual(ah);
-    expect(lidl).not.toEqual(ah);
+    expect(jumbo).toEqual(ah);
+    expect(lidl).toEqual(ah);
   });
 
   it("places Olvarit baby meals in pantry, not produce", () => {

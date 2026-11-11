@@ -23,7 +23,7 @@ export const NormalizedSchema = z.strictObject({
   category: z
     .enum(DEPARTMENTS)
     .describe(
-      "produce: groente en fruit; bakery: brood; meat: vlees, vis en vega; breakfast: ontbijt en broodbeleg; deli: kaas en vleeswaren; dairy: zuivel en eieren; snacks: snacks en snoep; pantry: houdbaar; meals: maaltijden en salades; drinks: dranken; frozen: diepvries; care: verzorging; household: huishouden.",
+      "produce: groente en fruit; meals: maaltijden en salades; meat: vlees, vis en vega; deli: kaas en vleeswaren; bakery: brood; breakfast: ontbijt en broodbeleg; dairy: zuivel; pantry: houdbaar; snacks: snacks en snoep; household: huishouden; care: verzorging; drinks: dranken; frozen: diepvries.",
     ),
   subcategory: z.string().nullable().describe("A short Dutch shelf name such as 'noten', 'specerijen' or 'gedroogd fruit', or null."),
   isGeneric: z.boolean().describe("False when the name is a brand or a branded product."),

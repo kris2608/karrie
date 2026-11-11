@@ -784,8 +784,8 @@ export function AddScreen() {
       />
 
       <Sheet open={!!removeConfirm} onClose={() => setRemoveConfirm(null)} label="Van de lijst halen">
-        <h2>Van de lijst halen?</h2>
-        <p className="sheet-note">{removeConfirm ? `${removeConfirm.name} verdwijnt van dit lijstje, niet uit Mijn producten.` : ""}</p>
+        <h2 className="no-select">Van de lijst halen?</h2>
+        <p className="sheet-note no-select">{removeConfirm ? `${removeConfirm.name} verdwijnt van dit lijstje, niet uit Mijn producten.` : ""}</p>
         <div className="sheet-actions">
           <PressButton variant="quiet" onClick={() => setRemoveConfirm(null)}>
             Annuleren

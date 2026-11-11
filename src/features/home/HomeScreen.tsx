@@ -22,7 +22,6 @@ import { shareKarrie } from "../../domain/share";
 import { trackEvent } from "../../services/analytics";
 import { ListsSheet } from "../lists/ListsSheet";
 import { AboutKarrie } from "./AboutKarrie";
-import { CategoryOrderEditor } from "./CategoryOrderEditor";
 import { HowKarrieWorks } from "./HowKarrieWorks";
 import { PrivacyInfo } from "./PrivacyInfo";
 import { StickerBook } from "./StickerBook";
@@ -44,11 +43,10 @@ const linkLabels: Record<Exclude<ParentView, "settings">, string> = {
 
 export function HomeScreen() {
   const state = useAdventure();
-  const { adventure, saved, stickers, settings, dispatch } = state;
+  const { adventure, stickers, settings, dispatch } = state;
   const navigate = useNavigate();
   const location = useLocation();
   const [parentOpen, setParentOpen] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
   const [listsOpen, setListsOpen] = useState(false);
   const [stickersOpen, setStickersOpen] = useState(false);
   const preview = stickerPreview(stickers);
@@ -118,7 +116,6 @@ export function HomeScreen() {
 
   function closeParent() {
     setParentOpen(false);
-    setConfirmClear(false);
     setView("settings");
   }
 
@@ -128,6 +125,11 @@ export function HomeScreen() {
   return (
     <main className="screen home">
       <HomeScene />
+      <button type="button" className="lists-button" data-testid="open-lists-home" aria-label="Lijstjes" onClick={() => setListsOpen(true)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 7h14M5 12h14M5 17h10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+        </svg>
+      </button>
       <button type="button" className="parent-button" aria-label="Instellingen voor ouders" onClick={() => setParentOpen(true)}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -193,12 +195,6 @@ export function HomeScreen() {
           </PressButton>
         )}
       </motion.div>
-
-      {saved.length > 0 && (
-        <PressButton type="button" variant="quiet" wide data-testid="open-lists-home" onClick={() => setListsOpen(true)}>
-          Lijstjes ({saved.length})
-        </PressButton>
-      )}
 
       {preview.count > 0 && (
         <motion.button
@@ -271,34 +267,6 @@ export function HomeScreen() {
               </span>
               <RetailerPicker value={settings.retailer} onChange={(retailer) => dispatch({ type: "set-default-retailer", retailer })} />
             </div>
-            <CategoryOrderEditor />
-            {saved.length > 0 &&
-              (confirmClear ? (
-                <div className="clear-saved" data-testid="clear-saved-confirm">
-                  <p>
-                    Alle {saved.length} bewaarde {saved.length === 1 ? "lijstje" : "lijstjes"} wissen?
-                  </p>
-                  <div className="clear-saved-actions">
-                    <PressButton variant="quiet" onClick={() => setConfirmClear(false)}>
-                      Annuleer
-                    </PressButton>
-                    <PressButton
-                      variant="secondary"
-                      data-testid="clear-saved-yes"
-                      onClick={() => {
-                        dispatch({ type: "clear-saved" });
-                        setConfirmClear(false);
-                      }}
-                    >
-                      Wissen
-                    </PressButton>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" className="text-button" data-testid="clear-saved" onClick={() => setConfirmClear(true)}>
-                  Bewaarde lijstjes wissen
-                </button>
-              ))}
             <nav className="settings-links" aria-label="Meer over Karrie">
               {(["howto", "about"] as const).map((target) => (
                 <button

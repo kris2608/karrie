@@ -269,7 +269,14 @@ type ItemRowProps = {
 function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
   const { adventure, settings, declined, dispatch } = useAdventure();
   const retailer = adventure?.retailer;
-  const { pressing, handlers } = useLongPress(onRemove);
+  /** Long-press steps quantity down; only the last unit leaves the list. */
+  const { pressing, handlers } = useLongPress(() => {
+    if (item.quantity > 1) {
+      dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 });
+      return;
+    }
+    onRemove();
+  });
   const heading = productHeading({ name: item.name, brand: item.brand, packageSize: item.packageSize });
   const mission = settings.smartDiscovery && missionOn(item, declined);
   return (
