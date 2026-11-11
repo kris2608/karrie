@@ -85,6 +85,52 @@ export const RecognizedProductSchema = z
 export type RecognizedProduct = z.infer<typeof RecognizedProductSchema>;
 export type Alternative = z.infer<typeof AlternativeSchema>;
 
+/**
+ * One visually observed product or flavour in the photo. Distinct from provider SKU identity.
+ * No healthier-alternative assessment here; that stays on the primary product only.
+ */
+export const VisualCandidateSchema = z
+  .object({
+    observedCandidateId: z.string().describe("Stable id for this visible product in the photo, e.g. 'c1'."),
+    productName: z.string().nullable().describe("Product name as printed, in Dutch where printed in Dutch."),
+    genericName: z.string().nullable().describe("Short generic Dutch product type, e.g. 'pindakaas', 'melk'."),
+    catalogType: z
+      .enum(CATALOG_TYPES)
+      .nullable()
+      .describe("Exact Karrie catalog type, or null. Never a merely similar type."),
+    specificProduct: z.boolean().describe("True when a specific branded package is visible."),
+    brand: z.string().nullable().describe("Brand exactly as printed. Null when not readable."),
+    variant: z.string().nullable().describe("Flavour or variant as printed. Null when not readable or unclear."),
+    packageSize: z.string().nullable().describe("Weight or volume only if printed and readable."),
+    category: z.enum(SHOP_SECTIONS).nullable().describe("Supermarket section in a Dutch store."),
+    subcategory: z.string().nullable().describe("Lowercase Dutch product type used for matching."),
+    ean: z.string().nullable().describe("Barcode digits only if fully readable on this pack. Never guess."),
+    inferredFields: z.array(z.enum(INFERABLE_FIELDS)).describe("Fields guessed rather than read from the pack."),
+    confidence: z.enum(["high", "medium", "low"]),
+  })
+  .strict();
+
+export type VisualCandidate = z.infer<typeof VisualCandidateSchema>;
+
+export const RECOGNITION_OUTCOMES = ["single", "multiple", "uncertain", "none"] as const;
+export type RecognitionOutcome = (typeof RECOGNITION_OUTCOMES)[number];
+
+/** OpenAI structured output: one primary product (back-compat) plus distinct visual candidates. */
+export const RecognizeVisionSchema = z
+  .object({
+    recognitionOutcome: z
+      .enum(RECOGNITION_OUTCOMES)
+      .describe("single: one clear product. multiple: 2–5 distinct visible products or flavours. uncertain: best guess needs a parent check. none: no grocery product found."),
+    needsSelection: z.boolean().describe("True when the parent should pick among candidates before adding."),
+    primary: RecognizedProductSchema.describe("Best single answer for older clients. When multiple flavours share a family, prefer a shared family name with needsConfirmation."),
+    candidates: z
+      .array(VisualCandidateSchema)
+      .describe("0–5 distinct visually supported products. Separate visible flavours/sizes. Deduplicate two photos of the same SKU. Do not invent neighbours that are not clearly intended."),
+  })
+  .strict();
+
+export type RecognizeVision = z.infer<typeof RecognizeVisionSchema>;
+
 /** Shared healthier-alternative rules for photo recognition and text evidence assessment. */
 export const HEALTHIER_RULES = `- The alternative must serve the same shopping purpose and keep the product type and its use. Examples: regular peanut butter -> 100% peanut butter without added sugar or salt; white bread -> wholegrain bread; sweetened yoghurt -> comparable yoghurt without added sugar; sugary cereal -> similar cereal with less sugar and more fibre; salted nuts -> unsalted nuts.
 - Never suggest a different food: not peanut butter -> hummus, biscuits -> carrots, chocolate spread -> apples, milk -> water. A different flavour, dairy-free or reduced-fat version is not automatically better.
@@ -109,7 +155,7 @@ Return only the requested structured output.`;
 
 export const INSTRUCTIONS = `You are a grocery product recognition assistant for Karrie, a Dutch family shopping application for parents and young children.
 
-Analyze the provided image and identify the main grocery or household product.
+Analyze the provided image and identify grocery or household product(s) the parent likely intends to add.
 
 Return structured product information in Dutch.
 
@@ -121,19 +167,26 @@ Never fabricate barcodes, brands, nutritional values, ingredients, package weigh
 
 If a field cannot be identified reliably, return null.
 
-If the image contains several products or is ambiguous, indicate that confirmation or a new photo is required.
+Use candidates for distinct visible products or flavours (at most five). Rules:
+- Two packs of the same flavour/size are one candidate (deduplicate).
+- Two clearly different flavours or sizes of the same family become separate candidates; set recognitionOutcome to "multiple" and needsSelection to true.
+- Prefer the central/foreground intended product over neighbouring ads. Do not list adjacent ads as candidates when one product is clearly framed.
+- Do not invent flavours, brands or sizes that are not visually supported. Prefer variant null over guessing.
+- For loose produce or a single clear pack, return one candidate (or only primary) with recognitionOutcome "single" and needsSelection false. Never turn clear fruit/vegetables into a multi-item chooser.
+- When nothing useful is identifiable, recognitionOutcome "none", needsSelection false, primary.recognized false, candidates empty.
+- When there is a weak best guess only, recognitionOutcome "uncertain", needsConfirmation true on primary.
 
 Prefer a useful generic product category over an uncertain exact product identification.
 
 Set catalogType only when the product is exactly that kind of product. Chocolate spread, hummus, oat drink and other products without their own catalog type get null.
 
-Ignore unrelated background objects.
+Ignore unrelated background objects and promotional price text; prices are irrelevant for identity.
 
-Do not attempt to identify people. If a face or body is visible, set containsPeople to true; a hand holding the product does not count.
+Do not attempt to identify people. If a face or body is visible, set containsPeople to true on primary; a hand holding the product does not count.
 
 Do not treat a visible Nutri-Score as proof that a product is healthy.
 
-Also assess in "alternative" whether a comparable product of the same narrow type is meaningfully better:
+Also assess in primary.alternative whether a comparable product of the same narrow type is meaningfully better:
 ${HEALTHIER_RULES}
 
 Return only the requested structured output.`;
@@ -178,10 +231,14 @@ export function sanitizeAlternative(alternative: Alternative, food: boolean): Al
   };
 }
 
+function sanitizeEan(value: string | null): string | null {
+  const digits = value?.replace(/[\s-]/g, "") ?? "";
+  return /^(\d{8}|\d{12}|\d{13})$/.test(digits) ? digits : null;
+}
+
 /** Trims model text and drops anything that cannot be a printed barcode. */
 export function sanitize(product: RecognizedProduct): RecognizedProduct {
-  const digits = product.ean?.replace(/[\s-]/g, "") ?? "";
-  const ean = /^(\d{8}|\d{12}|\d{13})$/.test(digits) ? digits : null;
+  const ean = sanitizeEan(product.ean);
   const visibleClaims = [...new Set(product.visibleClaims.map((claim) => clean(claim)).filter((claim): claim is string => Boolean(claim)))].slice(0, MAX_CLAIMS);
   const lowConfidence = product.confidence === "low" || !product.recognized;
   const food = product.recognized && product.category !== "huishouden" && !(HOUSEHOLD_TYPES as readonly string[]).includes(product.catalogType ?? "");
@@ -200,4 +257,209 @@ export function sanitize(product: RecognizedProduct): RecognizedProduct {
     needsConfirmation: product.needsConfirmation || lowConfidence,
     alternative: sanitizeAlternative(product.alternative, food),
   };
+}
+
+/** Trims a visual candidate; EAN digits are a hint only until exact-identity validation. */
+export function sanitizeCandidate(candidate: VisualCandidate, index: number): VisualCandidate {
+  const id = clean(candidate.observedCandidateId, 24) || `c${index + 1}`;
+  return {
+    ...candidate,
+    observedCandidateId: id,
+    productName: clean(candidate.productName),
+    genericName: clean(candidate.genericName),
+    brand: clean(candidate.brand),
+    variant: clean(candidate.variant),
+    packageSize: clean(candidate.packageSize),
+    subcategory: clean(candidate.subcategory)?.toLowerCase() ?? null,
+    ean: sanitizeEan(candidate.ean),
+    inferredFields: [...new Set(candidate.inferredFields)],
+  };
+}
+
+function candidateKey(candidate: Pick<VisualCandidate, "brand" | "productName" | "genericName" | "variant" | "packageSize">): string {
+  return [candidate.brand, candidate.productName ?? candidate.genericName, candidate.variant, candidate.packageSize]
+    .map((part) => (part ?? "").trim().toLowerCase().replace(/\s+/g, " "))
+    .join("|");
+}
+
+/** Drop duplicate SKUs and empty rows; keep at most five distinct candidates. */
+export function dedupeCandidates(candidates: VisualCandidate[]): VisualCandidate[] {
+  const seen = new Set<string>();
+  const out: VisualCandidate[] = [];
+  for (const candidate of candidates) {
+    if (!candidate.productName && !candidate.genericName && !candidate.brand) continue;
+    const key = candidateKey(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(candidate);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+function normBrand(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function nameBlob(candidate: Pick<VisualCandidate, "productName" | "genericName" | "variant">): string {
+  return [candidate.productName, candidate.genericName, candidate.variant]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Keep only visually intended choices: drop neighbouring ads with another brand,
+ * collapse loose produce to one result, and merge near-duplicate same-SKU rows.
+ */
+export function filterIntendedCandidates(primary: RecognizedProduct, candidates: VisualCandidate[]): VisualCandidate[] {
+  let list = [...candidates];
+  const primaryBrand = normBrand(primary.brand);
+
+  // Clear loose produce / unbranded staples: do not open a chooser for adjacent shelf items.
+  if (primary.recognized && primary.confidence !== "low" && !primary.specificProduct) {
+    const family = (primary.catalogType || primary.genericName || primary.productName || "").toLowerCase();
+    const same = list.filter((candidate) => {
+      const blob = nameBlob(candidate);
+      return family && (blob.includes(family) || (candidate.catalogType && candidate.catalogType === primary.catalogType));
+    });
+    return same.slice(0, 1);
+  }
+
+  // When the primary brand is clear, neighbouring ads from other brands are noise.
+  if (primaryBrand) {
+    const sameBrand = list.filter((candidate) => {
+      const brand = normBrand(candidate.brand);
+      return !brand || brand === primaryBrand || brand.includes(primaryBrand) || primaryBrand.includes(brand);
+    });
+    if (sameBrand.length > 0) list = sameBrand;
+  }
+
+  const NEUTRAL_VARIANT = /^(original|origineel|originele|classic|klassiek|klassieke)$/i;
+
+  // Merge near-duplicates: "Original" vs "Original Aardbei" with the same size.
+  const merged: VisualCandidate[] = [];
+  for (const candidate of list) {
+    const title = (candidate.productName || candidate.genericName || "").toLowerCase().trim();
+    const nest = merged.findIndex((other) => {
+      if (normBrand(other.brand) !== normBrand(candidate.brand)) return false;
+      if ((other.packageSize || "") !== (candidate.packageSize || "")) return false;
+      const otherTitle = (other.productName || other.genericName || "").toLowerCase().trim();
+      if (!title || !otherTitle) return false;
+      if (otherTitle.includes(title) || title.includes(otherTitle)) return true;
+      // Same brand+size where one variant is only "Original" and the other is a real flavour.
+      const a = (candidate.variant || "").trim();
+      const b = (other.variant || "").trim();
+      return Boolean(a && b && ((NEUTRAL_VARIANT.test(a) && !NEUTRAL_VARIANT.test(b)) || (NEUTRAL_VARIANT.test(b) && !NEUTRAL_VARIANT.test(a))));
+    });
+    if (nest < 0) {
+      merged.push(candidate);
+      continue;
+    }
+    // Keep the more specific name/variant (prefer a real flavour over "Original").
+    const current = merged[nest];
+    const candidateNeutral = NEUTRAL_VARIANT.test(candidate.variant || "");
+    const currentNeutral = NEUTRAL_VARIANT.test(current.variant || "");
+    const prefer =
+      candidateNeutral && !currentNeutral
+        ? current
+        : !candidateNeutral && currentNeutral
+          ? candidate
+          : (candidate.productName || "").length > (current.productName || "").length || (candidate.variant && !current.variant)
+            ? candidate
+            : current;
+    merged[nest] = prefer;
+  }
+  return merged.slice(0, 5);
+}
+
+/**
+ * Server-side outcome from the cleaned primary + candidates. Model values are advisory only.
+ * Multiple meaningful candidates → selection; weak/empty → uncertain/none; else single.
+ */
+export function deriveRecognitionOutcome(
+  primary: RecognizedProduct,
+  candidates: VisualCandidate[],
+): { recognitionOutcome: RecognitionOutcome; needsSelection: boolean; selectionReason?: string } {
+  if (!primary.recognized && candidates.length === 0) {
+    return { recognitionOutcome: "none", needsSelection: false, selectionReason: "no-product" };
+  }
+  if (candidates.length >= 2) {
+    return { recognitionOutcome: "multiple", needsSelection: true, selectionReason: "distinct-candidates" };
+  }
+  if (!primary.recognized || primary.confidence === "low" || primary.needsConfirmation) {
+    return { recognitionOutcome: "uncertain", needsSelection: false, selectionReason: "needs-check" };
+  }
+  return { recognitionOutcome: "single", needsSelection: false };
+}
+
+const EMPTY_ALTERNATIVE: Alternative = {
+  status: "none",
+  evidence: "none",
+  criteria: [],
+  alternativeType: null,
+  targetType: null,
+  reason: null,
+  parentExplanation: null,
+  childPrompt: null,
+};
+
+/** Lift a visual candidate into the RecognizedProduct shape used by mergeDraft. */
+export function productFromCandidate(candidate: VisualCandidate, template?: RecognizedProduct): RecognizedProduct {
+  return sanitize({
+    recognized: true,
+    productName: candidate.productName,
+    genericName: candidate.genericName,
+    catalogType: candidate.catalogType,
+    specificProduct: candidate.specificProduct,
+    brand: candidate.brand,
+    variant: candidate.variant,
+    packageSize: candidate.packageSize,
+    category: candidate.category,
+    subcategory: candidate.subcategory,
+    ean: candidate.ean,
+    visibleNutriScore: template?.visibleNutriScore ?? null,
+    visibleClaims: template?.visibleClaims ?? [],
+    visibleIngredients: template?.visibleIngredients ?? null,
+    inferredFields: candidate.inferredFields,
+    confidence: candidate.confidence,
+    needsConfirmation: candidate.confidence === "low",
+    containsPeople: false,
+    alternative: template?.alternative ?? EMPTY_ALTERNATIVE,
+  });
+}
+
+/** Sanitize OpenAI vision payload into primary + candidates + derived outcome. */
+export function sanitizeVision(vision: RecognizeVision): {
+  product: RecognizedProduct;
+  candidates: VisualCandidate[];
+  recognitionOutcome: RecognitionOutcome;
+  needsSelection: boolean;
+  selectionReason?: string;
+} {
+  const product = sanitize(vision.primary);
+  let candidates = filterIntendedCandidates(product, dedupeCandidates(vision.candidates.map(sanitizeCandidate)));
+  if (candidates.length === 0 && product.recognized) {
+    candidates = [
+      {
+        observedCandidateId: "c1",
+        productName: product.productName,
+        genericName: product.genericName,
+        catalogType: product.catalogType,
+        specificProduct: product.specificProduct,
+        brand: product.brand,
+        variant: product.variant,
+        packageSize: product.packageSize,
+        category: product.category,
+        subcategory: product.subcategory,
+        ean: product.ean,
+        inferredFields: product.inferredFields,
+        confidence: product.confidence,
+      },
+    ];
+  }
+  const derived = deriveRecognitionOutcome(product, candidates);
+  return { product, candidates, ...derived };
 }

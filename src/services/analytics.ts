@@ -16,6 +16,10 @@ export type BarcodeLookupSource = Exclude<RecognitionSource, "openai" | "cache">
 export type BarcodeLookupOutcome = "success" | "not_found" | "error" | "offline" | "rate_limited";
 export type ReturnBucket = "1" | "2-7" | "8-30" | "31+";
 export type ScannerOutcome = "success" | "not_found" | "error" | "offline";
+/** Aggregated photo recognition shape; never product names or EANs. */
+export type PhotoRecognitionOutcome = "single" | "multiple" | "uncertain" | "none" | "error";
+export type RecognitionChooserAction = "shown" | "selected" | "corrected" | "manual";
+export type LatencyBucket = "0-2s" | "2-5s" | "5-15s" | "15s+";
 export type OnboardingAction = "start" | "skip" | "dismiss";
 export type FeedbackSource = "settings" | "completed";
 export type BonusKind = "healthier" | "guess" | "color" | "drag";
@@ -30,6 +34,8 @@ export type AnalyticsEvent =
   | { name: "shopping_list_created" }
   | { name: "product_added"; data: { method: AddMethod; category: CategoryId } }
   | { name: "product_recognized"; data: { method: "photo" | "barcode"; source: RecognitionSource } }
+  | { name: "photo_recognition_outcome"; data: { outcome: PhotoRecognitionOutcome; candidate_count: number; latency_bucket: LatencyBucket } }
+  | { name: "recognition_chooser"; data: { action: RecognitionChooserAction; candidate_count: number } }
   | { name: "barcode_lookup_result"; data: { source: BarcodeLookupSource; outcome: BarcodeLookupOutcome } }
   | { name: "adventure_started"; data: { item_count: number } }
   | { name: "adventure_first_item_found"; data: { item_count: number } }
@@ -61,6 +67,13 @@ export type AnalyticsEvent =
   | { name: "storage_operation_failed"; data: { operation: StorageOperation; reason: StorageFailureReason } }
   | { name: "feedback_opened"; data: { source: FeedbackSource } }
   | { name: "sticker_book_opened" };
+
+export function latencyBucket(ms: number): LatencyBucket {
+  if (ms < 2_000) return "0-2s";
+  if (ms < 5_000) return "2-5s";
+  if (ms < 15_000) return "5-15s";
+  return "15s+";
+}
 
 export type Tracked = { event: AnalyticsEvent; once?: string };
 

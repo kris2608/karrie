@@ -6,8 +6,9 @@ import { PressButton } from "../../components/ui/PressButton";
 import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { categoryIcon } from "../../domain/categoryIcon";
 import { declineKey, missionOn } from "../../domain/discovery";
-import { newItemFor, type ProductDraft } from "../../domain/productDraft";
+import { newItemFor, selectIdentityCandidate, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem, AlternativeAssessment, CategoryId } from "../../domain/types";
+import { trackEvent } from "../../services/analytics";
 import { confirmPackSize } from "../../services/barcode/pack";
 import { storeCredit } from "../../services/images/storeImage";
 import { useAdventure } from "../../state/AdventureContext";
@@ -62,19 +63,22 @@ export function sourcesLine(draft: ProductDraft | null, hasPhoto: boolean): stri
   return parts.join(" ");
 }
 
-export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCancel, onDone }: PhotoResultSheetProps) {
+export function PhotoResultSheet({ draft: initialDraft, photoUrl, photo, items, onRetake, onCancel, onDone }: PhotoResultSheetProps) {
   const { declined, dispatch } = useAdventure();
-  const [name, setName] = useState(draft?.name ?? "");
-  const [category, setCategory] = useState<CategoryId>(draft?.category ?? "pantry");
+  const [draft, setDraft] = useState(initialDraft);
+  const [name, setName] = useState(initialDraft?.name ?? "");
+  const [category, setCategory] = useState<CategoryId>(initialDraft?.category ?? "pantry");
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [packSize, setPackSize] = useState(draft?.fields.packageSize?.value);
-  const [conflictResolved, setConflictResolved] = useState(!draft?.packConflict);
+  const [packSize, setPackSize] = useState(initialDraft?.fields.packageSize?.value);
+  const [conflictResolved, setConflictResolved] = useState(!initialDraft?.packConflict);
+  const [choseIdentity, setChoseIdentity] = useState(false);
   /** Set in the same tap, so a quick second tap (even on the sheet as it slides away) does nothing. */
   const settled = useRef(false);
   const earlier = usePhotoUrl(photoUrl ? undefined : draft?.photoId);
   const open = items.filter((item) => item.status !== "found");
   const candidates = draft?.match ? open.filter((item) => item.productId === draft.match!.id) : [];
+  const identityChoices = draft?.needsSelection && !choseIdentity ? draft.identityCandidates ?? [] : [];
   const drawing = draft && !draft.keepPhoto ? draft.match : null;
   const assessment = draft?.pack.alternative;
   const keyed = draft ? { name: draft.name, brand: draft.pack.brand, alternative: assessment } : null;
@@ -90,6 +94,20 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
   const picture = photoUrl ?? earlier ?? usable(store?.imageUrl) ?? usable(hinted) ?? usable(draft?.imageUrl);
   const storeShown = Boolean((store && picture === store.imageUrl) || (hinted && picture === hinted));
   const nutriScore = draft?.from.barcode?.product.nutriScore ?? draft?.pack.nutrition?.nutriscore?.toUpperCase();
+
+  function chooseIdentity(candidateId: string) {
+    if (!draft) return;
+    const next = selectIdentityCandidate(draft, candidateId);
+    setDraft(next);
+    setName(next.name);
+    setCategory(next.category);
+    setPackSize(next.fields.packageSize?.value);
+    setChoseIdentity(true);
+    trackEvent({
+      name: "recognition_chooser",
+      data: { action: "selected", candidate_count: Math.min(draft.identityCandidates?.length ?? 0, 5) },
+    });
+  }
 
   function choosePack(quantity: string) {
     setPackSize(quantity);
@@ -192,6 +210,61 @@ export function PhotoResultSheet({ draft, photoUrl, photo, items, onRetake, onCa
     </p>
   );
   const retakeLabel = photo ? "Opnieuw fotograferen" : "Terug naar camera";
+
+  if (identityChoices.length > 1) {
+    return (
+      <>
+        <h2>Welke bedoel je?</h2>
+        <p className="sheet-note">Karrie ziet meerdere producten of smaken. Tik op wat je wilt toevoegen.</p>
+        <ul className="scan-pick" data-testid="identity-pick">
+          {identityChoices.map((choice) => {
+            const label = [choice.brand, choice.productName ?? choice.genericName].filter(Boolean).join(" · ") || "Onbekend product";
+            const detail = [choice.variant, choice.packageSize].filter(Boolean).join(" · ");
+            const thumb = usable(choice.imageUrl);
+            return (
+              <li key={choice.observedCandidateId}>
+                <button type="button" disabled={saving} onClick={() => chooseIdentity(choice.observedCandidateId)} aria-label={label}>
+                  {thumb ? (
+                    <span className="product-art item-photo">
+                      <img src={thumb} alt="" referrerPolicy="no-referrer" onError={() => markBroken(thumb)} />
+                    </span>
+                  ) : (
+                    <ProductArt id={draft?.icon ?? categoryIcon(category)} />
+                  )}
+                  <span>
+                    <strong>{label}</strong>
+                    {detail && <small>{detail}</small>}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <PressButton
+          variant="quiet"
+          wide
+          data-testid="identity-manual"
+          onClick={() => {
+            setChoseIdentity(true);
+            trackEvent({
+              name: "recognition_chooser",
+              data: { action: "manual", candidate_count: Math.min(identityChoices.length, 5) },
+            });
+          }}
+        >
+          Zelf invullen
+        </PressButton>
+        <div className="sheet-actions scan-actions">
+          <PressButton variant="quiet" onClick={onCancel}>
+            Annuleren
+          </PressButton>
+          <PressButton variant="quiet" data-testid="photo-retake" onClick={onRetake}>
+            {retakeLabel}
+          </PressButton>
+        </div>
+      </>
+    );
+  }
 
   if (picking && photo) {
     return (

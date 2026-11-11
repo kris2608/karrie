@@ -93,29 +93,34 @@ describe("checkImage", () => {
 });
 
 describe("requestBody", () => {
-  it("never stores the request and asks for the strict schema", () => {
+  it("never stores the request and asks for the strict multi-candidate schema", () => {
     const body = requestBody(CONFIG, jpeg());
     expect(body.store).toBe(false);
-    expect(body.text.format).toMatchObject({ type: "json_schema", name: "recognized_product", strict: true });
+    expect(body.text.format).toMatchObject({ type: "json_schema", name: "recognized_products", strict: true });
     expect(body.input[0].content[1]).toMatchObject({ type: "input_image", detail: "auto" });
     expect(JSON.stringify(body)).not.toMatch(/web_search|image_generation/);
   });
 
   it("produces a schema strict mode accepts: every property required, no extras", () => {
-    type Strict = { required: string[]; properties: Record<string, Strict>; additionalProperties: boolean };
+    type Strict = { required: string[]; properties: Record<string, Strict>; additionalProperties: boolean; items?: Strict };
     const schema = requestBody(CONFIG, jpeg()).text.format.schema as Strict;
     expect(schema.additionalProperties).toBe(false);
     expect([...schema.required].sort()).toEqual(Object.keys(schema.properties).sort());
-    const alternative = schema.properties.alternative;
+    const primary = schema.properties.primary;
+    expect(primary.additionalProperties).toBe(false);
+    expect([...primary.required].sort()).toEqual(Object.keys(primary.properties).sort());
+    const alternative = primary.properties.alternative;
     expect(alternative.additionalProperties).toBe(false);
     expect([...alternative.required].sort()).toEqual(Object.keys(alternative.properties).sort());
+    const candidates = schema.properties.candidates;
+    expect(candidates.items?.additionalProperties).toBe(false);
   });
 
   it("passes a scanned barcode as context only, and nothing when there is none", () => {
     const withCode = requestBody(CONFIG, jpeg(), "8710400000006").input[0].content[0];
     expect(withCode.type === "input_text" && withCode.text).toMatch(/streepjescode 8710400000006.*alleen als context/s);
     const plain = requestBody(CONFIG, jpeg()).input[0].content[0];
-    expect(plain.type === "input_text" && plain.text).toBe("Welk product staat op deze foto?");
+    expect(plain.type === "input_text" && plain.text).toMatch(/Welk product staat op deze foto\?/);
   });
 
   it("assesses the alternative in the same call, with the same-type rules", () => {
@@ -123,6 +128,7 @@ describe("requestBody", () => {
     expect(body.instructions).toMatch(/same narrow type/);
     expect(body.instructions).toMatch(/peanut butter -> hummus/);
     expect(body.instructions).toMatch(/always for non-food/);
+    expect(body.instructions).toMatch(/candidates/);
   });
 });
 
@@ -160,7 +166,7 @@ describe("sanitizeAlternative", () => {
 });
 
 describe("interpret", () => {
-  it("parses and sanitizes a good answer", () => {
+  it("parses and sanitizes a good answer, including legacy single-product payloads", () => {
     const result = interpret(completed(JSON.stringify(PEANUT)));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -168,7 +174,173 @@ describe("interpret", () => {
     expect(result.product.subcategory).toBe("pindakaas");
     expect(result.product.visibleClaims).toEqual(["100% pindakaas", "Naturel"]);
     expect(result.product.ean).toBeNull();
+    expect(result.recognitionOutcome).toBe("single");
+    expect(result.needsSelection).toBe(false);
+    expect(result.candidates).toHaveLength(1);
     expect(result.usage).toEqual({ inputTokens: 1000, cachedInputTokens: 0, outputTokens: 200 });
+  });
+
+  it("keeps multiple distinct flavour candidates and requires selection", () => {
+    const payload = {
+      recognitionOutcome: "multiple",
+      needsSelection: true,
+      primary: { ...PEANUT, productName: "Casa di Mama", brand: "Dr. Oetker", variant: null, needsConfirmation: true, catalogType: "pizza", category: "diepvries", subcategory: "pizza" },
+      candidates: [
+        {
+          observedCandidateId: "c1",
+          productName: "Casa di Mama Salame",
+          genericName: "pizza",
+          catalogType: "pizza",
+          specificProduct: true,
+          brand: "Dr. Oetker",
+          variant: "Salame",
+          packageSize: null,
+          category: "diepvries",
+          subcategory: "pizza",
+          ean: null,
+          inferredFields: [],
+          confidence: "high",
+        },
+        {
+          observedCandidateId: "c2",
+          productName: "Casa di Mama Speciale",
+          genericName: "pizza",
+          catalogType: "pizza",
+          specificProduct: true,
+          brand: "Dr. Oetker",
+          variant: "Speciale",
+          packageSize: null,
+          category: "diepvries",
+          subcategory: "pizza",
+          ean: null,
+          inferredFields: [],
+          confidence: "high",
+        },
+        {
+          observedCandidateId: "c3",
+          productName: "Blue Band",
+          genericName: "margarine",
+          catalogType: null,
+          specificProduct: true,
+          brand: "Blue Band",
+          variant: null,
+          packageSize: null,
+          category: "koeling",
+          subcategory: "margarine",
+          ean: null,
+          inferredFields: [],
+          confidence: "medium",
+        },
+      ],
+    };
+    const result = interpret(completed(JSON.stringify(payload)));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.recognitionOutcome).toBe("multiple");
+    expect(result.needsSelection).toBe(true);
+    expect(result.candidates.map((c) => c.variant)).toEqual(["Salame", "Speciale"]);
+  });
+
+  it("collapses clear produce to a single candidate and merges near-duplicate same-SKU rows", () => {
+    const produce = interpret(
+      completed(
+        JSON.stringify({
+          recognitionOutcome: "multiple",
+          needsSelection: true,
+          primary: {
+            ...PEANUT,
+            productName: "Mandarijnen",
+            brand: null,
+            variant: null,
+            packageSize: "1 kg",
+            catalogType: "mandarijn",
+            category: "groente-fruit",
+            subcategory: "mandarijn",
+            specificProduct: false,
+            genericName: "mandarijnen",
+          },
+          candidates: [
+            {
+              observedCandidateId: "c1",
+              productName: "Mandarijnen",
+              genericName: "mandarijnen",
+              catalogType: "mandarijn",
+              specificProduct: false,
+              brand: null,
+              variant: null,
+              packageSize: "1 kg",
+              category: "groente-fruit",
+              subcategory: "mandarijn",
+              ean: null,
+              inferredFields: [],
+              confidence: "high",
+            },
+            {
+              observedCandidateId: "c2",
+              productName: "Wortelen",
+              genericName: "wortelen",
+              catalogType: "wortel",
+              specificProduct: false,
+              brand: null,
+              variant: null,
+              packageSize: null,
+              category: "groente-fruit",
+              subcategory: "wortel",
+              ean: null,
+              inferredFields: [],
+              confidence: "medium",
+            },
+          ],
+        }),
+      ),
+    );
+    expect(produce.ok && produce.recognitionOutcome).toBe("single");
+    expect(produce.ok && produce.needsSelection).toBe(false);
+    expect(produce.ok && produce.candidates).toHaveLength(1);
+
+    const syrup = interpret(
+      completed(
+        JSON.stringify({
+          recognitionOutcome: "multiple",
+          needsSelection: true,
+          primary: { ...PEANUT, productName: "Cevitam Original", brand: "Cevitam", variant: "Original", catalogType: "siroop", category: "dranken", subcategory: "siroop" },
+          candidates: [
+            {
+              observedCandidateId: "c1",
+              productName: "Cevitam Original",
+              genericName: "siroop",
+              catalogType: "siroop",
+              specificProduct: true,
+              brand: "Cevitam",
+              variant: "Original",
+              packageSize: "600 ml",
+              category: "dranken",
+              subcategory: "siroop",
+              ean: null,
+              inferredFields: [],
+              confidence: "medium",
+            },
+            {
+              observedCandidateId: "c2",
+              productName: "Cevitam Original Aardbei",
+              genericName: "siroop",
+              catalogType: "siroop",
+              specificProduct: true,
+              brand: "Cevitam",
+              variant: "Aardbei",
+              packageSize: "600 ml",
+              category: "dranken",
+              subcategory: "siroop",
+              ean: null,
+              inferredFields: [],
+              confidence: "medium",
+            },
+          ],
+        }),
+      ),
+    );
+    expect(syrup.ok && syrup.candidates).toHaveLength(1);
+    expect(syrup.ok && syrup.needsSelection).toBe(false);
   });
 
   it("keeps only barcode-shaped EANs and flags low confidence for confirmation", () => {
@@ -251,7 +423,14 @@ describe("http handler", () => {
       configured: true,
       model: "gpt-5.4-mini",
       limits: createLimits(LIMITS),
-      recognize: async () => ({ ok: true, product: PEANUT, usage: { inputTokens: 900, cachedInputTokens: 0, outputTokens: 150 } }),
+      recognize: async () => ({
+        ok: true as const,
+        product: PEANUT,
+        candidates: [],
+        recognitionOutcome: "single" as const,
+        needsSelection: false,
+        usage: { inputTokens: 900, cachedInputTokens: 0, outputTokens: 150 },
+      }),
       log: (entry) => logs.push(entry),
       ...overrides,
     });
@@ -294,7 +473,14 @@ describe("http handler", () => {
     const post = await start({
       recognize: () =>
         new Promise((resolve) => {
-          release = () => resolve({ ok: true, product: PEANUT });
+          release = () =>
+            resolve({
+              ok: true,
+              product: PEANUT,
+              candidates: [],
+              recognitionOutcome: "single",
+              needsSelection: false,
+            });
         }),
     });
     const first = post({ image: jpeg() });

@@ -8,7 +8,7 @@ import { mergeDraft, type ProductDraft } from "../../domain/productDraft";
 import type { AdventureItem } from "../../domain/types";
 import { buzz } from "../../feedback/haptics";
 import { playBeep, playPop } from "../../feedback/sound";
-import { trackEvent } from "../../services/analytics";
+import { latencyBucket, trackEvent } from "../../services/analytics";
 import { lookupBarcode, type BarcodeOutcome } from "../../services/barcode/lookup";
 import { vision, type VisionResult } from "../../services/vision/client";
 import { useAdventure } from "../../state/AdventureContext";
@@ -252,6 +252,7 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     const controller = new AbortController();
     request.current = controller;
     const scanned = scan.current;
+    const started = Date.now();
     const result = await vision.recognize(await blobToDataUrl(next.upload), {
       signal: controller.signal,
       scannedEan: scanned?.ean,
@@ -262,6 +263,15 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     if (result.status === "aborted") return;
     if (result.status === "ok") {
       if (result.product.containsPeople) return setStep({ kind: "problem", problem: PEOPLE });
+      const elapsed = Date.now() - started;
+      trackEvent({
+        name: "photo_recognition_outcome",
+        data: {
+          outcome: result.recognitionOutcome,
+          candidate_count: Math.min(result.candidates.length, 5),
+          latency_bucket: latencyBucket(elapsed),
+        },
+      });
       if (result.product.recognized) {
         trackEvent({ name: "product_recognized", data: { method: "photo", source: "openai" } });
         trackEvent({ name: "scanner_result", data: { method: "photo", outcome: "success" } }, `scanner-result:photo:${session.current}`);
@@ -269,10 +279,31 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
       } else {
         trackEvent({ name: "scanner_result", data: { method: "photo", outcome: "not_found" } }, `scanner-result:photo:${session.current}`);
       }
-      const lookup = scanned ? known(scanned.ean, await scanned.outcome) : {};
-      setStep({ kind: "result", draft: mergeDraft({ ...lookup, photo: result.product }) });
+      // Multiple visible products: do not let a neighbouring pack's barcode silently own the result.
+      const multi = result.needsSelection || result.candidates.length > 1;
+      const lookup = scanned && !multi ? known(scanned.ean, await scanned.outcome) : {};
+      if (multi) {
+        trackEvent({
+          name: "recognition_chooser",
+          data: { action: "shown", candidate_count: Math.min(result.candidates.length, 5) },
+        });
+      }
+      setStep({
+        kind: "result",
+        draft: mergeDraft({
+          ...lookup,
+          photo: result.product,
+          identityCandidates: result.candidates,
+          recognitionOutcome: result.recognitionOutcome,
+          needsSelection: result.needsSelection,
+        }),
+      });
       return;
     }
+    trackEvent({
+      name: "photo_recognition_outcome",
+      data: { outcome: "error", candidate_count: 0, latency_bucket: latencyBucket(Date.now() - started) },
+    });
     trackEvent({ name: "scanner_result", data: { method: "photo", outcome: "error" } }, `scanner-result:photo:${session.current}`);
     setStep({ kind: "problem", problem: problemFor(result) });
   }

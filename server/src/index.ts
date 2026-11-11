@@ -41,7 +41,8 @@ const config: RecognizeConfig = {
   model: env.OPENAI_VISION_MODEL || "gpt-5.4-mini",
   detail: pick("OPENAI_IMAGE_DETAIL", ["low", "high", "auto"] as const, "auto"),
   reasoningEffort: env.OPENAI_REASONING_EFFORT === "default" ? null : pick("OPENAI_REASONING_EFFORT", ["none", "low", "medium", "high"] as const, "low"),
-  maxOutputTokens: number("OPENAI_MAX_OUTPUT_TOKENS", 1200),
+  // Multi-candidate vision replies need more room than the old single-product schema.
+  maxOutputTokens: number("OPENAI_MAX_OUTPUT_TOKENS", 1800),
 };
 
 const apiKey = env.OPENAI_API_KEY;

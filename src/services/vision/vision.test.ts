@@ -144,13 +144,69 @@ describe("visionMapping", () => {
 });
 
 describe("vision client", () => {
-  it("posts the image once and returns the product", async () => {
-    const fetcher = vi.fn(() => ok({ status: "ok", product: PEANUT }));
+  it("posts the image once and returns the product, including additive multi-candidate fields", async () => {
+    const fetcher = vi.fn(() =>
+      ok({
+        status: "ok",
+        product: PEANUT,
+        recognitionOutcome: "multiple",
+        needsSelection: true,
+        candidates: [
+          {
+            observedCandidateId: "c1",
+            productName: "Casa di Mama Salame",
+            genericName: "pizza",
+            catalogType: "pizza",
+            specificProduct: true,
+            brand: "Dr. Oetker",
+            variant: "Salame",
+            packageSize: null,
+            category: "diepvries",
+            subcategory: "pizza",
+            ean: null,
+            inferredFields: [],
+            confidence: "high",
+          },
+          {
+            observedCandidateId: "c2",
+            productName: "Casa di Mama Speciale",
+            genericName: "pizza",
+            catalogType: "pizza",
+            specificProduct: true,
+            brand: "Dr. Oetker",
+            variant: "Speciale",
+            packageSize: null,
+            category: "diepvries",
+            subcategory: "pizza",
+            ean: null,
+            inferredFields: [],
+            confidence: "high",
+          },
+        ],
+      }),
+    );
     const result = await client(fetcher).recognize("data:image/jpeg;base64,AAAA");
-    expect(result).toEqual({ status: "ok", product: PEANUT });
+    expect(result).toMatchObject({
+      status: "ok",
+      product: PEANUT,
+      recognitionOutcome: "multiple",
+      needsSelection: true,
+      candidates: [{ variant: "Salame" }, { variant: "Speciale" }],
+    });
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.test/api/products/recognize-photo");
     expect(init).toMatchObject({ method: "POST", credentials: "omit", referrerPolicy: "no-referrer" });
+  });
+
+  it("accepts a legacy single-product response without candidates", async () => {
+    const result = await client(() => ok({ status: "ok", product: PEANUT })).recognize("data:a");
+    expect(result).toEqual({
+      status: "ok",
+      product: PEANUT,
+      candidates: [],
+      recognitionOutcome: "uncertain",
+      needsSelection: false,
+    });
   });
 
   it("does not call the network when offline", async () => {

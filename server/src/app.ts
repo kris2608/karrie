@@ -17,6 +17,7 @@ import { PRODUCT_CATEGORIES } from "./offers/match.js";
 import { RETAILERS, type PrijsProfeet } from "./offers/prijsprofeet.js";
 import type { StoreImageLookup, StoreImageResult } from "./storeImage.js";
 import type { RecognizeResult } from "./recognize.js";
+import { enrichCandidates, primaryProduct } from "./recognizeIdentity.js";
 import type { SharedListStore } from "./sharedLists.js";
 import { sharedListPreviewHtml } from "./sharedListPreview.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
@@ -327,11 +328,30 @@ export function createHandler(deps: AppDeps) {
     const callStarted = now();
     try {
       const result = await deps.recognize(image.dataUrl, canonicalEan((body as { scannedEan?: unknown }).scannedEan) ?? undefined);
-      const latencyMs = now() - callStarted;
-      deps.limits.record({ ok: result.ok, latencyMs, usage: result.usage });
-      Object.assign(entry, { model: deps.model, openaiMs: latencyMs, usage: result.usage, code: result.ok ? undefined : result.code });
+      const openaiMs = now() - callStarted;
+      deps.limits.record({ ok: result.ok, latencyMs: openaiMs, usage: result.usage });
+      Object.assign(entry, { model: deps.model, openaiMs, usage: result.usage, code: result.ok ? undefined : result.code });
       if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
-      return send(200, { status: "ok", product: result.product });
+
+      const enrichStarted = now();
+      const enrichment = await enrichCandidates(result.candidates, deps.nameImages?.lookup);
+      const product = primaryProduct(result.product, enrichment.candidates, result.needsSelection);
+      Object.assign(entry, {
+        recognitionOutcome: result.recognitionOutcome,
+        needsSelection: result.needsSelection,
+        candidateCount: enrichment.candidates.length,
+        identityLookups: enrichment.lookups,
+        identityFailures: enrichment.failures,
+        identityMs: now() - enrichStarted,
+      });
+      return send(200, {
+        status: "ok",
+        product,
+        recognitionOutcome: result.recognitionOutcome,
+        needsSelection: result.needsSelection,
+        ...(result.selectionReason && { selectionReason: result.selectionReason }),
+        candidates: enrichment.candidates,
+      });
     } finally {
       inFlight.delete(ip);
     }

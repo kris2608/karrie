@@ -1,6 +1,13 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { INSTRUCTIONS, RecognizedProductSchema, sanitize, type RecognizedProduct } from "./schema.js";
+import {
+  INSTRUCTIONS,
+  RecognizeVisionSchema,
+  sanitizeVision,
+  type RecognizedProduct,
+  type RecognitionOutcome,
+  type VisualCandidate,
+} from "./schema.js";
 import type { Usage } from "./limits.js";
 
 export type RecognizeConfig = {
@@ -21,7 +28,15 @@ export type RecognizeErrorCode =
   | "misconfigured";
 
 export type RecognizeResult =
-  | { ok: true; product: RecognizedProduct; usage?: Usage }
+  | {
+      ok: true;
+      product: RecognizedProduct;
+      candidates: VisualCandidate[];
+      recognitionOutcome: RecognitionOutcome;
+      needsSelection: boolean;
+      selectionReason?: string;
+      usage?: Usage;
+    }
   | { ok: false; code: RecognizeErrorCode; usage?: Usage };
 
 type ResponsesClient = { responses: { create: (body: never, options?: { signal?: AbortSignal }) => Promise<unknown> } };
@@ -33,7 +48,7 @@ type RawResponse = {
   usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number } };
 };
 
-const FORMAT = zodTextFormat(RecognizedProductSchema, "recognized_product");
+const FORMAT = zodTextFormat(RecognizeVisionSchema, "recognized_products");
 
 function usageOf(response: RawResponse): Usage | undefined {
   if (!response.usage) return undefined;
@@ -47,8 +62,8 @@ function usageOf(response: RawResponse): Usage | undefined {
 /** scannedEan: a barcode the phone decoded on this pack. Context only; the model reports `ean` only if it can read it. */
 export function requestBody(config: RecognizeConfig, dataUrl: string, scannedEan?: string) {
   const question = scannedEan
-    ? `Welk product staat op deze foto?\nDe telefoon las op deze verpakking de streepjescode ${scannedEan}. Gebruik die alleen als context; vul ean alleen in als je de cijfers zelf op de foto kunt lezen.`
-    : "Welk product staat op deze foto?";
+    ? `Welk product staat op deze foto?\nDe telefoon las op deze verpakking de streepjescode ${scannedEan}. Gebruik die alleen als context; vul ean alleen in als je de cijfers zelf op de foto kunt lezen. Als er meerdere smaken of producten zichtbaar zijn, geef aparte candidates.`
+    : "Welk product staat op deze foto? Als er meerdere smaken of producten zichtbaar zijn, geef aparte candidates.";
   return {
     model: config.model,
     store: false,
@@ -84,9 +99,17 @@ export function interpret(response: RawResponse): RecognizeResult {
   } catch {
     return { ok: false, code: "malformed", usage };
   }
-  const parsed = RecognizedProductSchema.safeParse(json);
+  // Back-compat: older single-product payloads still parse by wrapping them.
+  const wrapped =
+    json && typeof json === "object" && "primary" in (json as object)
+      ? json
+      : json && typeof json === "object" && "recognized" in (json as object)
+        ? { recognitionOutcome: "single", needsSelection: false, primary: json, candidates: [] }
+        : json;
+  const parsed = RecognizeVisionSchema.safeParse(wrapped);
   if (!parsed.success) return { ok: false, code: "malformed", usage };
-  return { ok: true, product: sanitize(parsed.data), usage };
+  const cleaned = sanitizeVision(parsed.data);
+  return { ok: true, ...cleaned, usage };
 }
 
 export function errorCode(error: unknown): RecognizeErrorCode {

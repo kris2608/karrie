@@ -8,5 +8,6 @@ dev-dist
 .env
 server/dist
 .testdata
+local-tests/
 
 exports/

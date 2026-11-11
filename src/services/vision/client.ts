@@ -1,7 +1,21 @@
-import { isRecognizedProduct, type RecognizedProduct } from "./types";
+import {
+  isRecognizedProduct,
+  isVisualCandidate,
+  type RecognizedProduct,
+  type RecognitionOutcome,
+  type VisualCandidate,
+  RECOGNITION_OUTCOMES,
+} from "./types";
 
 export type VisionResult =
-  | { status: "ok"; product: RecognizedProduct }
+  | {
+      status: "ok";
+      product: RecognizedProduct;
+      candidates: VisualCandidate[];
+      recognitionOutcome: RecognitionOutcome;
+      needsSelection: boolean;
+      selectionReason?: string;
+    }
   | { status: "offline" }
   | { status: "aborted" }
   | { status: "limit"; code: "device-limit" | "rate-limited" | "daily-limit" | "budget" | "in-flight" }
@@ -24,6 +38,42 @@ export type VisionDeps = {
 
 const DEVICE_KEY = "karrie-vision-day";
 const LIMIT_CODES = new Set(["rate-limited", "daily-limit", "budget", "in-flight"]);
+
+function parseOutcome(value: unknown): RecognitionOutcome {
+  return RECOGNITION_OUTCOMES.includes(value as RecognitionOutcome) ? (value as RecognitionOutcome) : "single";
+}
+
+/** Accept additive multi-candidate fields; older servers that only return `product` still work. */
+export function parseRecognizeBody(body: {
+  status?: string;
+  product?: unknown;
+  candidates?: unknown;
+  recognitionOutcome?: unknown;
+  needsSelection?: unknown;
+  selectionReason?: unknown;
+} | null): Extract<VisionResult, { status: "ok" }> | null {
+  if (!body || body.status !== "ok" || !isRecognizedProduct(body.product)) return null;
+  const candidates = Array.isArray(body.candidates) ? body.candidates.filter(isVisualCandidate) : [];
+  const needsSelection = typeof body.needsSelection === "boolean" ? body.needsSelection : candidates.length > 1;
+  const recognitionOutcome =
+    typeof body.recognitionOutcome === "string"
+      ? parseOutcome(body.recognitionOutcome)
+      : candidates.length > 1
+        ? "multiple"
+        : body.product.recognized
+          ? body.product.needsConfirmation || body.product.confidence === "low"
+            ? "uncertain"
+            : "single"
+          : "none";
+  return {
+    status: "ok",
+    product: body.product,
+    candidates,
+    recognitionOutcome,
+    needsSelection,
+    ...(typeof body.selectionReason === "string" && body.selectionReason ? { selectionReason: body.selectionReason } : {}),
+  };
+}
 
 export function createVisionClient(deps: VisionDeps) {
   let inFlight = false;
@@ -73,8 +123,19 @@ export function createVisionClient(deps: VisionDeps) {
           referrerPolicy: "no-referrer",
           signal: controller.signal,
         });
-        const body = (await response.json().catch(() => null)) as { status?: string; code?: string; product?: unknown } | null;
-        if (response.ok && body?.status === "ok" && isRecognizedProduct(body.product)) return { status: "ok", product: body.product };
+        const body = (await response.json().catch(() => null)) as {
+          status?: string;
+          code?: string;
+          product?: unknown;
+          candidates?: unknown;
+          recognitionOutcome?: unknown;
+          needsSelection?: unknown;
+          selectionReason?: unknown;
+        } | null;
+        if (response.ok) {
+          const parsed = parseRecognizeBody(body);
+          if (parsed) return parsed;
+        }
         const code = body?.code ?? `http-${response.status}`;
         if (LIMIT_CODES.has(code)) return { status: "limit", code: code as "rate-limited" };
         return { status: "error", code };

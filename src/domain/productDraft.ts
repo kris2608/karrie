@@ -1,7 +1,8 @@
 import { products } from "../data/catalog";
 import type { VisionPack } from "../data/sample";
 import type { FoundAnswer } from "../services/barcode/lookup";
-import type { RecognizedProduct } from "../services/vision/types";
+import type { RecognizedProduct, RecognitionOutcome, VisualCandidate } from "../services/vision/types";
+import { productFromCandidate } from "../services/vision/types";
 import { categoryIcon } from "./categoryIcon";
 import { normalize } from "./matchProduct";
 import { resolveCategory } from "./resolveCategory";
@@ -36,6 +37,10 @@ export type ProductDraft = {
   recognized: boolean;
   /** Independent sources disagree on pack size; parent should confirm. */
   packConflict?: { choices: string[]; raw: string[] };
+  /** Visually distinct products/flavours; parent picks one before add when needsSelection. */
+  identityCandidates?: VisualCandidate[];
+  recognitionOutcome?: RecognitionOutcome;
+  needsSelection?: boolean;
 };
 
 /**
@@ -98,9 +103,41 @@ export function newItemFor(draft: ProductDraft | null, name: string, category: C
   };
 }
 
-export type DraftInput = { ean?: string; mine?: SavedItem; barcode?: FoundAnswer; photo?: RecognizedProduct };
+export type DraftInput = {
+  ean?: string;
+  mine?: SavedItem;
+  barcode?: FoundAnswer;
+  photo?: RecognizedProduct;
+  identityCandidates?: VisualCandidate[];
+  recognitionOutcome?: RecognitionOutcome;
+  needsSelection?: boolean;
+};
 
-export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDraft {
+/**
+ * Rebuild a draft after the parent picks one visual candidate. Only the selected candidate is kept;
+ * speculative siblings are dropped so they are never persisted.
+ */
+export function selectIdentityCandidate(draft: ProductDraft, candidateId: string): ProductDraft {
+  const candidate = draft.identityCandidates?.find((entry) => entry.observedCandidateId === candidateId);
+  if (!candidate) return draft;
+  const photo = productFromCandidate(candidate, draft.from.photo);
+  const next = mergeDraft({
+    ean: draft.ean,
+    mine: draft.from.mine,
+    barcode: draft.from.barcode,
+    photo,
+    identityCandidates: [candidate],
+    recognitionOutcome: "single",
+    needsSelection: false,
+  });
+  // Prefer a reliable provider pack photo for the chosen flavour when the parent has no new capture.
+  if (!next.imageUrl && candidate.imageUrl) {
+    return { ...next, imageUrl: candidate.imageUrl };
+  }
+  return next;
+}
+
+export function mergeDraft({ ean, mine, barcode, photo, identityCandidates, recognitionOutcome, needsSelection }: DraftInput): ProductDraft {
   const vision = photo ? draftFromVision(photo) : null;
   const inferred = new Set(photo?.inferredFields ?? []);
   const found = barcode?.product;
@@ -168,6 +205,8 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     barcode?.status === "off-exact" ||
     (barcode?.status === "web-page" && Boolean(found?.name && found?.brand));
   const disagree = Boolean(photo?.recognized && differ(photo.brand, mine?.brand ?? found?.brand));
+  const choose = Boolean(needsSelection && identityCandidates && identityCandidates.length > 1);
+  const candidateImage = !choose && identityCandidates?.length === 1 ? identityCandidates[0].imageUrl : undefined;
   return {
     name: fields.name?.value ?? match?.name ?? "",
     category,
@@ -176,14 +215,17 @@ export function mergeDraft({ ean, mine, barcode, photo }: DraftInput): ProductDr
     keepPhoto: Boolean(kept("brand")) || Boolean(photo?.specificProduct) || Boolean(ean) || !match,
     fields,
     photoId: mine?.photoId,
-    imageUrl: offImage,
+    imageUrl: offImage ?? candidateImage,
     pack,
     ean: pack.ean,
     from: { mine, barcode, photo },
-    unsure: disagree || Boolean(packConflict) || (!trustedIdentity && (Boolean(barcode) || !photo || needsCheck(photo))),
-    confident: !disagree && !packConflict && (trustedIdentity || !photo || photo.confidence !== "low"),
+    unsure: choose || disagree || Boolean(packConflict) || (!trustedIdentity && (Boolean(barcode) || !photo || needsCheck(photo))),
+    confident: !choose && !disagree && !packConflict && (trustedIdentity || !photo || photo.confidence !== "low"),
     recognized: Boolean(mine || found?.name || photo?.recognized),
     ...(packConflict && { packConflict }),
+    ...(identityCandidates && identityCandidates.length > 0 && { identityCandidates }),
+    ...(recognitionOutcome && { recognitionOutcome }),
+    ...(typeof needsSelection === "boolean" && { needsSelection }),
   };
 }
 

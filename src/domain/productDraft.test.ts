@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { sourcesLine } from "../features/photo/PhotoResultSheet";
 import type { FoundAnswer } from "../services/barcode/lookup";
 import type { RecognizedProduct } from "../services/vision/types";
-import { catalogByName, categoryFromName, categoryFromTags, mergeDraft, newItemFor } from "./productDraft";
+import { catalogByName, categoryFromName, categoryFromTags, mergeDraft, newItemFor, selectIdentityCandidate } from "./productDraft";
 import type { SavedItem } from "./types";
+import type { VisualCandidate } from "../services/vision/types";
 
 const CALVE = "8710400000006";
 
@@ -216,5 +217,52 @@ describe("merging barcode, photo and my products", () => {
     expect(item.pack?.catalogProductId).toBeUndefined();
     expect(item.pack?.ean).toBeUndefined();
     expect(withPhoto).toBe(false);
+  });
+});
+
+describe("multi-candidate photo selection", () => {
+  const salame: VisualCandidate = {
+    observedCandidateId: "c1",
+    productName: "Casa di Mama Salame",
+    genericName: "pizza",
+    catalogType: "pizza",
+    specificProduct: true,
+    brand: "Dr. Oetker",
+    variant: "Salame",
+    packageSize: null,
+    category: "diepvries",
+    subcategory: "pizza",
+    ean: null,
+    inferredFields: [],
+    confidence: "high",
+    imageUrl: "https://example.com/salame.jpg",
+  };
+  const speciale: VisualCandidate = {
+    ...salame,
+    observedCandidateId: "c2",
+    productName: "Casa di Mama Speciale",
+    variant: "Speciale",
+    imageUrl: "https://example.com/speciale.jpg",
+  };
+
+  it("asks for a choice when several flavours are visible, then keeps only the selected one", () => {
+    const draft = mergeDraft({
+      photo: { ...PHOTO, productName: "Casa di Mama", brand: "Dr. Oetker", variant: null, catalogType: "pizza", category: "diepvries", subcategory: "pizza" },
+      identityCandidates: [salame, speciale],
+      recognitionOutcome: "multiple",
+      needsSelection: true,
+    });
+    expect(draft.needsSelection).toBe(true);
+    expect(draft.confident).toBe(false);
+    expect(draft.identityCandidates).toHaveLength(2);
+
+    const chosen = selectIdentityCandidate(draft, "c2");
+    expect(chosen.needsSelection).toBe(false);
+    expect(chosen.recognitionOutcome).toBe("single");
+    expect(chosen.name).toMatch(/Speciale/);
+    expect(chosen.fields.variant?.value).toBe("Speciale");
+    expect(chosen.identityCandidates).toEqual([speciale]);
+    expect(chosen.imageUrl).toBe("https://example.com/speciale.jpg");
+    expect(chosen.pack.ean).toBeUndefined();
   });
 });

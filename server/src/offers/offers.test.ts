@@ -5,7 +5,7 @@ import { createHandler } from "../app.js";
 import { createLimits } from "../limits.js";
 import { createOfferLookup, nameQuery } from "./index.js";
 import type { OfferProduct } from "./match.js";
-import { createPrijsProfeet, imageSearchUrl, parseSearch, retailerImage, searchUrl, type OfferRow, type SearchResult } from "./prijsprofeet.js";
+import { createPrijsProfeet, imageSearchUrl, nameSearchUrl, parseSearch, retailerImage, searchUrl, type OfferRow, type SearchResult } from "./prijsprofeet.js";
 
 const NOW = Date.parse("2026-11-07T10:00:00Z");
 const HOUR = 60 * 60_000;
@@ -176,7 +176,9 @@ describe("PrijsProfeet adapter", () => {
     expect(params).toEqual({ q: "8718166011021", page_size: "20", page: "1" });
     expect(imageSearchUrl("8718166011021")).not.toContain("promotion_status");
     expect(imageSearchUrl("8718166011021")).not.toContain("retailer=");
+    expect(nameSearchUrl("Milbona drinkyoghurt")).not.toContain("promotion_status");
     expect(searchUrl("8718166011021", "jumbo")).toContain("promotion_status=active");
+    expect(searchUrl("melk", "albert_heijn")).toContain("promotion_status=active");
     await provider.search("8718166011021", "jumbo");
     expect(await provider.searchImage("8718166011021")).toEqual({ ok: false, code: "ean-limit" });
     expect(provider.stats().eanToday).toBe(2);
