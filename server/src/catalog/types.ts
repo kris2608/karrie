@@ -115,7 +115,8 @@ export type CatalogStore = {
   byAlias: (request: NameLookupRequest) => Promise<StoredNameHit | null>;
   /** Returns confirmed catalog ids after a successful write; null when Postgres did not store the row. */
   upsertBarcodeRecord: (input: UpsertBarcodeInput) => Promise<{ productId: string; variantId: string } | null>;
-  upsertNameImages: (input: UpsertNameImagesInput) => Promise<void>;
+  /** Returns the resolved catalog product id after a successful write; null when nothing was stored. */
+  upsertNameImages: (input: UpsertNameImagesInput) => Promise<{ productId: string } | null>;
   upsertStoreImage: (input: StoreImageInput) => Promise<void>;
   storeImageByGtin: (ean: string, preferRetailer?: string) => Promise<StoreImageInput | null>;
   recordRetailerPack: (input: RetailerPackInput) => Promise<PackSummary | null>;

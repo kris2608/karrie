@@ -196,6 +196,47 @@ describe("merging barcode, photo and my products", () => {
     expect(item.pack?.catalogProductId).toBe("b-abc123def456");
   });
 
+  it("stamps catalogProductId and identity image from a single photo candidate", () => {
+    const candidate: VisualCandidate = {
+      observedCandidateId: "c1",
+      productName: "Magnum Mini Classic",
+      genericName: "ijs",
+      catalogType: "ijs",
+      specificProduct: true,
+      brand: "Magnum",
+      variant: "Classic",
+      packageSize: "6 x 55 ml",
+      category: "diepvries",
+      subcategory: "ijs",
+      ean: null,
+      inferredFields: [],
+      confidence: "high",
+      imageUrl: "https://cdn.example/magnum.jpg",
+      catalogProductId: "n-magnumclassic01",
+    };
+    const draft = mergeDraft({
+      photo: {
+        ...PHOTO,
+        productName: "Magnum Mini Classic",
+        brand: "Magnum",
+        variant: "Classic",
+        catalogType: "ijs",
+        category: "diepvries",
+        subcategory: "ijs",
+      },
+      identityCandidates: [candidate],
+      recognitionOutcome: "single",
+      needsSelection: false,
+    });
+    expect(draft.pack).toMatchObject({
+      catalogProductId: "n-magnumclassic01",
+      imageUrl: "https://cdn.example/magnum.jpg",
+    });
+    expect(draft.imageUrl).toBe("https://cdn.example/magnum.jpg");
+    const { item } = newItemFor(draft, draft.name, draft.category);
+    expect(item.pack?.catalogProductId).toBe("n-magnumclassic01");
+  });
+
   it("S6: generic Melk without EAN keeps the bundled drawing id and invents no catalog ids", () => {
     const match = catalogByName("Melk");
     expect(match?.id).toBe("melk");
@@ -243,6 +284,7 @@ describe("multi-candidate photo selection", () => {
     productName: "Casa di Mama Speciale",
     variant: "Speciale",
     imageUrl: "https://example.com/speciale.jpg",
+    catalogProductId: "n-casaspeciale01",
   };
 
   it("asks for a choice when several flavours are visible, then keeps only the selected one's evidence", () => {
@@ -286,6 +328,8 @@ describe("multi-candidate photo selection", () => {
     expect(chosen.identityCandidates).toEqual([speciale]);
     expect(chosen.imageUrl).toBe("https://example.com/speciale.jpg");
     expect(chosen.omitCapturePhoto).toBe(true);
+    expect(chosen.pack.catalogProductId).toBe("n-casaspeciale01");
+    expect(chosen.pack.imageUrl).toBe("https://example.com/speciale.jpg");
     expect(chosen.pack.ean).toBeUndefined();
     expect(chosen.pack.nutrition).toBeUndefined();
     expect(chosen.pack.ingredients).toBeUndefined();
@@ -293,5 +337,6 @@ describe("multi-candidate photo selection", () => {
     expect(chosen.pack.recognition?.claims).toBeUndefined();
     expect(chosen.pack.recognition?.ingredientsSeen).toBeUndefined();
     expect(newItemFor(chosen, chosen.name, chosen.category).withPhoto).toBe(false);
+    expect(newItemFor(chosen, chosen.name, chosen.category).item.pack?.catalogProductId).toBe("n-casaspeciale01");
   });
 });

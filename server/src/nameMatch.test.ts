@@ -203,6 +203,74 @@ describe("name image lookup", () => {
     expect(calls.off).toEqual(["nutella"]);
   });
 
+  it("treats approximate PrijsProfeet hits as non-terminal and still asks Open Food Facts", async () => {
+    const approx = { ...offer(pp("Magnum Mini", "6 x 55 ml", "jumbo", "Magnum")), approximate: true };
+    const off: OffSearchResult = {
+      ok: true,
+      rows: [{ source: "off", name: "Magnum Mini Classic", brands: ["Magnum"], quantity: "6 x 55 ml", imageUrl: "https://images.openfoodfacts.org/images/products/m.jpg" }],
+    };
+    const { lookup, calls } = setup({ ok: true, rows: [approx] }, off);
+    const result = await lookup.findIdentity("Magnum Mini Classic");
+    expect(calls.off).toEqual(["magnum mini classic"]);
+    expect(result).toMatchObject({
+      ok: true,
+      answer: { match: { source: "off", productName: "Magnum Mini Classic" }, searched: { prijsprofeet: "brand", off: "match" } },
+    });
+  });
+
+  it("findIdentity accepts long recognition queries that parseName would refuse", async () => {
+    const row = offer(pp("Magnum Mini Double Caramel Almond", "6 x 55 ml", "jumbo", "Magnum"));
+    const { lookup, calls } = setup({ ok: true, rows: [row] });
+    const result = await lookup.findIdentity("Magnum Mini Double Caramel Almond");
+    expect(calls.pp[0]).toBe("magnum mini double caramel almond");
+    expect(result).toMatchObject({ ok: true, answer: { match: { productName: "Magnum Mini Double Caramel Almond" } } });
+    expect(await lookup.find("Magnum Mini Double Caramel Almond")).toMatchObject({
+      ok: true,
+      answer: { match: null, searched: { prijsprofeet: "skipped", off: "skipped" } },
+    });
+  });
+
+  it("persists strict identity matches to the catalog but not approximate ones", async () => {
+    const upserts: unknown[] = [];
+    const caches: string[] = [];
+    const catalog = {
+      byAlias: async () => null,
+      upsertNameImages: async (input: unknown) => {
+        upserts.push(input);
+        return { productId: "n-magnumclassic01" };
+      },
+      cacheGet: async () => null,
+      cachePut: async (key: string) => {
+        caches.push(key);
+      },
+      rememberSeen: async () => undefined,
+    };
+    const strictLookup = createNameImageLookup(
+      { prijsProfeet: { searchName: async () => ({ ok: true, rows: [offer(pp("Magnum Mini Classic", "6 x 55 ml", "jumbo", "Magnum"))] }) } },
+      () => 0,
+      catalog,
+    );
+    const strict = await strictLookup.findIdentity("Magnum Mini Classic");
+    expect(upserts).toHaveLength(1);
+    expect(strict).toMatchObject({ ok: true, answer: { catalogProductId: "n-magnumclassic01" } });
+    expect(caches.some((key) => key.startsWith("identity:"))).toBe(true);
+
+    upserts.length = 0;
+    const approxLookup = createNameImageLookup(
+      {
+        prijsProfeet: {
+          searchName: async () => ({ ok: true, rows: [{ ...offer(pp("Magnum Mini", "6 x 55 ml", "jumbo", "Magnum")), approximate: true }] }),
+        },
+        off: { search: async () => ({ ok: true, rows: [] }) },
+      },
+      () => 0,
+      catalog,
+    );
+    const approx = await approxLookup.findIdentity("Magnum Mini Classic");
+    expect(upserts).toHaveLength(0);
+    expect(approx.ok && approx.answer.catalogProductId).toBeUndefined();
+  });
+
   it("tries the brand word alone when the whole name finds no brand", async () => {
     const calvé = { ...pp("Calvé Pindakaas", "350 g", "albert_heijn", "Calvé"), category: "ontbijt" };
     const { lookup, calls } = setup((q) => ({ ok: true, rows: q === "calve" ? [offer(calvé)] : [offer(pp("Flower Farm pinda's", "200 g", "albert_heijn", "Flower Farm"))] }));

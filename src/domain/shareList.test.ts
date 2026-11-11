@@ -199,10 +199,12 @@ describe("import mapping", () => {
         { name: "Hagelslag", quantity: 1, category: "breakfast", ean: "8710496978722", brand: "De Ruijter" },
         { name: "Chocomel Vol", quantity: 1, category: "drinks", brand: "Chocomel", variant: "vol" },
         { name: "Banaan", quantity: 1, category: "produce", productId: "banaan" },
+        { name: "Magnum Mini Classic", quantity: 1, category: "frozen", productId: "n-magnumclassic01", brand: "Magnum" },
       ],
     };
     const items = toImportSavedItems(list);
     expect(items[0]).toMatchObject({ productId: "melk", imageChoice: "drawing" });
+    expect(items[0].catalogProductId).toBeUndefined();
     expect(items[1]).toMatchObject({ ean: "8710496978722", brand: "De Ruijter", source: "barcode" });
     expect(items[1].imageChoice).toBeUndefined();
     expect(wantsStoreImage(items[1])).toBe(true);
@@ -210,6 +212,12 @@ describe("import mapping", () => {
     expect(items[2]).toMatchObject({ brand: "Chocomel", source: "shared", recognition: { variant: "vol" } });
     expect(identityOf(items[2])?.generic).toBe(false);
     expect(items[3]).toMatchObject({ productId: "banaan", imageChoice: "drawing" });
+    expect(items[4]).toMatchObject({
+      productId: "n-magnumclassic01",
+      catalogProductId: "n-magnumclassic01",
+      brand: "Magnum",
+      source: "shared",
+    });
     expect(items.every((item) => !item.photoId)).toBe(true);
     expect(pickArt(items[1].imageChoice, { prijsprofeet: "https://cdn.example/hagel.jpg" })).toEqual({
       source: "prijsprofeet",

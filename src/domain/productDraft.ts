@@ -155,6 +155,8 @@ export function selectIdentityCandidate(draft: ProductDraft, candidateId: string
       ...next.pack,
       brand: candidate.brand ?? undefined,
       packageSize: candidate.packageSize ?? undefined,
+      ...(candidate.catalogProductId && { catalogProductId: candidate.catalogProductId }),
+      ...(candidate.imageUrl && { imageUrl: candidate.imageUrl }),
       recognition: {
         ...next.pack.recognition,
         genericName: candidate.genericName ?? undefined,
@@ -207,21 +209,25 @@ export function mergeDraft({ ean, mine, barcode, photo, identityCandidates, reco
     const field = fields[name];
     return field && field.source !== "guess" ? field.value : undefined;
   };
+  const barcodeInfo: BarcodeInfo | undefined = barcode ? { status: barcode.status, sourceName: barcode.source.name, sourceUrl: barcode.source.url, at: barcode.at } : mine?.barcode;
+
+  const packConflict = packConflictOf(barcode);
+  const choose = Boolean(needsSelection && identityCandidates && identityCandidates.length > 1);
+  const primaryCandidate = !choose && identityCandidates?.length === 1 ? identityCandidates[0] : undefined;
+  const catalogProductId =
+    barcode?.catalogProductId ?? mine?.catalogProductId ?? primaryCandidate?.catalogProductId;
+  const catalogVariantId = barcode?.catalogVariantId ?? mine?.catalogVariantId;
+  const candidateImage = primaryCandidate?.imageUrl;
   const fieldSources: FieldSources = Object.fromEntries(
     Object.entries({
       name: fields.name?.source,
       brand: fields.brand?.source,
       variant: fields.variant?.source,
       packageSize: fields.packageSize?.source,
-      image: mine?.photoId ? "parent" : offImage ? "off" : undefined,
+      image: mine?.photoId ? "parent" : offImage || candidateImage ? "off" : undefined,
       nutrition: nutrition ? (mine?.nutrition ? (mine.fieldSources?.nutrition ?? "off") : "off") : undefined,
     }).filter(([, value]) => value !== undefined),
   );
-  const barcodeInfo: BarcodeInfo | undefined = barcode ? { status: barcode.status, sourceName: barcode.source.name, sourceUrl: barcode.source.url, at: barcode.at } : mine?.barcode;
-
-  const packConflict = packConflictOf(barcode);
-  const catalogProductId = barcode?.catalogProductId ?? mine?.catalogProductId;
-  const catalogVariantId = barcode?.catalogVariantId ?? mine?.catalogVariantId;
   const pack: VisionPack = {
     recognition: vision?.pack.recognition ?? mine?.recognition,
     alternative: vision?.pack.alternative ?? mine?.alternative,
@@ -229,7 +235,7 @@ export function mergeDraft({ ean, mine, barcode, photo, identityCandidates, reco
     packageSize: kept("packageSize"),
     ean: ean ?? mine?.ean,
     barcode: barcodeInfo,
-    imageUrl: offImage,
+    imageUrl: offImage ?? candidateImage,
     ...(catalogProductId && { catalogProductId }),
     ...(catalogVariantId && { catalogVariantId }),
     nutrition,
@@ -244,8 +250,6 @@ export function mergeDraft({ ean, mine, barcode, photo, identityCandidates, reco
     barcode?.status === "off-exact" ||
     (barcode?.status === "web-page" && Boolean(found?.name && found?.brand));
   const disagree = Boolean(photo?.recognized && differ(photo.brand, mine?.brand ?? found?.brand));
-  const choose = Boolean(needsSelection && identityCandidates && identityCandidates.length > 1);
-  const candidateImage = !choose && identityCandidates?.length === 1 ? identityCandidates[0].imageUrl : undefined;
   return {
     name: fields.name?.value ?? match?.name ?? "",
     category,

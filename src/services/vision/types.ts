@@ -78,6 +78,8 @@ export type VisualCandidate = {
     source: "prijsprofeet" | "off";
     score?: number;
   };
+  /** Confirmed Postgres catalog id from strict identity upsert; never invented client-side. */
+  catalogProductId?: string;
 };
 
 const NULLABLE_TEXT = ["productName", "genericName", "catalogType", "brand", "variant", "packageSize", "subcategory", "ean", "visibleNutriScore", "visibleIngredients"] as const;
@@ -118,17 +120,27 @@ export function isRecognizedProduct(value: unknown): value is RecognizedProduct 
   );
 }
 
+const CENTRAL_CATALOG_ID = /^(?:b|n|pl|c)-[a-z0-9]+$/i;
+
 export function isVisualCandidate(value: unknown): value is VisualCandidate {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.observedCandidateId === "string" &&
-    typeof candidate.specificProduct === "boolean" &&
-    ["high", "medium", "low"].includes(candidate.confidence as string) &&
-    (candidate.category === null || SHOP_SECTIONS.includes(candidate.category as ShopSection)) &&
-    Array.isArray(candidate.inferredFields) &&
-    CANDIDATE_TEXT.every((key) => isText(candidate[key]))
-  );
+  if (
+    !(
+      typeof candidate.observedCandidateId === "string" &&
+      typeof candidate.specificProduct === "boolean" &&
+      ["high", "medium", "low"].includes(candidate.confidence as string) &&
+      (candidate.category === null || SHOP_SECTIONS.includes(candidate.category as ShopSection)) &&
+      Array.isArray(candidate.inferredFields) &&
+      CANDIDATE_TEXT.every((key) => isText(candidate[key]))
+    )
+  ) {
+    return false;
+  }
+  if (candidate.catalogProductId !== undefined && (typeof candidate.catalogProductId !== "string" || !CENTRAL_CATALOG_ID.test(candidate.catalogProductId))) {
+    return false;
+  }
+  return true;
 }
 
 const EMPTY_ALTERNATIVE: RecognizedAlternative = {

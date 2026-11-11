@@ -443,6 +443,7 @@ export function createCatalogStore(
             ? { category: category as ProductCategory }
             : {}),
           searched: { prijsprofeet: "skipped", off: "skipped" },
+          catalogProductId: productId,
         };
         return { answer, productId, packMatched: true, exactPack } satisfies StoredNameHit;
       } catch {
@@ -672,12 +673,12 @@ export function createCatalogStore(
       }
     },
 
-    async upsertNameImages(input: UpsertNameImagesInput) {
+    async upsertNameImages(input: UpsertNameImagesInput): Promise<{ productId: string } | null> {
       try {
         const { answer } = input;
-        if (answer.classification !== "branded" || !answer.brand) return;
+        if (answer.classification !== "branded" || !answer.brand) return null;
         const parsed = parseName(input.typed);
-        await run("write:name", () =>
+        return await run("write:name", () =>
           tx(async (db) => {
             const name = answer.brand!;
             const formulation = answer.variant;
@@ -799,10 +800,12 @@ export function createCatalogStore(
               preferred = false;
             }
             counters.writes += 1;
+            return { productId: resolvedId };
           }),
         );
       } catch {
         counters.writeErrors += 1;
+        return null;
       }
     },
 

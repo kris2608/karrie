@@ -183,6 +183,7 @@ export function toImportSavedItems(list: SharedListV1): SavedItem[] {
     const ean = item.ean ? canonicalEan(item.ean) ?? item.ean : undefined;
     const brand = item.brand?.trim() || undefined;
     const commercial = Boolean(ean || brand);
+    const catalogProductId = CENTRAL_ID.test(productId) ? productId : undefined;
     const saved: SavedItem = {
       productId,
       name: item.name,
@@ -192,6 +193,7 @@ export function toImportSavedItems(list: SharedListV1): SavedItem[] {
       ...(brand && { brand }),
       ...(item.packageSize && { packageSize: item.packageSize }),
       ...(ean && { ean }),
+      ...(catalogProductId && { catalogProductId }),
       ...(item.kind === "custom_generic" && { kind: "custom_generic" }),
       imageKind: "generic",
       ...(commercial

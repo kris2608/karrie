@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { enrichCandidates, identityConsistent, identityQuery, identityScore, primaryProduct } from "./recognizeIdentity.js";
+import {
+  enrichCandidates,
+  identityConsistent,
+  identityQueries,
+  identityQuery,
+  identityScore,
+  primaryProduct,
+  stripSizeTokens,
+} from "./recognizeIdentity.js";
 import type { RecognizedProduct, VisualCandidate } from "./schema.js";
 
 const base: VisualCandidate = {
@@ -50,9 +58,26 @@ const product: RecognizedProduct = {
 };
 
 describe("identityQuery", () => {
-  it("builds brand + discriminating title without duplicating the brand", () => {
-    expect(identityQuery(base)).toBe("Milbona Goudse oud 450 g");
-    expect(identityQuery({ ...base, productName: "Milbona Goudse oud 450 g", packageSize: "450 g" })).toBe("Milbona Goudse oud 450 g");
+  it("builds brand + discriminating title without stuffing package size into the search string", () => {
+    expect(identityQuery(base)).toBe("Milbona Goudse oud");
+    expect(identityQuery({ ...base, productName: "Milbona Goudse oud 450 g", packageSize: "450 g" })).toBe("Milbona Goudse oud");
+    expect(stripSizeTokens("Magnum mini Double 6 x 55 ml")).toBe("Magnum mini Double");
+  });
+
+  it("offers progressive queries from exact to broader brand+type", () => {
+    const magnum: VisualCandidate = {
+      ...base,
+      brand: "Magnum",
+      productName: "Magnum mini Double Caramel Almond",
+      genericName: "ijs",
+      catalogType: "ijs",
+      variant: "Caramel Almond",
+      packageSize: "6 stuks",
+    };
+    const queries = identityQueries(magnum);
+    expect(queries[0]).toMatch(/Magnum/i);
+    expect(queries[0]).not.toMatch(/6/);
+    expect(queries.some((query) => /ijs/i.test(query))).toBe(true);
   });
 });
 
@@ -66,10 +91,31 @@ describe("identityConsistent", () => {
     expect(identityConsistent(base, { productName: "AH Goudse oud", brand: "Albert Heijn" })).toBe(false);
     expect(identityConsistent(base, { productName: "Milbona Goudse oud 48+", brand: "Milbona", packaging: "450 g" })).toBe(true);
   });
+
+  it("rejects conflicting flavours and multipack counts", () => {
+    expect(
+      identityConsistent(
+        { ...base, brand: "Magnum", productName: "Magnum mini Classic", variant: "Classic", packageSize: "6 stuks" },
+        { productName: "Magnum Mini Almond", brand: "Magnum", packaging: "6 x 55 ml" },
+      ),
+    ).toBe(false);
+    expect(
+      identityConsistent(
+        { ...base, brand: "Magnum", productName: "Magnum mini", packageSize: "6 stuks" },
+        { productName: "Magnum Mini Classic", brand: "Magnum", packaging: "3 x 55 ml" },
+      ),
+    ).toBe(false);
+    expect(
+      identityConsistent(
+        { ...base, brand: "Dr. Oetker", productName: "Casa di Mama Salame", variant: "Salame", packageSize: null },
+        { productName: "Dr. Oetker Ristorante pizza salami", brand: "Dr. Oetker" },
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("identityScore", () => {
-  it("ranks exact brand + flavour + size above weak image-only hints", () => {
+  it("ranks exact brand + flavour + size above weak image-only hints and penalises approximate hits", () => {
     const strong = identityScore(base, {
       productName: "Milbona Goudse kaas oud",
       brand: "Milbona",
@@ -83,13 +129,22 @@ describe("identityScore", () => {
       confidence: "medium",
       source: "off",
     });
+    const approx = identityScore(base, {
+      productName: "Milbona Goudse kaas oud",
+      brand: "Milbona",
+      packaging: "450 g",
+      confidence: "medium",
+      source: "prijsprofeet",
+      approximate: true,
+    });
     expect(strong).toBeGreaterThan(weak);
+    expect(strong).toBeGreaterThan(approx);
     expect(identityScore(base, { productName: "AH Geraspte kaas", brand: "AH", confidence: "high", source: "prijsprofeet" })).toBe(-1);
   });
 });
 
 describe("enrichCandidates", () => {
-  it("attaches a photo hint without inventing an EAN, uses cache first, and leaves vision claims on failure", async () => {
+  it("attaches a photo hint without inventing an EAN, uses identity cache first, and leaves vision claims on failure", async () => {
     const match = {
       source: "prijsprofeet" as const,
       productName: "Milbona Goudse kaas oud 450 g",
@@ -98,7 +153,7 @@ describe("enrichCandidates", () => {
       imageUrl: "https://example.com/cheese.jpg",
       confidence: "high" as const,
     };
-    const find = vi.fn(async () => ({
+    const findIdentity = vi.fn(async () => ({
       ok: true as const,
       cached: false,
       answer: {
@@ -107,16 +162,19 @@ describe("enrichCandidates", () => {
         match,
         alternatives: [],
         searched: { prijsprofeet: "match" as const, off: "skipped" as const },
+        catalogProductId: "n-milbonagoudse01",
       },
     }));
-    const cached = vi.fn(() => null);
-    const enriched = await enrichCandidates([base], { find, cached });
-    expect(enriched.lookups).toBe(1);
+    const cachedIdentity = vi.fn(() => null);
+    const enriched = await enrichCandidates([base], { findIdentity, cachedIdentity });
+    expect(enriched.lookups).toBeGreaterThanOrEqual(1);
     expect(enriched.candidates[0].imageUrl).toBe("https://example.com/cheese.jpg");
     expect(enriched.candidates[0].identity?.source).toBe("prijsprofeet");
+    expect(enriched.candidates[0].catalogProductId).toBe("n-milbonagoudse01");
     expect(enriched.candidates[0].ean).toBeNull();
     expect(enriched.candidates[0].identity).not.toHaveProperty("ean");
-    expect(find).toHaveBeenCalledTimes(1);
+    expect(findIdentity).toHaveBeenCalled();
+    expect(findIdentity.mock.calls[0][0]).not.toMatch(/450/);
 
     const cachedLookup = vi.fn(() => ({
       ok: true as const,
@@ -129,23 +187,64 @@ describe("enrichCandidates", () => {
         searched: { prijsprofeet: "match" as const, off: "skipped" as const },
       },
     }));
-    const fromCache = await enrichCandidates([base], { find, cached: cachedLookup });
-    expect(fromCache.cacheHits).toBe(1);
+    const fromCache = await enrichCandidates([base], { findIdentity, cachedIdentity: cachedLookup });
+    expect(fromCache.cacheHits).toBeGreaterThanOrEqual(1);
     expect(fromCache.lookups).toBe(0);
-    expect(find).toHaveBeenCalledTimes(1);
+    expect(findIdentity).toHaveBeenCalledTimes(enriched.lookups);
 
     const failed = await enrichCandidates([base], {
-      find: async () => ({ ok: false as const, code: "unavailable" as const }),
-      cached: () => null,
+      findIdentity: async () => ({ ok: false as const, code: "unavailable" as const }),
+      cachedIdentity: () => null,
     });
-    expect(failed.failures).toBe(1);
+    expect(failed.failures).toBeGreaterThanOrEqual(1);
     expect(failed.candidates[0]).toEqual(base);
+  });
+
+  it("scores alternatives when the primary match contradicts the vision variant", async () => {
+    const findIdentity = vi.fn(async () => ({
+      ok: true as const,
+      cached: false,
+      answer: {
+        classification: "branded" as const,
+        brand: "Magnum",
+        match: {
+          source: "prijsprofeet" as const,
+          productName: "Magnum Mini Almond",
+          brand: "Magnum",
+          packaging: "6 x 55 ml",
+          imageUrl: "https://example.com/almond.jpg",
+          confidence: "high" as const,
+        },
+        alternatives: [
+          {
+            source: "off" as const,
+            productName: "Magnum Mini Classic",
+            brand: "Magnum",
+            packaging: "6 x 55 ml",
+            imageUrl: "https://example.com/classic.jpg",
+            confidence: "medium" as const,
+          },
+        ],
+        searched: { prijsprofeet: "match" as const, off: "match" as const },
+      },
+    }));
+    const candidate: VisualCandidate = {
+      ...base,
+      brand: "Magnum",
+      productName: "Magnum mini Classic",
+      genericName: "ijs",
+      variant: "Classic",
+      packageSize: "6 stuks",
+    };
+    const enriched = await enrichCandidates([candidate], { findIdentity, cachedIdentity: () => null });
+    expect(enriched.candidates[0].identity?.productName).toMatch(/Classic/i);
+    expect(enriched.candidates[0].imageUrl).toBe("https://example.com/classic.jpg");
   });
 
   it("runs lookups concurrently under an overall deadline and still returns visual candidates", async () => {
     const slow = {
-      find: () => new Promise(() => undefined),
-      cached: () => null,
+      findIdentity: () => new Promise<never>(() => undefined),
+      cachedIdentity: () => null,
     };
     const enriched = await enrichCandidates(
       [

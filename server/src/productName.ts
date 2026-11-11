@@ -85,14 +85,22 @@ export function parseSize(text: string): Size | null {
   return count && count > 1 ? { unit: unit.unit, amount, count } : { unit: unit.unit, amount };
 }
 
-/**
- * What a parent typed, split into the product and an optional packaging word or pack size. Refuses sentences,
- * phrases and anything with digits that is not a pack size or a percentage ("0% suiker").
- */
-export function parseName(input: string): ParsedName | null {
-  const name = input.replace(/\s+/g, " ").trim();
-  if (name.length < 2 || name.length > MAX_TYPED_LENGTH) return null;
-  if (!/\p{L}/u.test(name) || /[^\p{L}\d\s'%,.×-]/u.test(name)) return null;
+type ParseLimits = {
+  maxTyped: number;
+  maxWords: number;
+  maxBaseLen: number;
+  /** Recognition queries may include "&" (e.g. Robijn Klein & Krachtig). */
+  allowAmpersand?: boolean;
+  /** Skip vague/connector refusal so brand+type queries like "Magnum ijs" still parse. */
+  allowConnectors?: boolean;
+};
+
+function parseWithLimits(input: string, limits: ParseLimits): ParsedName | null {
+  const cleaned = limits.allowAmpersand ? input.replace(/&/g, " ") : input;
+  const name = cleaned.replace(/\s+/g, " ").trim();
+  if (name.length < 2 || name.length > limits.maxTyped) return null;
+  const allowed = limits.allowAmpersand ? /[^\p{L}\d\s'%,.×&-]/u : /[^\p{L}\d\s'%,.×-]/u;
+  if (!/\p{L}/u.test(name) || allowed.test(name)) return null;
   const tokens = name.split(" ");
   const base: string[] = [];
   let packaging: Packaging | undefined;
@@ -141,12 +149,34 @@ export function parseName(input: string): ParsedName | null {
   }
   const words = normalizeName(base.join(" ")).split(" ").filter(Boolean);
   const counted = words.filter((word) => !/^\d+$/.test(word));
-  if (!counted.length || counted.length > MAX_WORDS || base.join(" ").length > MAX_LENGTH) return null;
-  if (words.some((word) => CONNECTORS.has(word) || VAGUE.has(word))) return null;
+  if (!counted.length || counted.length > limits.maxWords || base.join(" ").length > limits.maxBaseLen) return null;
+  if (!limits.allowConnectors && words.some((word) => CONNECTORS.has(word) || VAGUE.has(word))) return null;
   if (count && count > 1 && size && !size.count) size = { ...size, count };
   if ((count && count > 1) || size?.count) packaging ??= "multipack";
   const tidy = (value: string) => value.charAt(0).toLocaleUpperCase("nl") + value.slice(1);
   return { name: tidy(name), base: tidy(base.join(" ")), ...(packaging ? { packaging } : {}), ...(size ? { size } : {}) };
+}
+
+/**
+ * What a parent typed, split into the product and an optional packaging word or pack size. Refuses sentences,
+ * phrases and anything with digits that is not a pack size or a percentage ("0% suiker").
+ */
+export function parseName(input: string): ParsedName | null {
+  return parseWithLimits(input, { maxTyped: MAX_TYPED_LENGTH, maxWords: MAX_WORDS, maxBaseLen: MAX_LENGTH });
+}
+
+/**
+ * Looser parse for photo-identity enrichment queries (brand + line + variant).
+ * Not used for parent-typed list names.
+ */
+export function parseIdentityQuery(input: string): ParsedName | null {
+  return parseWithLimits(input, {
+    maxTyped: 96,
+    maxWords: 8,
+    maxBaseLen: 72,
+    allowAmpersand: true,
+    allowConnectors: true,
+  });
 }
 
 /** A name a parent may put on the list: a product, optionally with a packaging word or a pack size. */

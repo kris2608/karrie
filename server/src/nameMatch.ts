@@ -1,6 +1,6 @@
 import { type ProductCategory } from "./offers/match.js";
 import { HOUSE_BRANDS, isHouseBrandRow, RETAILER_RANK, type RetailerId, type SourceRetailer } from "./offers/prijsprofeet.js";
-import { parseName, parseSize, type Packaging, type ParsedName, type Size } from "./productName.js";
+import { parseIdentityQuery, parseName, parseSize, type Packaging, type ParsedName, type Size } from "./productName.js";
 import { categoryOf } from "./resolveCategory.js";
 
 export { categoryOf } from "./resolveCategory.js";
@@ -27,6 +27,8 @@ export type NameRow = {
   /** True when PrijsProfeet marked it, or when the brand is a known house brand. */
   privateLabel?: boolean;
   promotionStatus?: string;
+  /** PrijsProfeet fuzzy / approximate hit — never a confirmed exact SKU. */
+  approximate?: boolean;
 };
 
 export type NameImage = {
@@ -41,6 +43,8 @@ export type NameImage = {
   sourceUrl?: string;
   confidence: "high" | "medium";
   privateLabel?: boolean;
+  /** Fuzzy provider hit; not evidence for an exact pack. */
+  approximate?: boolean;
 };
 
 export type NameMatch = {
@@ -399,13 +403,16 @@ function judge(row: NameRow, brand: string[], requested: string[], parsed: Parse
   else if (parsed.packaging) packagingOk = packaging === parsed.packaging || (!packaging && !multipack);
   const sizeOk = !parsed.size || sameSize(parsed.size, size);
 
-  const eligible = formulationOk && unknown <= NAME_RULES.maxUnknownWords && packagingOk && sizeOk && Boolean(row.imageUrl);
+  /** Approximate PP rows may appear as alternatives but never as the automatic confirmed match. */
+  const eligible =
+    formulationOk && unknown <= NAME_RULES.maxUnknownWords && packagingOk && sizeOk && Boolean(row.imageUrl) && !row.approximate;
   const score =
     (multipack ? 0 : 4) +
     (parsed.packaging && packaging === parsed.packaging ? 2 : 0) +
     (!parsed.size && size?.unit === "ml" && size.amount === 1000 && !multipack ? 1 : 0) -
     unknown * 2 +
-    (formulationOk ? 8 : 0);
+    (formulationOk ? 8 : 0) -
+    (row.approximate ? 4 : 0);
   return { row, brandHit, hasAll, eligible, score };
 }
 
@@ -449,6 +456,7 @@ function allowHouseBrand(row: NameRow, typedBrand: string[], listRetailer?: stri
 }
 
 function imageOf(row: NameRow, confidence: NameImage["confidence"], brand: string | undefined): NameImage {
+  const approx = row.approximate === true;
   return {
     source: row.source,
     productName: row.name.slice(0, 120),
@@ -458,7 +466,8 @@ function imageOf(row: NameRow, confidence: NameImage["confidence"], brand: strin
     ...(row.retailer && { retailer: row.retailer }),
     ...(row.sourceUrl && { sourceUrl: row.sourceUrl }),
     ...(row.privateLabel === true && { privateLabel: true }),
-    confidence,
+    ...(approx && { approximate: true }),
+    confidence: approx ? "medium" : confidence,
   };
 }
 
@@ -495,9 +504,7 @@ function typedWords(base: string, from: number, to?: number): string {
   return base.split(" ").slice(from, to).join(" ");
 }
 
-export function matchName(typed: string, rows: NameRow[], listRetailer?: RetailerId): NameMatch {
-  const parsed = parseName(typed);
-  if (!parsed) return { classification: "unknown", match: null, alternatives: [] };
+function matchParsed(parsed: ParsedName, rows: NameRow[], listRetailer?: RetailerId): NameMatch {
   const query = words(parsed.base);
   const brand = brandOf(query, rows);
   if (!brand) return { classification: "unknown", match: null, alternatives: [] };
@@ -519,7 +526,7 @@ export function matchName(typed: string, rows: NameRow[], listRetailer?: Retaile
     seen.add(productKey(best.row));
   }
   const alternatives: NameImage[] = [];
-  /** With a plain match, only other plain packs; without one, flavour rows the parent can pick from. */
+  /** With a plain match, only other plain packs; without one, flavour / approximate rows the parent can pick from. */
   const altPool = best
     ? branded.filter((item) => item.eligible && !rowLooksHouseBrand(item.row))
     : branded.filter((item) => item.row.imageUrl && item.hasAll && item.brandHit && !rowLooksHouseBrand(item.row));
@@ -534,4 +541,22 @@ export function matchName(typed: string, rows: NameRow[], listRetailer?: Retaile
   const category = categoryOf((best ?? [...branded].sort((a, b) => order(a, b, listRetailer, parsed.size))[0])?.row.category);
   const variant = typedWords(parsed.base, brand.length);
   return { classification: "branded", brand: brandName, ...(variant && { variant }), match, alternatives, ...(category && { category }) };
+}
+
+export function matchName(typed: string, rows: NameRow[], listRetailer?: RetailerId): NameMatch {
+  const parsed = parseName(typed);
+  if (!parsed) return { classification: "unknown", match: null, alternatives: [] };
+  return matchParsed(parsed, rows, listRetailer);
+}
+
+/** Match provider rows for photo-identity queries (looser parse than parent-typed names). */
+export function matchIdentityName(typed: string, rows: NameRow[], listRetailer?: RetailerId): NameMatch {
+  const parsed = parseIdentityQuery(typed);
+  if (!parsed) return { classification: "unknown", match: null, alternatives: [] };
+  return matchParsed(parsed, rows, listRetailer);
+}
+
+/** True when the answer has a non-approximate confirmed pack photo. */
+export function isStrictNameMatch(match: NameMatch | null | undefined): boolean {
+  return Boolean(match?.match && !match.match.approximate);
 }
