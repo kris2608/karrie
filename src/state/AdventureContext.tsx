@@ -69,8 +69,8 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   const applyHydrated = useCallback((data: Persisted) => {
     rawDispatch({ type: "hydrate", data });
     void catalogSync.sync();
-    setPersistStatus("ready");
-    void bootstrapAnalytics(data);
+    // Load milestone acks before screens mount so ensure* catch-up cannot race bootstrap.
+    void bootstrapAnalytics(data).finally(() => setPersistStatus("ready"));
   }, []);
 
   useEffect(() => {

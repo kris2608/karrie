@@ -114,7 +114,8 @@ export function PhotoFlow({ ref, items, onDone }: PhotoFlowProps) {
     setBarcodeStatus(null);
     if (!next) vision.warmUp();
     setStep({ kind: "camera" });
-    if (!next) trackEvent({ name: "scanner_opened" }, `scanner-open:${session.current}`);
+    // Count every camera open (discover and item scan); previously item opens skipped this.
+    trackEvent({ name: "scanner_opened" }, `scanner-open:${session.current}`);
   }
 
   useImperativeHandle(ref, () => ({

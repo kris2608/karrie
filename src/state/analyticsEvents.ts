@@ -1,5 +1,5 @@
 import type { AddMethod, RecognitionSource, Tracked } from "../services/analytics";
-import { getMilestones, markMilestoneSent } from "../services/analyticsMilestones";
+import { ackAdventureCompleted, ackAdventureStarted, getMilestones, markMilestoneSent } from "../services/analyticsMilestones";
 import type { BarcodeOutcome } from "../services/barcode/lookup";
 import type { Action, AppState } from "./reducer";
 
@@ -135,12 +135,14 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
   return events;
 }
 
-/** Flip lifetime first-* flags only for events that were actually sent. */
+/** Flip lifetime first-* flags and adventure delivery acks only for events that were actually sent. */
 export function commitMilestoneEvents(events: Tracked[], sent: boolean[]): void {
   events.forEach((entry, index) => {
     if (!sent[index]) return;
     if (entry.event.name === "first_list_created") markMilestoneSent("firstListTracked");
     if (entry.event.name === "first_adventure_started") markMilestoneSent("firstAdventureStartedTracked");
     if (entry.event.name === "first_adventure_completed") markMilestoneSent("firstAdventureCompletedTracked");
+    if (entry.event.name === "adventure_started" && entry.once) ackAdventureStarted(entry.once);
+    if (entry.event.name === "adventure_completed" && entry.once) ackAdventureCompleted(entry.once);
   });
 }

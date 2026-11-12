@@ -61,6 +61,8 @@ function seedMilestones(patch: Partial<AnalyticsMilestones> = {}) {
     firstListTracked: true,
     firstAdventureStartedTracked: true,
     firstAdventureCompletedTracked: true,
+    startedAdventureIds: [],
+    completedAdventureIds: [],
     ...patch,
   };
   vi.spyOn(milestones, "getMilestones").mockReturnValue(value);
@@ -255,6 +257,33 @@ describe("barcode sources", () => {
     ).toBe("my_products");
     for (const status of ["none", "offline"] as const) expect(barcodeSource({ status, ean: "1" })).toBeNull();
     expect(barcodeSource({ status: "error", ean: "1", code: "timeout" })).toBeNull();
+  });
+});
+
+describe("commitMilestoneEvents adventure acks", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetMilestonesMemory();
+  });
+
+  it("acks start and complete ids when those events were accepted", () => {
+    resetMilestonesMemory();
+    const ackStart = vi.spyOn(milestones, "ackAdventureStarted");
+    const ackDone = vi.spyOn(milestones, "ackAdventureCompleted");
+    seedMilestones({ firstAdventureStartedTracked: false, firstAdventureCompletedTracked: false });
+    const listed = play([{ type: "add-product", product: first }, { type: "add-product", product: second }]).state;
+    const start = run(listed, { type: "start-shopping" });
+    commitMilestoneEvents(
+      start.events,
+      start.events.map(() => true),
+    );
+    expect(ackStart).toHaveBeenCalledWith(listed.adventure!.id);
+    const finish = play([{ type: "found" }, { type: "found" }], start.state);
+    commitMilestoneEvents(
+      finish.events,
+      finish.events.map(() => true),
+    );
+    expect(ackDone).toHaveBeenCalledWith(listed.adventure!.id);
   });
 });
 

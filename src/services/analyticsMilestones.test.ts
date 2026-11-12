@@ -2,9 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyPersisted, type Persisted } from "../storage/db";
 import { resetTracking } from "./analytics";
 import {
+  ackAdventureStarted,
   bootstrapAnalytics,
   daysBetween,
   emptyMilestones,
+  ensureAdventureCompleted,
+  ensureAdventureStarted,
+  getMilestones,
   inferPriorUse,
   localDay,
   migrateMilestones,
@@ -99,5 +103,62 @@ describe("analytics milestones", () => {
 describe("emptyMilestones", () => {
   it("starts uninitialized", () => {
     expect(emptyMilestones().initialized).toBe(false);
+  });
+});
+
+describe("adventure start/complete ensure", () => {
+  const track = vi.fn();
+  beforeEach(() => {
+    store.clear();
+    resetTracking();
+    resetMilestonesMemory();
+    track.mockReset();
+    vi.stubGlobal("window", { umami: { track } });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetMilestonesMemory();
+    store.clear();
+  });
+
+  const shopping = { id: "adv-1", items: [{ mission: undefined }, { mission: { status: "done" as const } }] };
+
+  it("sends adventure_started once and acks the id", () => {
+    expect(ensureAdventureStarted(shopping)).toBe(true);
+    expect(track.mock.calls.map(([name]) => name)).toEqual(["adventure_started", "first_adventure_started"]);
+    track.mockClear();
+    expect(ensureAdventureStarted(shopping)).toBe(true);
+    expect(track).not.toHaveBeenCalled();
+    expect(getMilestones().startedAdventureIds).toContain("adv-1");
+  });
+
+  it("does not double-send after reducer-path ack", () => {
+    ackAdventureStarted("adv-1");
+    expect(ensureAdventureStarted(shopping)).toBe(true);
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  it("ensures start before complete and acks both", () => {
+    expect(ensureAdventureCompleted(shopping)).toBe(true);
+    expect(track.mock.calls.map(([name]) => name)).toEqual([
+      "adventure_started",
+      "first_adventure_started",
+      "adventure_completed",
+      "first_adventure_completed",
+    ]);
+    expect(track.mock.calls.find(([name]) => name === "adventure_completed")?.[1]).toEqual({
+      item_count: 2,
+      completed_missions: 1,
+    });
+    track.mockClear();
+    expect(ensureAdventureCompleted(shopping)).toBe(true);
+    expect(track).not.toHaveBeenCalled();
+    expect(getMilestones().completedAdventureIds).toContain("adv-1");
+  });
+
+  it("returns false without Umami so callers can retry", () => {
+    vi.stubGlobal("window", {});
+    expect(ensureAdventureStarted(shopping)).toBe(false);
+    expect(getMilestones().startedAdventureIds).not.toContain("adv-1");
   });
 });

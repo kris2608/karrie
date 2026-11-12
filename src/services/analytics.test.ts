@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetTracking, trackEvent } from "./analytics";
+import { hasTracked, resetTracking, trackEvent } from "./analytics";
 
 describe("trackEvent", () => {
   const track = vi.fn();
@@ -21,6 +21,7 @@ describe("trackEvent", () => {
 
   it("sends an event with a once-key only once and does not re-accept duplicates", () => {
     expect(trackEvent({ name: "adventure_completed", data: { item_count: 2, completed_missions: 0 } }, "a1")).toBe(true);
+    expect(hasTracked("adventure_completed", "a1")).toBe(true);
     expect(trackEvent({ name: "adventure_completed", data: { item_count: 2, completed_missions: 0 } }, "a1")).toBe(false);
     expect(trackEvent({ name: "adventure_started", data: { item_count: 2 } }, "a1")).toBe(true);
     expect(track).toHaveBeenCalledTimes(2);

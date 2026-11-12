@@ -90,4 +90,7 @@ Do **not** describe anonymous browser visits as verified individual families.
 
 - `trackEvent` returns whether Umami **accepted** the invoke (not network delivery).
 - Lifetime milestones are marked only when acceptance is true for a real invoke.
-- A short in-memory buffer (cap 20, ~5s) waits for late tracker init; nothing is stored across sessions.
+- A short in-memory buffer (cap 20, ~15s) waits for late tracker init; nothing is stored across sessions.
+- `adventure_started` / `adventure_completed`: at most **once per adventure id** on device. Reducer transitions emit them; ShopScreen / CompleteScreen catch up if hydrate/resume or a late tracker skipped the first send. Persisted ack lists prevent double-counting across reloads.
+- `first_*` milestones remain **once per browser profile** (not per adventure).
+- `scanner_opened` fires on every camera open (discover and item scan).

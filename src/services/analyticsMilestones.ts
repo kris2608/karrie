@@ -1,8 +1,10 @@
+import type { Adventure } from "../domain/types";
 import type { Persisted } from "../storage/db";
 import { readKv, writeKv } from "../storage/db";
-import { trackEvent, type ReturnBucket } from "./analytics";
+import { hasTracked, trackEvent, type ReturnBucket } from "./analytics";
 
 const KEY = "analyticsMilestones";
+const ADVENTURE_ACK_CAP = 100;
 
 export type AnalyticsMilestones = {
   version: 1;
@@ -11,6 +13,10 @@ export type AnalyticsMilestones = {
   firstListTracked: boolean;
   firstAdventureStartedTracked: boolean;
   firstAdventureCompletedTracked: boolean;
+  /** Adventure ids whose `adventure_started` was accepted (or catch-up succeeded). */
+  startedAdventureIds: string[];
+  /** Adventure ids whose `adventure_completed` was accepted (or catch-up succeeded). */
+  completedAdventureIds: string[];
   lastOpenDay?: string;
   lastReturnTrackedDay?: string;
 };
@@ -22,7 +28,19 @@ export const emptyMilestones = (): AnalyticsMilestones => ({
   firstListTracked: false,
   firstAdventureStartedTracked: false,
   firstAdventureCompletedTracked: false,
+  startedAdventureIds: [],
+  completedAdventureIds: [],
 });
+
+function pushId(ids: string[], id: string): string[] {
+  if (ids.includes(id)) return ids;
+  return [...ids, id].slice(-ADVENTURE_ACK_CAP);
+}
+
+function idList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string").slice(-ADVENTURE_ACK_CAP);
+}
 
 /** Local calendar day as YYYY-MM-DD. */
 export function localDay(now: Date = new Date()): string {
@@ -79,6 +97,9 @@ export function migrateMilestones(data: Persisted, today: string = localDay()): 
     firstListTracked: listed,
     firstAdventureStartedTracked: Boolean(started),
     firstAdventureCompletedTracked: completed,
+    // Leave empty so screen catch-up can still send adventure_started / adventure_completed once.
+    startedAdventureIds: [],
+    completedAdventureIds: [],
     lastOpenDay: today,
   };
 }
@@ -94,6 +115,8 @@ function clean(raw: unknown): AnalyticsMilestones | null {
     firstListTracked: value.firstListTracked === true,
     firstAdventureStartedTracked: value.firstAdventureStartedTracked === true,
     firstAdventureCompletedTracked: value.firstAdventureCompletedTracked === true,
+    startedAdventureIds: idList(value.startedAdventureIds),
+    completedAdventureIds: idList(value.completedAdventureIds),
     ...(typeof value.lastOpenDay === "string" && { lastOpenDay: value.lastOpenDay }),
     ...(typeof value.lastReturnTrackedDay === "string" && { lastReturnTrackedDay: value.lastReturnTrackedDay }),
   };
@@ -184,4 +207,73 @@ export function markMilestoneSent(flag: "firstListTracked" | "firstAdventureStar
   const current = getMilestones();
   if (!current.initialized || current[flag]) return;
   setMilestones({ ...current, [flag]: true });
+}
+
+/** Record that adventure_started was delivered for this id (reducer path or catch-up). */
+export function ackAdventureStarted(id: string): void {
+  const current = getMilestones();
+  if (current.startedAdventureIds.includes(id)) return;
+  setMilestones({ ...current, startedAdventureIds: pushId(current.startedAdventureIds, id) });
+}
+
+/** Record that adventure_completed was delivered for this id. */
+export function ackAdventureCompleted(id: string): void {
+  const current = getMilestones();
+  if (current.completedAdventureIds.includes(id)) return;
+  setMilestones({ ...current, completedAdventureIds: pushId(current.completedAdventureIds, id) });
+}
+
+function delivered(name: "adventure_started" | "adventure_completed" | "first_adventure_started" | "first_adventure_completed", once: string, accepted: boolean): boolean {
+  return accepted || hasTracked(name, once);
+}
+
+function maybeFirstStarted(id: string): void {
+  const current = getMilestones();
+  if (current.firstAdventureStartedTracked) return;
+  const once = `first-start:${id}`;
+  const accepted = trackEvent({ name: "first_adventure_started" }, once);
+  if (delivered("first_adventure_started", once, accepted)) markMilestoneSent("firstAdventureStartedTracked");
+}
+
+function maybeFirstCompleted(id: string): void {
+  const current = getMilestones();
+  if (current.firstAdventureCompletedTracked) return;
+  const once = `first-done:${id}`;
+  const accepted = trackEvent({ name: "first_adventure_completed" }, once);
+  if (delivered("first_adventure_completed", once, accepted)) markMilestoneSent("firstAdventureCompletedTracked");
+}
+
+/**
+ * Ensure adventure_started reached Umami at most once per adventure id.
+ * Returns true when acked (already or newly); false when Umami is not ready yet (caller may retry).
+ */
+export function ensureAdventureStarted(adventure: Pick<Adventure, "id" | "items">): boolean {
+  const id = adventure.id;
+  const current = getMilestones();
+  if (current.startedAdventureIds.includes(id)) return true;
+  const accepted = trackEvent({ name: "adventure_started", data: { item_count: adventure.items.length } }, id);
+  if (!delivered("adventure_started", id, accepted)) return false;
+  ackAdventureStarted(id);
+  maybeFirstStarted(id);
+  return true;
+}
+
+/**
+ * Ensure adventure_completed reached Umami at most once per adventure id.
+ * Sends adventure_started first when that ack is still missing.
+ */
+export function ensureAdventureCompleted(adventure: Pick<Adventure, "id" | "items">): boolean {
+  const id = adventure.id;
+  if (!ensureAdventureStarted(adventure)) return false;
+  const current = getMilestones();
+  if (current.completedAdventureIds.includes(id)) return true;
+  const completed_missions = adventure.items.filter((item) => item.mission?.status === "done").length;
+  const accepted = trackEvent(
+    { name: "adventure_completed", data: { item_count: adventure.items.length, completed_missions } },
+    id,
+  );
+  if (!delivered("adventure_completed", id, accepted)) return false;
+  ackAdventureCompleted(id);
+  maybeFirstCompleted(id);
+  return true;
 }

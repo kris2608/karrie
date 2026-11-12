@@ -15,6 +15,7 @@ import { buzz } from "../../feedback/haptics";
 import { playFanfare } from "../../feedback/sound";
 import { softSpring } from "../../motion/variants";
 import { trackEvent } from "../../services/analytics";
+import { ensureAdventureCompleted } from "../../services/analyticsMilestones";
 import { useAdventure } from "../../state/AdventureContext";
 import { SaveListSheet } from "../review/SaveListSheet";
 import { ShareListSheet } from "../share/ShareListSheet";
@@ -43,6 +44,21 @@ export function CompleteScreen() {
     playFanfare();
     buzz([20, 60, 30]);
   }, [adventure]);
+
+  /** Catch-up adventure_started + adventure_completed when Umami missed the reducer transition. */
+  useEffect(() => {
+    if (!adventure || adventure.phase !== "done") return;
+    const target = adventure;
+    if (ensureAdventureCompleted(target)) return;
+    const tick = window.setInterval(() => {
+      if (ensureAdventureCompleted(target)) window.clearInterval(tick);
+    }, 500);
+    const stop = window.setTimeout(() => window.clearInterval(tick), 16_000);
+    return () => {
+      window.clearInterval(tick);
+      window.clearTimeout(stop);
+    };
+  }, [adventure?.id, adventure?.phase, adventure?.items.length]);
 
   useEffect(() => {
     if (reduced) {

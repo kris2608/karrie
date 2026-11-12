@@ -17,6 +17,7 @@ import { productEnter, productExit, spring } from "../../motion/variants";
 import { useFoundSequence, type Flight } from "../../motion/useFoundSequence";
 import { analyticsRetailer } from "../../domain/retailers";
 import { trackEvent } from "../../services/analytics";
+import { ensureAdventureStarted } from "../../services/analyticsMilestones";
 import { useOfferViews } from "../../storage/offers";
 import { useScreenWakeLock } from "../../hooks/useScreenWakeLock";
 import { useAdventure } from "../../state/AdventureContext";
@@ -119,6 +120,21 @@ export function ShopScreen() {
     const timer = window.setTimeout(() => setIntro(false), INTRO_MS);
     return () => window.clearTimeout(timer);
   }, [intro]);
+
+  /** Catch-up adventure_started after hydrate/resume or when the tracker was late on Start. */
+  useEffect(() => {
+    if (!adventure || adventure.phase !== "shopping") return;
+    const target = adventure;
+    if (ensureAdventureStarted(target)) return;
+    const tick = window.setInterval(() => {
+      if (ensureAdventureStarted(target)) window.clearInterval(tick);
+    }, 500);
+    const stop = window.setTimeout(() => window.clearInterval(tick), 16_000);
+    return () => {
+      window.clearInterval(tick);
+      window.clearTimeout(stop);
+    };
+  }, [adventure?.id, adventure?.phase, adventure?.items.length]);
 
   useEffect(() => {
     if (!play || play.status !== "offered") return;

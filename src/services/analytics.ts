@@ -83,7 +83,8 @@ const sent = new Set<string>();
 type Queued = { event: AnalyticsEvent; once?: string; at: number };
 
 const BUFFER_CAP = 20;
-const BUFFER_TTL_MS = 5_000;
+/** Allow slow production script load (defer + PWA) before dropping buffered events. */
+const BUFFER_TTL_MS = 15_000;
 const queue: Queued[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -148,6 +149,11 @@ export function trackEvent(event: AnalyticsEvent, once?: string): boolean {
     // Analytics must never get in the way of the app.
     return false;
   }
+}
+
+/** True when this name+once was already accepted (or flushed) in this page session. */
+export function hasTracked(name: string, once: string): boolean {
+  return sent.has(`${name}|${once}`);
 }
 
 /** For tests only. */
