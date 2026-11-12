@@ -23,7 +23,7 @@ export function ForgetListSheet({ list, onCancel, onConfirm }: ForgetListSheetPr
       <div className="forget-list" data-testid="forget-list-sheet">
         <h2>Lijstje wissen?</h2>
         <p className="sheet-note">
-          <strong>{name}</strong> met {count} {count === 1 ? "product" : "producten"} verdwijnt van dit apparaat.
+          {name} met {count} {count === 1 ? "product" : "producten"} verdwijnt van dit apparaat.
         </p>
         <div className="sheet-actions">
           <PressButton variant="quiet" data-testid="forget-list-cancel" onClick={onCancel}>

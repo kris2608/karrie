@@ -1806,7 +1806,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   gap: 0.2rem;
 }
 .product-title h1 {
-  font-size: clamp(1.9rem, 9vw, 2.6rem);
+  font-size: clamp(1.6rem, 7.5vw, 2.2rem);
   font-weight: 900;
   line-height: 1.05;
   overflow-wrap: anywhere;
@@ -2155,12 +2155,25 @@ a.settings-link { text-decoration: none; color: inherit; }
   border-radius: var(--radius-pill);
   background: var(--green-shade);
   color: #fff;
+  font-size: 0.82rem;
   font-weight: 900;
   box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.4);
 }
-.camera-added svg { flex: none; width: 20px; height: 20px; }
-.camera-barcode { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 var(--space-2); max-width: 340px; font-size: 0.9rem; font-weight: 800; }
-.camera-barcode .text-button { color: inherit; text-decoration: underline; }
+.camera-added svg { flex: none; width: 18px; height: 18px; }
+.camera-barcode { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-2); max-width: 340px; font-size: 0.82rem; font-weight: 800; }
+.camera-manual {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--orange);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  cursor: pointer;
+}
 .photo-ean { color: var(--ink-mute); font-variant-numeric: tabular-nums; }
 .scanner-help {
   display: grid;
@@ -2225,11 +2238,11 @@ a.settings-link { text-decoration: none; color: inherit; }
 }
 .camera .scanner-karrie {
   position: absolute;
-  right: 3%;
-  bottom: 2%;
-  width: 104px;
+  right: calc(var(--safe-right) + var(--space-3));
+  bottom: calc(var(--safe-bottom) + var(--space-4));
+  width: 112px;
   margin: 0;
-  z-index: 4;
+  z-index: 2;
 }
 .camera-slow { max-width: 260px; font-size: 0.9rem; font-weight: 700; text-align: center; }
 .shutter-row {

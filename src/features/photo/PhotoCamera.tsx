@@ -136,7 +136,6 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
             {slow && <small className="camera-slow">Karrie wordt even wakker. De eerste foto kan een halve minuut duren.</small>}
           </span>
         )}
-        {!problem && <Karrie mood={busy ? "happy" : "searching"} beat={attempt} className="scanner-karrie" />}
       </div>
 
       <div className="scanner-message" aria-live="polite">
@@ -163,14 +162,20 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
             {scanBarcodes && !hint && <p className="scanner-subhint">Rechtop of liggend werkt allebei</p>}
           </div>
         )}
-        {!problem && !busy && scanBarcodes && barcodeStatus && (
+        {!problem && !busy && scanBarcodes && barcodeStatus === "looking" && (
+          <p className="camera-added" data-testid="camera-barcode">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {BARCODE_TEXT.looking}
+          </p>
+        )}
+        {!problem && !busy && scanBarcodes && barcodeStatus && barcodeStatus !== "looking" && (
           <p className="camera-barcode" data-testid="camera-barcode">
             {BARCODE_TEXT[barcodeStatus]}
-            {barcodeStatus !== "looking" && (
-              <button type="button" className="text-button" data-testid="camera-manual" onClick={onManual}>
-                Zelf invullen
-              </button>
-            )}
+            <button type="button" className="camera-manual" data-testid="camera-manual" onClick={onManual}>
+              Zelf invullen
+            </button>
           </p>
         )}
       </div>
@@ -200,6 +205,8 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
       )}
 
       <p className="camera-note">{localOnly ? "De foto blijft alleen op dit apparaat." : "Een foto gaat naar OpenAI. Zet er geen mensen op."}</p>
+
+      {!problem && <Karrie mood={busy ? "happy" : "searching"} beat={attempt} className="scanner-karrie" />}
     </motion.div>
   );
 }

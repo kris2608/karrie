@@ -48,10 +48,7 @@ function ListsRow({
         {...handlers}
       >
         <span className="lists-row-text">
-          <strong>
-            {label}
-            {active ? <small className="lists-active"> · huidig</small> : null}
-          </strong>
+          <strong>{label}</strong>
         </span>
         <span className="lists-row-body">
           <span className="lists-row-art">
@@ -59,7 +56,10 @@ function ListsRow({
               <ItemArt key={`${item.productId}-${index}`} item={item} />
             ))}
           </span>
-          <small>{detail}</small>
+          <small>
+            {detail}
+            {active && <span className="lists-active"> · huidig</span>}
+          </small>
         </span>
       </motion.button>
       <button type="button" className="lists-row-action" data-testid="lists-share" aria-label={`Deel ${label}`} data-no-long-press onClick={onShare}>
