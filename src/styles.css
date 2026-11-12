@@ -552,18 +552,20 @@ h1, h2, p { margin: 0; }
   margin: 0 auto;
   padding: var(--space-2) var(--space-5) var(--space-2) var(--space-3);
   border-radius: var(--radius-pill);
-  font-weight: 900;
+  font-size: 0.82rem;
+  font-weight: 800;
   color: #fff;
   background: var(--green);
   box-shadow: 0 3px 0 var(--green-shade), var(--shadow-float);
 }
-.toast svg { width: 22px; height: 22px; flex: none; }
+.toast svg { width: 18px; height: 18px; flex: none; }
 .toast-action { max-width: calc(100% - 24px); padding-right: var(--space-2); }
 .toast-action span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toast-button {
   flex: none;
-  min-height: 40px;
-  padding: 0 var(--space-4);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font-size: inherit;
   border: 0;
   border-radius: var(--radius-pill);
   font-weight: 900;
@@ -1335,6 +1337,10 @@ a.settings-link { text-decoration: none; color: inherit; }
 .scan-card-text { display: grid; gap: 2px; min-width: 0; }
 .scan-card-text strong { font-size: 1.2rem; font-weight: 900; overflow-wrap: anywhere; }
 .scan-card-text span { color: var(--ink-soft); font-weight: 700; }
+.scan-card-text .offer-tag,
+.scan-card-text .offer-tag span { color: #fff; }
+.scan-card-text .offer-tag.is-maybe,
+.scan-card-text .offer-tag.is-maybe span { color: var(--orange-shade); }
 .scan-card-text small { color: var(--ink-mute); font-variant-numeric: tabular-nums; }
 .new-product-wait { display: grid; place-items: center; aspect-ratio: 1; }
 .new-product-wait .karrie { width: 100%; height: auto; }

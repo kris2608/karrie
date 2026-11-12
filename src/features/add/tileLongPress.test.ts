@@ -6,8 +6,9 @@ describe("tileLongPress", () => {
     expect(tileLongPress(true, 0)).toBe("confirm-forget");
   });
 
-  it("takes a user product off the list without a dialog while quantity is 1", () => {
+  it("takes a product off the list without a dialog while quantity is 1", () => {
     expect(tileLongPress(true, 1)).toBe("remove-from-list");
+    expect(tileLongPress(false, 1)).toBe("remove-from-list");
   });
 
   it("steps quantity down above one, for user products and catalog products", () => {
@@ -17,6 +18,5 @@ describe("tileLongPress", () => {
 
   it("never deletes a catalog product", () => {
     expect(tileLongPress(false, 0)).toBe("nothing");
-    expect(tileLongPress(false, 1)).toBe("confirm-list");
   });
 });

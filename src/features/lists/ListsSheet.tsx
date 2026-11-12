@@ -98,10 +98,6 @@ export function ListsSheet({ open, onClose, onOpened }: ListsSheetProps) {
   }
 
   function openList(list: SavedList) {
-    if (adventure?.id === list.id) {
-      afterOpen();
-      return;
-    }
     dispatch({ type: "open-saved", id: list.id });
     afterOpen();
   }

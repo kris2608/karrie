@@ -202,11 +202,10 @@ export function AddScreen() {
   const [burst, setBurst] = useState<{ id: string; token: number } | null>(null);
   const [pickingStore, setPickingStore] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
-  const [removeConfirm, setRemoveConfirm] = useState<{ tile: string; name: string } | null>(null);
   const [forgetConfirm, setForgetConfirm] = useState<SavedItem | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
-  const sheetOpen = newName !== null || pasteOpen || pickingStore || preview !== null || removeConfirm !== null || forgetConfirm !== null;
+  const sheetOpen = newName !== null || pasteOpen || pickingStore || preview !== null || forgetConfirm !== null;
   const onPullRefresh = useCallback(async () => {
     const eans = collectRefreshEans(mine, adventure);
     const [result] = await Promise.all([
@@ -344,16 +343,7 @@ export function AddScreen() {
     return removed;
   }
 
-  function removeProduct(tile: string) {
-    const removed = takeOff(tile);
-    if (!removed.length) return;
-    show(`${removed[0].item.name} van de lijst gehaald`, {
-      label: "Ongedaan maken",
-      run: () => removed.forEach(({ item, index }) => dispatch({ type: "insert-item", item, index })),
-    });
-  }
-
-  /** Long-press. User products confirm a delete only when they are not on this list. */
+  /** Long-press. Leaving the list is silent. A confirm is only for deleting from Mijn producten. */
   function pressTile(tile: string, mine: boolean, entry?: SavedItem) {
     const quantity = onList.get(tile)?.quantity ?? 0;
     const action = tileLongPress(mine, quantity);
@@ -365,13 +355,8 @@ export function AddScreen() {
       return;
     }
     if (action === "remove-from-list") {
-      removeProduct(tile);
-      return;
-    }
-    if (action === "confirm-list") {
-      const listed = onList.get(tile);
-      if (!listed) return;
-      setRemoveConfirm({ tile, name: listed.item.name });
+      takeOff(tile);
+      buzz(8);
       return;
     }
     if (action === "confirm-forget" && entry) setForgetConfirm(entry);
@@ -791,8 +776,8 @@ export function AddScreen() {
             else setPreview({ ...preview, listed: { ...listed.item, quantity: nextQty }, quantity: nextQty });
             return;
           }
+          takeOff(tile);
           setPreview(null);
-          setRemoveConfirm({ tile, name: listed.item.name });
         }}
         onForgetMine={
           preview?.kind === "mine"
@@ -822,26 +807,6 @@ export function AddScreen() {
             }}
           >
             Verwijderen
-          </PressButton>
-        </div>
-      </Sheet>
-
-      <Sheet open={!!removeConfirm} onClose={() => setRemoveConfirm(null)} label="Van de lijst halen">
-        <h2 className="no-select">Van de lijst halen?</h2>
-        <p className="sheet-note no-select">{removeConfirm ? `${removeConfirm.name} verdwijnt van dit lijstje, niet uit Mijn producten.` : ""}</p>
-        <div className="sheet-actions">
-          <PressButton variant="quiet" onClick={() => setRemoveConfirm(null)}>
-            Annuleren
-          </PressButton>
-          <PressButton
-            variant="primary"
-            data-testid="confirm-remove-from-list"
-            onClick={() => {
-              if (removeConfirm) removeProduct(removeConfirm.tile);
-              setRemoveConfirm(null);
-            }}
-          >
-            Van de lijst
           </PressButton>
         </div>
       </Sheet>

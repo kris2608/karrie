@@ -979,14 +979,13 @@ export function reducer(state: AppState, action: Action): AppState {
     case "open-saved": {
       const list = state.saved.find((entry) => entry.id === action.id);
       if (!list) return state;
-      if (state.adventure?.id === list.id) {
+      if (state.adventure?.id === list.id && state.adventure.phase !== "done") {
         const retailer = isRetailer(list.retailer) ? list.retailer : state.settings.retailer;
         return {
           ...state,
           adventure: withRetailer(
             touch(state.adventure, {
               items: sortByCategory(state.adventure.items, state.categoryOrder),
-              phase: state.adventure.phase === "done" ? "draft" : state.adventure.phase,
             }),
             retailer,
           ),

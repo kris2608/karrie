@@ -143,6 +143,18 @@ it("een gewist lijstje komt niet vanzelf terug als vorig lijstje", () => {
   expect(reducer(state, { type: "save-favorite" }).saved.map((list) => list.id)).toEqual([id]);
 });
 
+it("opent een afgerond lijstje opnieuw als concept met dezelfde producten", () => {
+  let state = shop();
+  const productIds = state.adventure!.items.map((item) => item.productId);
+  for (let step = 0; step < productIds.length; step += 1) state = reducer(state, { type: "found" });
+  expect(state.adventure?.phase).toBe("done");
+  const id = state.adventure!.id;
+  state = reducer(state, { type: "open-saved", id });
+  expect(state.adventure).toMatchObject({ id, phase: "draft", history: [] });
+  expect(state.adventure?.items.map((item) => item.productId).sort()).toEqual([...productIds].sort());
+  expect(state.adventure?.items.every((item) => item.status === "pending")).toBe(true);
+});
+
 it("een afgerond avontuur dat gewist is, komt niet terug na nieuw avontuur of terug", () => {
   let state = shop();
   for (let step = 0; step < 4; step += 1) state = reducer(state, { type: "found" });
