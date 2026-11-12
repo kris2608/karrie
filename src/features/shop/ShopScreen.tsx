@@ -226,42 +226,40 @@ export function ShopScreen() {
       <section className="shop-guide">
         <Karrie mood={playMood ?? sequence.mood} beat={sequence.beat} basketRef={basketRef} className="shop-mascot" />
         <AnimatePresence mode="wait">
-          <motion.p
-            key={
-              !current
-                ? "done"
-                : showMission
-                  ? "mission"
-                  : searching
-                    ? "bonus"
-                    : guessPending
-                      ? "guess"
+          {!guessPending && (
+            <motion.p
+              key={
+                !current
+                  ? "done"
+                  : showMission
+                    ? "mission"
+                    : searching
+                      ? "bonus"
                       : colorPlay
                         ? "color"
                         : dragPlay
                           ? "drag"
                           : "search"
-            }
-            className="speech"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={spring}
-          >
-            {!current
-              ? "Alles gevonden!"
-              : showMission
-                ? "Ik heb een bonusmissie!"
-                : searching
-                  ? "Zoek de bonus!"
-                  : guessPending
-                    ? "Tik op het goede plaatje!"
+              }
+              className="speech"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={spring}
+            >
+              {!current
+                ? "Alles gevonden!"
+                : showMission
+                  ? "Ik heb een bonusmissie!"
+                  : searching
+                    ? "Zoek de bonus!"
                     : colorPlay
                       ? `Zoek iets ${play?.colorLabel ?? "kleurigs"}!`
                       : dragPlay
                         ? "Sleep naar Karrie!"
                         : "Zoek dit product!"}
-          </motion.p>
+            </motion.p>
+          )}
         </AnimatePresence>
       </section>
 
@@ -340,7 +338,7 @@ export function ShopScreen() {
             </motion.div>
           )}
         </AnimatePresence>
-        {current && offer?.answer.offer && retailer && (
+        {current && offer?.answer.offer && retailer && !guessPending && !showMission && !searching && !colorPlay && !dragPlay && (
           <button
             type="button"
             className="offer-tag-button shop-offer"

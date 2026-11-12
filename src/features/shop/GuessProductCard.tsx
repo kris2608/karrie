@@ -44,7 +44,7 @@ export function GuessProductCard({ item, distractor, reduced, onCorrect, onSkip 
       >
         <h2 id="guess-title">Raad het product!</h2>
         <p className="mission-prompt">
-          Waar is de <strong>{title}</strong>? Tik op het goede plaatje.
+          Waar is de <strong>{title}</strong>?
         </p>
         <div className="guess-choices" role="group" aria-label={`Tik op ${title}`}>
           {choices.map((choice) => (

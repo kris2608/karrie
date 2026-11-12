@@ -47,16 +47,18 @@ function ListsRow({
         onClick={onOpen}
         {...handlers}
       >
-        <span className="lists-row-art">
-          {list.items.slice(0, 3).map((item, index) => (
-            <ItemArt key={`${item.productId}-${index}`} item={item} />
-          ))}
-        </span>
         <span className="lists-row-text">
           <strong>
             {label}
             {active ? <small className="lists-active"> · huidig</small> : null}
           </strong>
+        </span>
+        <span className="lists-row-body">
+          <span className="lists-row-art">
+            {list.items.slice(0, 3).map((item, index) => (
+              <ItemArt key={`${item.productId}-${index}`} item={item} />
+            ))}
+          </span>
           <small>{detail}</small>
         </span>
       </motion.button>
