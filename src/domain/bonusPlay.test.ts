@@ -23,14 +23,14 @@ const possible: AlternativeAssessment = {
 };
 
 describe("bonus play picker", () => {
-  it("is deterministic for a seed and rotates kinds", () => {
+  it("is deterministic for a seed and only assigns comparison (guess) plays", () => {
     const list = [
-      item("1", "banaan", "produce"),
-      item("2", "broccoli", "produce"),
-      item("3", "melk", "dairy"),
-      item("4", "brood", "bakery"),
-      item("5", "yoghurt", "dairy"),
-      item("6", "wortel", "produce"),
+      withPhoto(item("1", "olijven", "pantry")),
+      withPhoto(item("2", "pindakaas", "pantry")),
+      withPhoto(item("3", "melk", "dairy")),
+      withPhoto(item("4", "brood", "bakery")),
+      withPhoto(item("5", "yoghurt", "dairy")),
+      withPhoto(item("6", "boter", "dairy")),
     ];
     const a = pickPlayOffers(list, [], true, "adv-1");
     const b = pickPlayOffers(list, [], true, "adv-1");
@@ -39,12 +39,15 @@ describe("bonus play picker", () => {
     expect(Object.keys(a).length).toBeGreaterThanOrEqual(1);
     expect(Object.keys(a).length).toBeLessThanOrEqual(2);
     expect(JSON.stringify(a)).not.toEqual(JSON.stringify(c));
-    const kinds = new Set(Object.values(a).map((play) => play.kind));
-    expect(kinds.size).toBeGreaterThanOrEqual(1);
+    expect(Object.values(a).every((play) => play.kind === "guess")).toBe(true);
   });
 
   it("never stacks play on a healthier mission product", () => {
-    const list = [item("a", "pindakaas", "breakfast", { alternative: possible, brand: "Calvé", name: "Calvé Pindakaas" }), item("b", "banaan", "produce"), item("c", "broccoli", "produce")];
+    const list = [
+      withPhoto(item("a", "pindakaas", "breakfast", { alternative: possible, brand: "Calvé", name: "Calvé Pindakaas" })),
+      withPhoto(item("b", "olijven", "pantry")),
+      withPhoto(item("c", "boter", "dairy")),
+    ];
     const missions = pickMissions(list, true);
     expect(missions).toContain("a");
     const plays = pickPlayOffers(list, missions, true, "seed");
@@ -53,14 +56,31 @@ describe("bonus play picker", () => {
   });
 
   it("assigns nothing when Bonusmissies is off", () => {
-    const list = [item("1", "banaan", "produce"), item("2", "broccoli", "produce"), item("3", "wortel", "produce")];
+    const list = [withPhoto(item("1", "olijven", "pantry")), withPhoto(item("2", "pindakaas", "pantry")), withPhoto(item("3", "boter", "dairy"))];
     expect(assignBonuses(list, false, [], "seed").every((entry) => !entry.mission && !entry.play)).toBe(true);
     expect(pickPlayOffers(list, [], false, "seed")).toEqual({});
   });
 
   it("handles short lists without crashing", () => {
-    expect(Object.keys(pickPlayOffers([item("1", "banaan", "produce")], [], true, "s"))).toHaveLength(1);
+    expect(pickPlayOffers([item("1", "banaan", "produce")], [], true, "s")).toEqual({});
+    expect(Object.keys(pickPlayOffers([withPhoto(item("1", "olijven", "pantry")), withPhoto(item("2", "pindakaas", "pantry"))], [], true, "s")).length).toBeGreaterThanOrEqual(1);
     expect(pickPlayOffers([], [], true, "s")).toEqual({});
+  });
+
+  it("does not assign color or drag plays", () => {
+    const list = [
+      item("1", "banaan", "produce"),
+      item("2", "broccoli", "produce"),
+      item("3", "melk", "dairy"),
+      item("4", "brood", "bakery"),
+      item("5", "yoghurt", "dairy"),
+      item("6", "wortel", "produce"),
+    ];
+    for (let n = 0; n < 20; n += 1) {
+      const plays = pickPlayOffers(list, [], true, `no-color-drag-${n}`);
+      expect(Object.values(plays).every((play) => play.kind === "guess")).toBe(true);
+      expect(Object.keys(plays)).toHaveLength(0);
+    }
   });
 
   it("only maps unambiguous colours and finds visually distinct distractors", () => {

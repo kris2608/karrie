@@ -2,7 +2,6 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ItemArt } from "../../components/ItemArt";
-import { PressButton } from "../../components/ui/PressButton";
 import { ShareIcon } from "../../components/ui/ShareIcon";
 import { Sheet } from "../../components/ui/Sheet";
 import { useLongPress } from "../../components/ui/useLongPress";
@@ -82,7 +81,7 @@ function sortedLists(saved: SavedList[], adventure: Adventure | null): SavedList
   });
 }
 
-/** All saved shopping lists: switch, create, share, delete — without cluttering the main screen. */
+/** All saved shopping lists: switch, share, delete — without cluttering the main screen. */
 export function ListsSheet({ open, onClose, onOpened }: ListsSheetProps) {
   const { adventure, saved, dispatch } = useAdventure();
   const navigate = useNavigate();
@@ -102,12 +101,6 @@ export function ListsSheet({ open, onClose, onOpened }: ListsSheetProps) {
     afterOpen();
   }
 
-  function createList() {
-    dispatch({ type: "new-draft" });
-    onClose();
-    navigate("/toevoegen");
-  }
-
   function forgetList(list: SavedList) {
     setForgetting(null);
     const index = saved.findIndex((entry) => entry.id === list.id);
@@ -120,26 +113,24 @@ export function ListsSheet({ open, onClose, onOpened }: ListsSheetProps) {
       <Sheet open={open} onClose={onClose} label="Lijstjes">
         <div className="lists-sheet" data-testid="lists-sheet">
           <h2>Lijstjes</h2>
-          <p className="sheet-note">Kies een lijstje of maak een nieuw. Lang drukken wist een lijstje.</p>
-          <PressButton type="button" variant="primary" wide data-testid="lists-new" onClick={createList}>
-            Nieuw lijstje
-          </PressButton>
-          {lists.length === 0 ? (
-            <p className="sheet-note">Nog geen bewaarde lijstjes.</p>
-          ) : (
-            <ul className="lists-sheet-list" aria-label="Bewaarde lijstjes">
-              {lists.map((list) => (
-                <ListsRow
-                  key={list.id}
-                  list={list}
-                  active={adventure?.id === list.id}
-                  onOpen={() => openList(list)}
-                  onForget={() => setForgetting(list)}
-                  onShare={() => setShareList(list)}
-                />
-              ))}
-            </ul>
-          )}
+          <div className="lists-panel" data-testid="lists-panel">
+            {lists.length === 0 ? (
+              <p className="lists-empty">Nog geen bewaarde lijstjes.</p>
+            ) : (
+              <ul className="lists-sheet-list" aria-label="Bewaarde lijstjes">
+                {lists.map((list) => (
+                  <ListsRow
+                    key={list.id}
+                    list={list}
+                    active={adventure?.id === list.id}
+                    onOpen={() => openList(list)}
+                    onForget={() => setForgetting(list)}
+                    onShare={() => setShareList(list)}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </Sheet>
       <ShareListSheet open={Boolean(shareList)} source={shareList} onClose={() => setShareList(null)} />

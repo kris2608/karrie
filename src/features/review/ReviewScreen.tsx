@@ -114,11 +114,17 @@ export function ReviewScreen() {
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => item.status !== "found");
     if (!removed.length) return;
+    const savedIndex = saved.findIndex((list) => list.id === adventure.id);
+    const forgotten = savedIndex >= 0 ? saved[savedIndex] : null;
     dispatch({ type: "clear-open-items" });
+    if (forgotten) dispatch({ type: "forget-saved", id: forgotten.id });
     setEditId(null);
-    show("Lijstje geleegd", {
+    show(forgotten ? "Lijstje geleegd en gewist" : "Lijstje geleegd", {
       label: "Ongedaan maken",
-      run: () => removed.forEach(({ item, index }) => dispatch({ type: "insert-item", item, index })),
+      run: () => {
+        removed.forEach(({ item, index }) => dispatch({ type: "insert-item", item, index }));
+        if (forgotten) dispatch({ type: "restore-saved", list: forgotten, index: savedIndex });
+      },
     });
   }
 
@@ -314,12 +320,12 @@ function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
         )}
       </div>
       <div className="stepper" data-no-long-press>
-        <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
-          −
-        </button>
-        <span>{item.quantity}</span>
         <button type="button" aria-label="Meer" onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 })}>
           +
+        </button>
+        <span>{item.quantity}</span>
+        <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
+          −
         </button>
       </div>
       <div className="row-actions" data-no-long-press>

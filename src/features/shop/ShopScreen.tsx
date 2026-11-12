@@ -4,10 +4,8 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Karrie, type Mood } from "../../components/mascot/Karrie";
 import { ItemArt } from "../../components/ItemArt";
 import { ShopScene } from "../../components/scenery/ShopScene";
-import { DiscoverySwitch } from "../../components/ui/DiscoverySwitch";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
-import { SoundSwitch } from "../../components/ui/SoundSwitch";
 import { StarIcon } from "../../components/ui/StarIcon";
 import { productById } from "../../data/catalog";
 import { playActive } from "../../domain/bonusPlay";
@@ -38,7 +36,6 @@ export function ShopScreen() {
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const [listOpen, setListOpen] = useState(false);
-  const [parentOpen, setParentOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const [missionShown, setMissionShown] = useState<string | null>(null);
@@ -202,23 +199,12 @@ export function ShopScreen() {
       <ShopScene />
 
       <header className="shop-bar">
-        <button type="button" className="round-button round-s" data-testid="bekijk-lijstje" aria-label="Bekijk lijstje" onClick={() => setListOpen(true)}>
+        <button type="button" className="shop-list-chip" data-testid="bekijk-lijstje" aria-label="Nog te vinden" onClick={() => setListOpen(true)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7 5h10v14H7z" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
             <path d="M10 9h4M10 13h4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
           </svg>
-        </button>
-        <button type="button" className="round-button round-s round-quiet" data-testid="shop-parent" aria-label="Voor ouders" onClick={() => setParentOpen(true)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" strokeWidth="2" />
-            <path
-              d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <span>Nog te vinden</span>
         </button>
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={found} aria-label={`${found} van ${total} gevonden`}>
           <motion.span className="progress-fill" initial={false} animate={{ scaleX: found / total }} transition={spring} />
@@ -516,9 +502,29 @@ export function ShopScreen() {
         )}
       </Sheet>
 
-      <Sheet open={listOpen} onClose={() => setListOpen(false)} label="Bekijk lijstje">
+      <Sheet open={listOpen} onClose={() => setListOpen(false)} label="Nog te vinden">
         <div className="bekijk-lijstje" data-testid="bekijk-lijstje-sheet">
-          <h2>Nog te vinden</h2>
+          <div className="bekijk-lijstje-head">
+            <h2>Nog te vinden</h2>
+            <button
+              type="button"
+              className="round-button round-s round-quiet"
+              data-testid="bekijk-edit-list"
+              aria-label="Lijst aanpassen"
+              onClick={() => navigate("/controleren")}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" strokeWidth="2" />
+                <path
+                  d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
           <p className="sheet-note">Tik op wat je ziet in de winkel.</p>
           <ul className="bekijk-lijstje-grid" aria-label="Nog te vinden">
             {openItems.map((item) => {
@@ -555,24 +561,6 @@ export function ShopScreen() {
             Verder speuren
           </PressButton>
         </div>
-      </Sheet>
-
-      <Sheet open={parentOpen} onClose={() => setParentOpen(false)} label="Voor ouders">
-        <h2>Voor ouders</h2>
-        <SoundSwitch />
-        <DiscoverySwitch />
-        <div className="sheet-actions">
-          <PressButton variant="quiet" onClick={() => navigate("/controleren")}>
-            Lijst aanpassen
-          </PressButton>
-          <PressButton variant="secondary" onClick={() => setParentOpen(false)}>
-            Verder speuren
-          </PressButton>
-        </div>
-        <button type="button" className="text-button" data-testid="shop-home" onClick={() => navigate("/")}>
-          Naar het beginscherm
-        </button>
-        <p className="sheet-note">Het avontuur blijft staan; op het beginscherm ga je verder.</p>
       </Sheet>
     </main>
   );

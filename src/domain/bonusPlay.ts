@@ -40,7 +40,8 @@ export const COLOR_HUNT: Readonly<Record<string, string>> = {
   kwark: "wit",
 };
 
-const PLAY_KINDS: readonly PlayKind[] = ["guess", "color", "drag"];
+/** Only the comparison game is active for now; color/drag stay in the type system but are not assigned. */
+const PLAY_KINDS: readonly PlayKind[] = ["guess"];
 
 /** Mulberry32 — stable 0..1 stream from a string seed. */
 export function seededRandom(seed: string): () => number {
