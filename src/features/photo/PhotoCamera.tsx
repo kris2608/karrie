@@ -118,6 +118,11 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
             {preview && busy && <img className="camera-still" src={preview} alt="" />}
             <span className={sighting || barcodeStatus === "looking" ? "scanner-corners is-detecting" : "scanner-corners"} aria-hidden="true" />
             {scanning && <BarcodeHighlight frameRef={frameRef} sighting={sighting} confirmed={barcodeStatus === "looking"} />}
+            {scanning && !sighting && barcodeStatus !== "looking" && (
+              <span className="camera-band" aria-hidden="true" data-testid="camera-scanline">
+                <i />
+              </span>
+            )}
           </>
         )}
         {busy && (
@@ -131,6 +136,7 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
             {slow && <small className="camera-slow">Karrie wordt even wakker. De eerste foto kan een halve minuut duren.</small>}
           </span>
         )}
+        {!problem && <Karrie mood={busy ? "happy" : "searching"} beat={attempt} className="scanner-karrie" />}
       </div>
 
       <div className="scanner-message" aria-live="polite">
@@ -194,8 +200,6 @@ export function PhotoCamera({ title, hint, localOnly, busy, slow, preview, scanB
       )}
 
       <p className="camera-note">{localOnly ? "De foto blijft alleen op dit apparaat." : "Een foto gaat naar OpenAI. Zet er geen mensen op."}</p>
-
-      <Karrie mood={busy ? "happy" : "searching"} beat={attempt} className="scanner-karrie" />
     </motion.div>
   );
 }

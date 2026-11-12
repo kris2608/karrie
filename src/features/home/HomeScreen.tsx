@@ -20,6 +20,7 @@ import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
 import { shareKarrie } from "../../domain/share";
 import { trackEvent } from "../../services/analytics";
+import { InstallCard } from "../install/InstallCard";
 import { ListsSheet } from "../lists/ListsSheet";
 import { AboutKarrie } from "./AboutKarrie";
 import { HowKarrieWorks } from "./HowKarrieWorks";
@@ -194,6 +195,7 @@ export function HomeScreen() {
             {shopping ? "Verder speuren" : "Verder met lijstje"}
           </PressButton>
         )}
+        <InstallCard />
       </motion.div>
 
       {preview.count > 0 && (

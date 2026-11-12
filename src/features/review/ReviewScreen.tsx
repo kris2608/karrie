@@ -22,6 +22,7 @@ import { offerQueries, offers, useOfferViews, type OfferView } from "../../stora
 import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
+import { markAppUsed } from "../install/installPrompt";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ShareIcon } from "../../components/ui/ShareIcon";
 import { ShareListSheet } from "../share/ShareListSheet";
@@ -46,6 +47,10 @@ export function ReviewScreen() {
   const { views, deals } = useOfferViews(items, retailer);
   const editingFavorite = Boolean(adventure && saved.some((list) => list.id === adventure.id && list.favorite));
   useHealthierPreflight(adventure, settings.smartDiscovery, dispatch);
+
+  useEffect(() => {
+    markAppUsed();
+  }, []);
 
   useEffect(() => {
     if ((location.state as { editItem?: string } | null)?.editItem) navigate(".", { replace: true, state: null });

@@ -18,6 +18,7 @@ import { Sheet } from "../../components/ui/Sheet";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { useLongPress } from "../../components/ui/useLongPress";
 import { usePullToRefresh } from "../../hooks/usePullToRefresh";
+import { markAppUsed } from "../install/installPrompt";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { activeSection } from "./sectionSpy";
 import { NewProductSheet, type NewProductChoice } from "./NewProductSheet";
@@ -85,7 +86,7 @@ type GridTileProps = {
   mine?: boolean;
   /** Only reliable offers show on a tile; doubtful ones stay on the parent's list screen. */
   offer?: RetailerId;
-  /** Short Dutch line under the name (e.g. generic “merk maakt niet uit”). */
+  /** Short Dutch line under the name, such as a pack size. */
   subtitle?: string;
 };
 
@@ -184,6 +185,9 @@ function matches(product: Product, needle: string) {
 export function AddScreen() {
   const { adventure, mine, settings, dispatch } = useAdventure();
   const navigate = useNavigate();
+  useEffect(() => {
+    markAppUsed();
+  }, []);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<CategoryId>(CATEGORIES[0].id);
   const reduced = useReducedMotion() ?? false;
@@ -521,7 +525,6 @@ export function AddScreen() {
     const entry = onList.get(product.id);
     const qty = entry?.quantity ?? 0;
     const offer = offerOn(entry?.item);
-    const generic = Boolean(needle && pinned && product.id === pinned.id);
     return (
       <GridTile
         key={product.id}
@@ -538,7 +541,6 @@ export function AddScreen() {
             : undefined
         }
         offer={offer}
-        subtitle={generic ? "merk maakt niet uit" : undefined}
       />
     );
   };
@@ -660,13 +662,6 @@ export function AddScreen() {
       {deals > 0 && <Attribution className="add-attribution" />}
       {nothing && !pinned && !custom && <p className="empty">Niets gevonden. Typ één product, zoals cashewnoten.</p>}
       {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er meteen een foto of plaatje bij.</p>}
-      {(count > 0 || mineVisible.length > 0) && (
-        <p className="add-hint">
-          {count > 0
-            ? "Tik voor +1. Lang drukken haalt er één af. Via i pas je aantallen aan of vergeet je iets uit Mijn producten."
-            : "Producten die je zelf hebt toegevoegd onthoudt Karrie. Via i kun je ze vergeten."}
-        </p>
-      )}
 
       <div className="dock dock-fixed">
         <PressButton variant="quiet" data-testid="paste" onClick={() => setPasteOpen(true)}>
