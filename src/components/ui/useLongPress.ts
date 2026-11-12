@@ -77,7 +77,8 @@ export function useLongPress(onLongPress: () => void, disabled = false) {
     onPointerLeave: () => press.current?.cancel(),
     onPointerCancel: () => press.current?.cancel(),
     onContextMenu(event: MouseEvent) {
-      if (!disabled && !(event.target as Element).closest(OPT_OUT)) event.preventDefault();
+      if ((event.target as Element).closest(OPT_OUT)) return;
+      event.preventDefault();
     },
     onClickCapture(event: MouseEvent) {
       if (press.current?.consumeClick()) {

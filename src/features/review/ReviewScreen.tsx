@@ -24,7 +24,6 @@ import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ShareIcon } from "../../components/ui/ShareIcon";
-import { ListsSheet } from "../lists/ListsSheet";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
@@ -39,7 +38,6 @@ export function ReviewScreen() {
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [listsOpen, setListsOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
@@ -129,13 +127,6 @@ export function ReviewScreen() {
       <TopBar
         title={named ?? "Klopt het lijstje?"}
         to="/toevoegen"
-        leading={
-          <button type="button" className="round-button" data-testid="open-lists" aria-label="Lijstjes" onClick={() => setListsOpen(true)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 7h14M5 12h14M5 17h10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-            </svg>
-          </button>
-        }
         action={
           <Link to="/toevoegen" className="round-button" aria-label="Producten toevoegen">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -227,6 +218,13 @@ export function ReviewScreen() {
 
       <ItemSheet
         item={editing}
+        offer={editing ? views.get(editing.id) : undefined}
+        retailer={retailer}
+        onOffer={() => {
+          if (!editing) return;
+          const view = views.get(editing.id);
+          if (view) openOffer(editing, view);
+        }}
         onClose={() => setEditId(null)}
         onRestore={() => {
           if (!editing) return;
@@ -251,7 +249,6 @@ export function ReviewScreen() {
         onSaveAsNew={saveAsNew}
       />
       <ShareListSheet open={sharing} source={adventure} onClose={() => setSharing(false)} />
-      <ListsSheet open={listsOpen} onClose={() => setListsOpen(false)} />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <Toast notice={notice} onDismiss={dismiss} />
     </main>
@@ -315,15 +312,15 @@ function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
             <OfferTag shown={offer.shown} retailer={retailer} />
           </button>
         )}
-        <div className="stepper" data-no-long-press>
-          <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
-            −
-          </button>
-          <span>{item.quantity}</span>
-          <button type="button" aria-label="Meer" onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 })}>
-            +
-          </button>
-        </div>
+      </div>
+      <div className="stepper" data-no-long-press>
+        <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
+          −
+        </button>
+        <span>{item.quantity}</span>
+        <button type="button" aria-label="Meer" onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 })}>
+          +
+        </button>
       </div>
       <div className="row-actions" data-no-long-press>
         <button type="button" className="round-button round-s round-danger" aria-label="Verwijder" onClick={onRemove}>

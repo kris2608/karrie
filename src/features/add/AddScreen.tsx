@@ -23,6 +23,7 @@ import { activeSection } from "./sectionSpy";
 import { NewProductSheet, type NewProductChoice } from "./NewProductSheet";
 import { ProductPreviewSheet } from "./ProductPreviewSheet";
 import { infoCorner, previewCategory, previewMine, previewName, previewPack, previewQuantity, type PreviewTarget } from "./productPreview";
+import { tileLongPress } from "./tileLongPress";
 import { Attribution, OfferTag, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { RETAILERS, retailerName, type RetailerId } from "../../domain/retailers";
@@ -77,7 +78,7 @@ type GridTileProps = {
   quantity: number;
   pop: { token: number } | null;
   onAdd: () => void;
-  /** Long-press: decrement qty or confirm list removal — never forgetMine. */
+  /** Long-press: step the list down, or forget a user product that is not on the list. */
   onRemove: () => void;
   /** Info for listed tiles (qty > 0) and Mijn producten — accessible qty without long-press. */
   onInfo?: () => void;
@@ -89,11 +90,18 @@ type GridTileProps = {
 };
 
 function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo, mine = false, offer, subtitle }: GridTileProps) {
-  const { pressing, handlers } = useLongPress(onRemove, quantity === 0);
+  const { pressing, handlers } = useLongPress(onRemove, !mine && quantity === 0);
   const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : ""].filter(Boolean).join(" ");
   const deal = offer && quantity ? `, in de aanbieding bij ${retailerName(offer)}` : "";
   const genericHint = subtitle ? `, ${subtitle}` : "";
-  const longHint = quantity > 1 ? "Lang drukken om er één af te halen" : quantity === 1 ? "Lang drukken om van de lijst te halen" : "";
+  const longHint =
+    quantity > 1
+      ? "Lang drukken om er één af te halen"
+      : quantity === 1
+        ? "Lang drukken om van de lijst te halen"
+        : mine
+          ? "Lang drukken om uit Mijn producten te verwijderen"
+          : "";
   const label = mine
     ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}${longHint ? `. ${longHint}` : ""}`
     : quantity
@@ -195,9 +203,10 @@ export function AddScreen() {
   const [pickingStore, setPickingStore] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [removeConfirm, setRemoveConfirm] = useState<{ tile: string; name: string } | null>(null);
+  const [forgetConfirm, setForgetConfirm] = useState<SavedItem | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
-  const sheetOpen = newName !== null || pasteOpen || pickingStore || preview !== null || removeConfirm !== null;
+  const sheetOpen = newName !== null || pasteOpen || pickingStore || preview !== null || removeConfirm !== null || forgetConfirm !== null;
   const onPullRefresh = useCallback(async () => {
     const eans = collectRefreshEans(mine, adventure);
     const [result] = await Promise.all([
@@ -344,16 +353,28 @@ export function AddScreen() {
     });
   }
 
-  /** Long-press / preview − : one less on the list, or confirm when quantity is one. Never forgets Mijn producten. */
-  function adjustTile(tile: string) {
-    const listed = onList.get(tile);
-    if (!listed) return;
-    if (listed.quantity > 1) {
+  /** Long-press. User products confirm a delete only when they are not on this list. */
+  function pressTile(tile: string, mine: boolean, entry?: SavedItem) {
+    const quantity = onList.get(tile)?.quantity ?? 0;
+    const action = tileLongPress(mine, quantity);
+    if (action === "decrement") {
+      const listed = onList.get(tile);
+      if (!listed) return;
       dispatch({ type: "set-quantity", itemId: listed.item.id, quantity: listed.quantity - 1 });
       buzz(8);
       return;
     }
-    setRemoveConfirm({ tile, name: listed.item.name });
+    if (action === "remove-from-list") {
+      removeProduct(tile);
+      return;
+    }
+    if (action === "confirm-list") {
+      const listed = onList.get(tile);
+      if (!listed) return;
+      setRemoveConfirm({ tile, name: listed.item.name });
+      return;
+    }
+    if (action === "confirm-forget" && entry) setForgetConfirm(entry);
   }
 
   function forgetMine(entry: SavedItem) {
@@ -481,7 +502,7 @@ export function AddScreen() {
         quantity={qty}
         pop={burst?.id === key ? burst : null}
         onAdd={() => addMine(entry)}
-        onRemove={() => adjustTile(key)}
+        onRemove={() => pressTile(key, true, entry)}
         onInfo={() => setPreview({ kind: "mine", entry, listed: listed?.item, quantity: qty, offer })}
         mine
         offer={offer}
@@ -503,7 +524,7 @@ export function AddScreen() {
         quantity={entry.quantity}
         pop={burst?.id === entry.item.productId ? burst : null}
         onAdd={() => addMore(entry.item)}
-        onRemove={() => adjustTile(tile)}
+        onRemove={() => pressTile(tile, false)}
         onInfo={() => setPreview({ kind: "extra", item: entry.item, quantity: entry.quantity, offer })}
         offer={offer}
         subtitle={heading.subtitle}
@@ -525,7 +546,7 @@ export function AddScreen() {
         quantity={qty}
         pop={burst?.id === product.id ? burst : null}
         onAdd={() => addProduct(product)}
-        onRemove={() => adjustTile(product.id)}
+        onRemove={() => pressTile(product.id, false)}
         onInfo={
           qty > 0
             ? () => setPreview({ kind: "catalog", product, listed: entry?.item, quantity: qty, offer })
@@ -782,6 +803,28 @@ export function AddScreen() {
         }
         onClose={() => setPreview(null)}
       />
+
+      <Sheet open={!!forgetConfirm} onClose={() => setForgetConfirm(null)} label="Uit Mijn producten verwijderen">
+        <h2 className="no-select">Verwijderen uit Mijn producten?</h2>
+        <p className="sheet-note no-select">
+          {forgetConfirm ? `${forgetConfirm.name} verdwijnt uit Mijn producten op dit apparaat.` : ""}
+        </p>
+        <div className="sheet-actions">
+          <PressButton variant="quiet" onClick={() => setForgetConfirm(null)}>
+            Annuleren
+          </PressButton>
+          <PressButton
+            variant="primary"
+            data-testid="confirm-forget-mine"
+            onClick={() => {
+              if (forgetConfirm) forgetMine(forgetConfirm);
+              setForgetConfirm(null);
+            }}
+          >
+            Verwijderen
+          </PressButton>
+        </div>
+      </Sheet>
 
       <Sheet open={!!removeConfirm} onClose={() => setRemoveConfirm(null)} label="Van de lijst halen">
         <h2 className="no-select">Van de lijst halen?</h2>

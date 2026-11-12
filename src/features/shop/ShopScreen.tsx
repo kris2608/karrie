@@ -524,6 +524,8 @@ export function ShopScreen() {
             {openItems.map((item) => {
               const heading = productHeading(item);
               const active = current?.id === item.id;
+              const view = offerViews.get(item.id);
+              const deal = view && retailer ? offerLabel(view.shown, retailer) : "";
               return (
                 <li key={item.id}>
                   <button
@@ -531,7 +533,7 @@ export function ShopScreen() {
                     className={active ? "bekijk-card is-active" : "bekijk-card"}
                     data-testid="bekijk-card"
                     aria-current={active ? "true" : undefined}
-                    aria-label={`${heading.title}${item.status === "skipped" ? ", later" : ""}${active ? ", nu zoeken" : ""}`}
+                    aria-label={`${heading.title}${item.status === "skipped" ? ", later" : ""}${deal ? `, ${deal}` : ""}${active ? ", nu zoeken" : ""}`}
                     onClick={() => {
                       dispatch({ type: "focus-item", itemId: item.id });
                       setListOpen(false);
@@ -542,6 +544,7 @@ export function ShopScreen() {
                       {item.quantity > 1 ? `${item.quantity}× ` : ""}
                       {heading.title}
                     </strong>
+                    {view && retailer && <OfferTag shown={view.shown} retailer={retailer} />}
                     {item.status === "skipped" && <small>later</small>}
                   </button>
                 </li>

@@ -9,7 +9,7 @@ import { CATEGORIES, categoryLabel } from "../../domain/categories";
 import { hasSuggestion, missionOn } from "../../domain/discovery";
 import { privateLabelLookupKey, privateLabelQuery, wantsPrivateLabels } from "../../domain/imageIdentity";
 import { productHeading } from "../../domain/productHeading";
-import { retailerName } from "../../domain/retailers";
+import { retailerName, type RetailerId } from "../../domain/retailers";
 import type { AdventureItem, NamePhoto } from "../../domain/types";
 import { productById } from "../../data/catalog";
 import { confirmPackSize } from "../../services/barcode/pack";
@@ -17,6 +17,8 @@ import { namePhotoCredit } from "../../services/images/nameImage";
 import { storeCredit } from "../../services/images/storeImage";
 import { useAdventure } from "../../state/AdventureContext";
 import { privateLabelImages, usePrivateLabelAnswer } from "../../storage/nameImages";
+import type { OfferView } from "../../storage/offers";
+import { OfferTag, offerLabel } from "../offers/OfferTag";
 import { PackConflict } from "../photo/PackConflict";
 import { useOffNutrition } from "../add/useOffNutrition";
 import { AlternativePreviewSheet } from "./AlternativePreviewSheet";
@@ -29,12 +31,28 @@ type ItemSheetProps = {
   onRestore: () => void;
   onPhoto: () => void;
   onRemove: () => void;
+  /** Deal for this item, when the list has a supermarket selected. */
+  offer?: OfferView;
+  retailer?: RetailerId;
+  onOffer?: () => void;
 };
 
-export function ItemSheet({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetProps) {
+export function ItemSheet({ item, onClose, onRestore, onPhoto, onRemove, offer, retailer, onOffer }: ItemSheetProps) {
   return (
     <Sheet open={Boolean(item)} onClose={onClose} label={item ? `Bewerk ${item.name}` : "Product"}>
-      {item && <ItemEditor key={item.id} item={item} onClose={onClose} onRestore={onRestore} onPhoto={onPhoto} onRemove={onRemove} />}
+      {item && (
+        <ItemEditor
+          key={item.id}
+          item={item}
+          onClose={onClose}
+          onRestore={onRestore}
+          onPhoto={onPhoto}
+          onRemove={onRemove}
+          offer={offer}
+          retailer={retailer}
+          onOffer={onOffer}
+        />
+      )}
     </Sheet>
   );
 }
@@ -74,7 +92,7 @@ function MissionBlock({ item }: { item: AdventureItem }) {
   );
 }
 
-function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetProps & { item: AdventureItem }) {
+function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove, offer, retailer, onOffer }: ItemSheetProps & { item: AdventureItem }) {
   const { dispatch, adventure } = useAdventure();
   const [name, setName] = useState(item.name);
   const [editing, setEditing] = useState(false);
@@ -145,6 +163,17 @@ function ItemEditor({ item, onClose, onRestore, onPhoto, onRemove }: ItemSheetPr
           {heading.subtitle && <span>{heading.subtitle}</span>}
           <NutriScoreMark grade={nutrition?.nutriscore} />
           <span>{categoryLabel(item.category)}</span>
+          {offer && retailer && (
+            <button
+              type="button"
+              className="offer-tag-button"
+              data-testid="item-offer"
+              aria-label={`${offerLabel(offer.shown, retailer)}: details`}
+              onClick={onOffer}
+            >
+              <OfferTag shown={offer.shown} retailer={retailer} />
+            </button>
+          )}
         </div>
       </div>
       {attribution && (

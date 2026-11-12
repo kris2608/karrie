@@ -213,8 +213,6 @@ export function PhotoResultSheet({ draft: initialDraft, photoUrl, photo, items, 
       {storeShown && store && <> {storeCredit(store)}</>}
     </p>
   );
-  const retakeLabel = photo ? "Opnieuw fotograferen" : "Terug naar camera";
-
   if (identityChoices.length > 1) {
     return (
       <>
@@ -372,19 +370,9 @@ export function PhotoResultSheet({ draft: initialDraft, photoUrl, photo, items, 
       <PressButton variant="quiet" wide data-testid="photo-add-done" disabled={saving || !name.trim()} onClick={() => addNew("done")}>
         Toevoegen en klaar
       </PressButton>
-      {open.length > 0 && photo && (
-        <button type="button" className="text-button photo-replace" data-testid="photo-replace" disabled={saving} onClick={() => setPicking(true)}>
-          Vervang bestaande afbeelding
-        </button>
-      )}
-      <div className="sheet-actions scan-actions">
-        <PressButton variant="quiet" onClick={onCancel}>
-          Annuleren
-        </PressButton>
-        <PressButton variant="quiet" data-testid="photo-retake" onClick={onRetake}>
-          {retakeLabel}
-        </PressButton>
-      </div>
+      <PressButton variant="quiet" wide data-testid="photo-back" onClick={onCancel}>
+        Terug
+      </PressButton>
       {footer}
     </>
   );

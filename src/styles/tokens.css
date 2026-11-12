@@ -61,7 +61,7 @@
 
   --tap-child: 64px;
   --tap-parent: 48px;
-  --dock-h: 96px;
+  --dock-h: 104px;
   --safe-top: env(safe-area-inset-top);
   --safe-bottom: env(safe-area-inset-bottom);
   --safe-left: env(safe-area-inset-left);
