@@ -1,10 +1,15 @@
-import type { Adventure } from "../domain/types";
 import type { Persisted } from "../storage/db";
 import { readKv, writeKv } from "../storage/db";
 import { hasTracked, trackEvent, type ReturnBucket } from "./analytics";
 
 const KEY = "analyticsMilestones";
 const ADVENTURE_ACK_CAP = 100;
+
+/** Minimal adventure shape for start/complete catch-up (avoids pulling full AdventureItem into callers/tests). */
+export type AdventureAckTarget = {
+  id: string;
+  items: ReadonlyArray<{ mission?: { status?: string } }>;
+};
 
 export type AnalyticsMilestones = {
   version: 1;
@@ -247,7 +252,7 @@ function maybeFirstCompleted(id: string): void {
  * Ensure adventure_started reached Umami at most once per adventure id.
  * Returns true when acked (already or newly); false when Umami is not ready yet (caller may retry).
  */
-export function ensureAdventureStarted(adventure: Pick<Adventure, "id" | "items">): boolean {
+export function ensureAdventureStarted(adventure: AdventureAckTarget): boolean {
   const id = adventure.id;
   const current = getMilestones();
   if (current.startedAdventureIds.includes(id)) return true;
@@ -262,7 +267,7 @@ export function ensureAdventureStarted(adventure: Pick<Adventure, "id" | "items"
  * Ensure adventure_completed reached Umami at most once per adventure id.
  * Sends adventure_started first when that ack is still missing.
  */
-export function ensureAdventureCompleted(adventure: Pick<Adventure, "id" | "items">): boolean {
+export function ensureAdventureCompleted(adventure: AdventureAckTarget): boolean {
   const id = adventure.id;
   if (!ensureAdventureStarted(adventure)) return false;
   const current = getMilestones();
