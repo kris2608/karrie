@@ -319,21 +319,23 @@ function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
           </button>
         )}
       </div>
-      <div className="stepper" data-no-long-press>
-        <button type="button" aria-label="Meer" onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 })}>
-          +
-        </button>
-        <span>{item.quantity}</span>
-        <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
-          −
-        </button>
-      </div>
-      <div className="row-actions" data-no-long-press>
-        <button type="button" className="round-button round-s round-danger" aria-label="Verwijder" onClick={onRemove}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-          </svg>
-        </button>
+      <div className="item-controls">
+        <div className="stepper" data-no-long-press>
+          <button type="button" aria-label="Minder" disabled={item.quantity <= 1} onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity - 1 })}>
+            −
+          </button>
+          <span>{item.quantity}</span>
+          <button type="button" aria-label="Meer" onClick={() => dispatch({ type: "set-quantity", itemId: item.id, quantity: item.quantity + 1 })}>
+            +
+          </button>
+        </div>
+        <div className="row-actions" data-no-long-press>
+          <button type="button" className="round-button round-s round-danger" aria-label="Verwijder" onClick={onRemove}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </div>
     </motion.li>
   );

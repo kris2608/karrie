@@ -36,8 +36,7 @@ describe("bonus play picker", () => {
     const b = pickPlayOffers(list, [], true, "adv-1");
     const c = pickPlayOffers(list, [], true, "adv-2");
     expect(a).toEqual(b);
-    expect(Object.keys(a).length).toBeGreaterThanOrEqual(1);
-    expect(Object.keys(a).length).toBeLessThanOrEqual(2);
+    expect(Object.keys(a)).toHaveLength(1);
     expect(JSON.stringify(a)).not.toEqual(JSON.stringify(c));
     expect(Object.values(a).every((play) => play.kind === "guess")).toBe(true);
   });

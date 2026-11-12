@@ -204,7 +204,6 @@ export function ShopScreen() {
             <path d="M7 5h10v14H7z" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
             <path d="M10 9h4M10 13h4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
           </svg>
-          <span>Nog te vinden</span>
         </button>
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={found} aria-label={`${found} van ${total} gevonden`}>
           <motion.span className="progress-fill" initial={false} animate={{ scaleX: found / total }} transition={spring} />

@@ -1439,9 +1439,11 @@ a.settings-link { text-decoration: none; color: inherit; }
 .category-block h2 { font-size: 1.15rem; font-weight: 900; }
 .category-block ul { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
 .item-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-2);
+  column-gap: var(--space-2);
+  row-gap: 4px;
   padding: var(--space-2);
   border-radius: var(--radius-m);
   background: var(--paper);
@@ -1449,7 +1451,8 @@ a.settings-link { text-decoration: none; color: inherit; }
 .item-row > .product-art { width: 52px; flex: none; }
 .item-art-button {
   position: relative;
-  flex: none;
+  grid-row: 1 / span 2;
+  align-self: center;
   width: 56px;
   padding: 2px;
   border: 0;
@@ -1457,7 +1460,15 @@ a.settings-link { text-decoration: none; color: inherit; }
   background: none;
   cursor: pointer;
 }
-.item-main { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
+.item-main { grid-column: 2; min-width: 0; display: grid; gap: 2px; }
+.item-controls {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
 .item-text-button {
   display: grid;
   gap: var(--space-1);
@@ -1499,7 +1510,7 @@ a.settings-link { text-decoration: none; color: inherit; }
 }
 .stepper {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 2px;
   width: fit-content;
@@ -1509,7 +1520,7 @@ a.settings-link { text-decoration: none; color: inherit; }
 }
 .stepper button {
   width: 32px;
-  height: 28px;
+  height: 32px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-s);
@@ -1522,7 +1533,6 @@ a.settings-link { text-decoration: none; color: inherit; }
 }
 .stepper button:disabled { opacity: 0.4; cursor: default; }
 .stepper span { min-width: 22px; text-align: center; font-weight: 900; font-variant-numeric: tabular-nums; }
-.item-row > .stepper { flex: none; align-self: center; }
 .row-actions { display: flex; flex: none; align-items: center; }
 .list-name { margin: calc(var(--space-2) * -1) 0 var(--space-3); padding-left: 60px; color: var(--ink-mute); font-weight: 800; }
 .save-list { display: grid; gap: var(--space-4); }
@@ -1593,23 +1603,19 @@ a.settings-link { text-decoration: none; color: inherit; }
 }
 .shop-bar { display: flex; align-items: center; gap: var(--space-2); }
 .shop-list-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 12px 0 8px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: 50%;
   background: #fff;
   box-shadow: var(--outline-soft);
-  color: var(--ink);
-  font: inherit;
-  font-weight: 900;
-  font-size: 0.85rem;
+  color: var(--teal-shade);
   cursor: pointer;
-  white-space: nowrap;
 }
-.shop-list-chip svg { width: 20px; height: 20px; flex: none; color: var(--teal-shade); }
+.shop-list-chip svg { width: 22px; height: 22px; }
 .bekijk-lijstje { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); min-width: 0; }
 .bekijk-lijstje-head {
   display: flex;

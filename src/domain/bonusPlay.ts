@@ -138,7 +138,7 @@ export type BonusPick = {
 
 /**
  * Deterministic unified picker (seed = adventure id):
- * healthier missions first (caller supplies missionIds), then ≈1 play per 3 remaining items.
+ * healthier missions first (caller supplies missionIds), then ≈1 play per 6 remaining items.
  * Never two bonuses on the same product.
  */
 export function pickPlayOffers(
@@ -153,7 +153,7 @@ export function pickPlayOffers(
   if (!candidates.length) return {};
 
   const rand = seededRandom(seed);
-  const target = Math.max(1, Math.round(candidates.length / 3));
+  const target = Math.max(1, Math.round(candidates.length / 6));
   const plays: Record<string, PlayOffer> = {};
   let kindIndex = Math.floor(rand() * PLAY_KINDS.length);
   const order = [...candidates];
