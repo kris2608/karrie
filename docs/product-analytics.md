@@ -85,6 +85,9 @@ Do **not** describe anonymous browser visits as verified individual families.
 - `product_image_result` — `source` (`store` | `name` | `reference` | `private_label`) × `outcome` (`found` | `not_found` | `error`)
 - `storage_operation_failed` — `operation` (`load` | `save` | `photo`) × `reason` (`unavailable` | `read_failed` | `write_failed` | `quota`)
 - `adventure_resumed` — explicit Home continue (`phase`: `draft` | `shopping`)
+- `voice_opt_in` — parent answered the voice prompt (`enabled`: `0` | `1`); never includes product text
+- `voice_muted` — speaker turned off in shop or settings
+- `voice_playback_failed` — `reason` (`play` | `element` | `network`)
 
 ## Delivery notes
 

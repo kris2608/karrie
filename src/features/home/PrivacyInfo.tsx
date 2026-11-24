@@ -30,6 +30,14 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
         </p>
       </section>
       <section>
+        <h3>Stem van Karrie</h3>
+        <p>
+          De stem van Karrie is gemaakt met AI. Als je stembegeleiding aanzet, stuurt Karrie alleen korte, vaste zinnetjes of een kindvriendelijke
+          productnaam naar de server om audioclipjes te maken. Er gaan geen boodschappenlijstjes, kindnamen of microfoongeluiden mee. Je kunt de stem
+          altijd uitzetten.
+        </p>
+      </section>
+      <section>
         <h3>Karrie verbeteren</h3>
         <p>
           Met Umami tellen we anoniem hoe de app wordt gebruikt, bijvoorbeeld welk scherm opent, of iemand terugkomt, hoe een product is toegevoegd

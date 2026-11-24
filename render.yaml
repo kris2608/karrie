@@ -112,3 +112,18 @@ services:
         value: "300"
       - key: OFFERS_LIMIT_PER_IP_DAY
         value: "1500"
+      # Short Dutch shopping voice clips (Speech API). Set VOICE=off to disable.
+      - key: OPENAI_VOICE_MODEL
+        value: gpt-4o-mini-tts
+      - key: OPENAI_VOICE
+        value: coral
+      - key: VOICE_LIMIT_PER_IP_HOUR
+        value: "40"
+      - key: VOICE_LIMIT_PER_IP_DAY
+        value: "120"
+      - key: VOICE_LIMIT_DAILY_REQUESTS
+        value: "2000"
+      - key: VOICE_DAILY_BUDGET_USD
+        value: "1"
+      - key: PRICE_VOICE_CALL
+        value: "0.015"

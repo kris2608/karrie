@@ -12,10 +12,12 @@ type GuessProductCardProps = {
   reduced: boolean;
   onCorrect: () => void;
   onSkip: () => void;
+  /** Gentle voice / feedback when the wrong picture is tapped. */
+  onWrong?: () => void;
 };
 
 /** Offline "Raad het product": hide the name, pick the matching pack photo. */
-export function GuessProductCard({ item, distractor, reduced, onCorrect, onSkip }: GuessProductCardProps) {
+export function GuessProductCard({ item, distractor, reduced, onCorrect, onSkip, onWrong }: GuessProductCardProps) {
   const [wrong, setWrong] = useState(false);
   const title = productHeading({ name: item.name, brand: item.brand, packageSize: item.packageSize }).title;
   const choices = useMemo(() => {
@@ -61,6 +63,7 @@ export function GuessProductCard({ item, distractor, reduced, onCorrect, onSkip 
                   return;
                 }
                 setWrong(true);
+                onWrong?.();
               }}
             >
               <ItemArt item={choice.item} />

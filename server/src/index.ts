@@ -22,6 +22,9 @@ import { createNameImageLookup } from "./nameImage.js";
 import { createOffSearch } from "./offSearch.js";
 import { createStoreImageLookup } from "./storeImage.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
+import { createMemoryVoiceCache, createPgVoiceCache } from "./voice/cache.js";
+import { createSpeechApiProvider } from "./voice/provider.js";
+import { createSpeakService } from "./voice/speak.js";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 
@@ -268,6 +271,29 @@ const handler = createHandler({
         limits: healthierLimits,
       }
     : undefined,
+  voice: (() => {
+    if (env.VOICE === "off") return undefined;
+    const voiceLimits = createLimits({
+      perIpPerHour: number("VOICE_LIMIT_PER_IP_HOUR", 40),
+      perIpPerDay: number("VOICE_LIMIT_PER_IP_DAY", 120),
+      dailyRequests: number("VOICE_LIMIT_DAILY_REQUESTS", 2000),
+      dailyBudgetUsd: number("VOICE_DAILY_BUDGET_USD", 1),
+      inputUsdPerMTok: 0,
+      cachedInputUsdPerMTok: 0,
+      outputUsdPerMTok: 0,
+    });
+    const callUsd = number("PRICE_VOICE_CALL", 0.015);
+    const provider = client
+      ? createSpeechApiProvider(client, {
+          model: env.OPENAI_VOICE_MODEL || "gpt-4o-mini-tts",
+          voice: env.OPENAI_VOICE || "coral",
+          callUsd,
+        })
+      : null;
+    const cache = pgPool ? createPgVoiceCache(pgPool) : createMemoryVoiceCache();
+    const service = createSpeakService({ provider, cache });
+    return { speak: service.speak, limits: voiceLimits, stats: () => service.stats(), callUsd };
+  })(),
   log: (entry) => console.log(JSON.stringify(entry)),
 });
 

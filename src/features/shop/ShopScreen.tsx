@@ -16,15 +16,17 @@ import type { AdventureItem } from "../../domain/types";
 import { productEnter, productExit, spring } from "../../motion/variants";
 import { useFoundSequence, type Flight } from "../../motion/useFoundSequence";
 import { analyticsRetailer } from "../../domain/retailers";
-import { trackEvent } from "../../services/analytics";
 import { ensureAdventureStarted } from "../../services/analyticsMilestones";
 import { useOfferViews } from "../../storage/offers";
 import { useScreenWakeLock } from "../../hooks/useScreenWakeLock";
 import { useAdventure } from "../../state/AdventureContext";
 import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { OfferTag, offerLabel } from "../offers/OfferTag";
+import { unlockAudio } from "../../feedback/sound";
+import { trackEvent } from "../../services/analytics";
 import { GuessProductCard } from "./GuessProductCard";
 import { MissionCard, ParentCheck } from "./MissionCard";
+import { useShopVoice } from "./useShopVoice";
 
 const SWIPE_DISTANCE = 90;
 const SWIPE_VELOCITY = 600;
@@ -33,7 +35,7 @@ const MISSION_DELAY_MS = 900;
 const INTRO_MS = 2200;
 
 export function ShopScreen() {
-  const { adventure, dispatch } = useAdventure();
+  const { adventure, settings, dispatch } = useAdventure();
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const [listOpen, setListOpen] = useState(false);
@@ -41,6 +43,7 @@ export function ShopScreen() {
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const [missionShown, setMissionShown] = useState<string | null>(null);
   const [playMood, setPlayMood] = useState<Mood | null>(null);
+  const [voicePromptOpen, setVoicePromptOpen] = useState(false);
   const location = useLocation();
   /** Shown once when a list collected at home goes shopping; a tap or a moment later it is gone. */
   const [intro, setIntro] = useState(() => Boolean((location.state as { intro?: boolean } | null)?.intro));
@@ -77,6 +80,21 @@ export function ShopScreen() {
   /** Hide the stage product as soon as a guess is pending so the name does not flash under the card. */
   const guessPending = Boolean(play?.kind === "guess" && play.status === "offered" && play.distractorItemId && current);
   const showGuess = Boolean(guessPending && !sequence.locked && !intro);
+  const voice = useShopVoice({
+    enabled: settings.voiceEnabled === true,
+    optInSeen: settings.voiceOptInSeen === true,
+    adventureId: adventure?.id,
+    items: adventure?.items ?? [],
+    currentId: current?.id,
+    intro,
+    locked: sequence.locked,
+    showGuess,
+  });
+
+  useEffect(() => {
+    if (intro || settings.voiceOptInSeen) return;
+    setVoicePromptOpen(true);
+  }, [intro, settings.voiceOptInSeen]);
   const guessDistractor =
     showGuess && current && play?.distractorItemId
       ? adventure?.items.find((entry) => entry.id === play.distractorItemId)
@@ -177,13 +195,29 @@ export function ShopScreen() {
     if (play && (play.kind === "color" || play.kind === "drag") && play.status !== "done" && play.status !== "skipped") {
       finishPlay(play.kind);
     }
+    voice.onFoundSuccess();
     sequence.collect(current, openItems.length === 1);
   }
 
   function celebrateGuess() {
     finishPlay("guess");
+    voice.onGuessCorrect();
     setPlayMood("celebrating");
     window.setTimeout(() => setPlayMood(null), 1200);
+  }
+
+  function toggleVoice() {
+    unlockAudio();
+    const next = !settings.voiceEnabled;
+    if (!next) trackEvent({ name: "voice_muted" });
+    dispatch({ type: "set-voice", enabled: next });
+  }
+
+  function answerVoicePrompt(enabled: boolean) {
+    unlockAudio();
+    voice.prepareOptIn(enabled);
+    dispatch({ type: "set-voice", enabled });
+    setVoicePromptOpen(false);
   }
 
   function dropOnBasket(_: unknown, info: { point: { x: number; y: number } }) {
@@ -207,6 +241,7 @@ export function ShopScreen() {
     keep.current = choice;
     const flying: AdventureItem =
       choice === "alternative" && missionTarget ? { ...searching, icon: missionTarget.id, imageKind: "generic", photoId: undefined, imageUrl: undefined } : searching;
+    voice.onFoundSuccess();
     sequence.collect(flying, openItems.length === 1, SCORING.discoveryBonus);
   }
 
@@ -231,6 +266,28 @@ export function ShopScreen() {
             </span>
           )}
         </div>
+        <button
+          type="button"
+          className={`shop-voice-chip${settings.voiceEnabled ? " is-on" : ""}`}
+          data-testid="shop-voice-toggle"
+          aria-pressed={settings.voiceEnabled}
+          aria-label={settings.voiceEnabled ? "Stem van Karrie aan" : "Stem van Karrie uit"}
+          onClick={toggleVoice}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            {settings.voiceEnabled ? (
+              <>
+                <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+                <path d="M16.5 8.5a5 5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </>
+            ) : (
+              <>
+                <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+                <path d="M17 9l4 6M21 9l-4 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </>
+            )}
+          </svg>
+        </button>
         <span className="star-pill" ref={starRef} aria-label={`${stars} sterren`} data-testid="star-count">
           <motion.span key={stars} className="star-pill-icon" initial={{ scale: stars ? 1.5 : 1, rotate: stars ? -20 : 0 }} animate={{ scale: 1, rotate: 0 }} transition={spring}>
             <StarIcon />
@@ -346,10 +403,28 @@ export function ShopScreen() {
               animate={{ y: 0, opacity: 1, transition: { ...spring, delay: sequence.enterDelay } }}
               exit={{ y: -8, opacity: 0, transition: { duration: 0.12 } }}
             >
-              <h1>
-                {current.quantity > 1 && <span className="qty">{current.quantity}×</span>}
-                {heading.title}
-              </h1>
+              <button
+                type="button"
+                className="product-title-replay"
+                data-testid="voice-replay"
+                aria-label={settings.voiceEnabled ? `Nog eens: ${heading.title}` : heading.title}
+                onClick={() => {
+                  if (settings.voiceEnabled) voice.replay();
+                }}
+              >
+                <h1>
+                  {current.quantity > 1 && <span className="qty">{current.quantity}×</span>}
+                  {heading.title}
+                </h1>
+                {settings.voiceEnabled && (
+                  <span className="product-title-speaker" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+                      <path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                )}
+              </button>
               {heading.subtitle && <p className="product-title-sub">{heading.subtitle}</p>}
             </motion.div>
           )}
@@ -480,6 +555,7 @@ export function ShopScreen() {
             distractor={guessDistractor}
             reduced={reduced}
             onCorrect={celebrateGuess}
+            onWrong={voice.onGuessWrong}
             onSkip={() => dispatch({ type: "play-skip" })}
           />
         )}
@@ -503,6 +579,22 @@ export function ShopScreen() {
       </AnimatePresence>
 
       <OfferSheet open={offerOpen} onClose={() => setOfferOpen(null)} />
+
+      <Sheet open={voicePromptOpen && !intro} onClose={() => answerVoicePrompt(false)} label="Stem van Karrie">
+        <div className="voice-opt-in" data-testid="voice-opt-in">
+          <Karrie mood="greeting" className="voice-opt-in-karrie" />
+          <h2>Wil je dat Karrie met je praat?</h2>
+          <p>Karrie kan hardop zeggen welk product je zoekt. De stem is gemaakt met AI.</p>
+          <div className="voice-opt-in-actions">
+            <PressButton variant="go" wide data-testid="voice-opt-in-yes" onClick={() => answerVoicePrompt(true)}>
+              Ja, graag
+            </PressButton>
+            <PressButton variant="quiet" wide data-testid="voice-opt-in-no" onClick={() => answerVoicePrompt(false)}>
+              Nee, liever niet
+            </PressButton>
+          </div>
+        </div>
+      </Sheet>
 
       <Sheet open={checkOpen && Boolean(searching)} onClose={() => setCheckOpen(false)} label="Bonusmissie controleren">
         {searching && (

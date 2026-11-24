@@ -66,7 +66,10 @@ export type AnalyticsEvent =
   | { name: "product_image_result"; data: { source: ProductImageSource; outcome: ProductImageOutcome } }
   | { name: "storage_operation_failed"; data: { operation: StorageOperation; reason: StorageFailureReason } }
   | { name: "feedback_opened"; data: { source: FeedbackSource } }
-  | { name: "sticker_book_opened" };
+  | { name: "sticker_book_opened" }
+  | { name: "voice_opt_in"; data: { enabled: 0 | 1 } }
+  | { name: "voice_muted" }
+  | { name: "voice_playback_failed"; data: { reason: "play" | "element" | "network" } };
 
 export function latencyBucket(ms: number): LatencyBucket {
   if (ms < 2_000) return "0-2s";

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { StorageLoadError } from "../components/StorageLoadError";
 import { setSoundEnabled } from "../feedback/sound";
 import { trackEvent } from "../services/analytics";
+import { voiceController } from "../services/voice/controller";
 import { trackStorageFailure } from "../services/analyticsHelpers";
 import { bootstrapAnalytics } from "../services/analyticsMilestones";
 import { catalogSync } from "../services/catalog/sync";
@@ -136,6 +137,10 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSoundEnabled(state.settings.soundEnabled);
   }, [state.settings.soundEnabled]);
+
+  useEffect(() => {
+    voiceController.setEnabled(state.settings.voiceEnabled === true);
+  }, [state.settings.voiceEnabled]);
 
   const ready = persistStatus === "ready" || persistStatus === "save_failed";
 

@@ -22,6 +22,7 @@ import { offerQueries, offers, useOfferViews, type OfferView } from "../../stora
 import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
+import { unlockAudio } from "../../feedback/sound";
 import { markAppUsed } from "../install/installPrompt";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ShareIcon } from "../../components/ui/ShareIcon";
@@ -101,6 +102,8 @@ export function ReviewScreen() {
   function start() {
     if (!adventure) return;
     const fresh = adventure.phase !== "shopping";
+    // User gesture unlocks Web Audio / HTMLAudio for voice guidance on iOS.
+    unlockAudio();
     if (fresh) dispatch({ type: "start-shopping" });
     navigate("/winkel", fresh && discoveredCount(adventure) > 0 ? { state: { intro: true } } : undefined);
   }

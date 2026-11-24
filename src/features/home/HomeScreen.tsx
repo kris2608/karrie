@@ -9,6 +9,7 @@ import { ReferenceSwitch } from "../../components/ui/ReferenceSwitch";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
 import { SoundSwitch } from "../../components/ui/SoundSwitch";
+import { VoiceSwitch } from "../../components/ui/VoiceSwitch";
 import { Toast, useNotice } from "../../components/ui/Toast";
 import { softSpring } from "../../motion/variants";
 import { appVersionLabel } from "../../domain/appVersion";
@@ -260,6 +261,8 @@ export function HomeScreen() {
           <>
             <h2 ref={headingRef}>Voor ouders</h2>
             <SoundSwitch />
+            <VoiceSwitch />
+            <p className="setting-note">De stem van Karrie is gemaakt met AI.</p>
             <DiscoverySwitch />
             <ReferenceSwitch />
             <div className="setting-block" data-testid="default-retailer">

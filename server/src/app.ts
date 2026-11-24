@@ -21,6 +21,7 @@ import { enrichCandidates, primaryProduct } from "./recognizeIdentity.js";
 import type { SharedListStore } from "./sharedLists.js";
 import { sharedListPreviewHtml } from "./sharedListPreview.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
+import { isVoiceEvent } from "./voice/allowlist.js";
 
 export type ImageDeps = {
   discovery: Pick<ImageDiscovery, "discover" | "cached" | "busy" | "provider">;
@@ -99,6 +100,7 @@ export type AppDeps = {
   catalog?: Catalog;
   sharedLists?: SharedListDeps;
   healthier?: HealthierDeps;
+  voice?: VoiceDeps;
   log: (entry: Record<string, unknown>) => void;
   now?: () => number;
 };
@@ -106,6 +108,14 @@ export type AppDeps = {
 export type HealthierDeps = {
   assess: (raw: unknown) => Promise<import("./healthier.js").HealthierResult>;
   limits: Limits;
+};
+
+export type VoiceDeps = {
+  speak: (request: import("./voice/speak.js").SpeakRequest) => Promise<import("./voice/speak.js").SpeakResult>;
+  limits: Limits;
+  stats: () => Record<string, unknown>;
+  /** Flat USD charged on cache misses when the provider reports extraUsd. */
+  callUsd: number;
 };
 
 const ROUTES = [
@@ -275,8 +285,11 @@ export function createHandler(deps: AppDeps) {
           ? { enabled: true, stats: deps.sharedLists.limits.stats(), outcomes: deps.sharedLists.store.stats() }
           : { enabled: false },
         healthier: deps.healthier ? { enabled: true, stats: deps.healthier.limits.stats() } : { enabled: false },
+        voice: deps.voice ? { enabled: true, stats: deps.voice.limits.stats(), cache: deps.voice.stats() } : { enabled: false },
       });
     }
+
+    if (url.pathname === "/api/voice/speak" && req.method === "POST") return speakVoice();
 
     if (url.pathname === "/api/lists/share" && req.method === "POST") return createSharedList();
     if (url.pathname.startsWith("/api/lists/share/") && req.method === "GET") return readSharedList();
@@ -716,6 +729,70 @@ export function createHandler(deps: AppDeps) {
         return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
       }
       return send(200, { status: "ok", alternative: result.alternative, cached: result.cached });
+    }
+
+    /** Short AI voice clips for shopping guidance. Allowlisted text only; never free-form TTS. */
+    async function speakVoice() {
+      if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
+      if (!deps.voice) return send(503, { status: "error", code: "unavailable" });
+      if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
+      if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) {
+        return send(415, { status: "error", code: "unsupported-type" });
+      }
+      let raw: string;
+      try {
+        raw = await readBody(req);
+      } catch (error) {
+        if (error instanceof BodyTooLarge) return send(413, { status: "error", code: "too-large" });
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      entry.bytes = raw.length;
+      let body: unknown;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      const event = (body as { event?: unknown })?.event;
+      const text = typeof (body as { text?: unknown })?.text === "string" ? (body as { text: string }).text : "";
+      if (!isVoiceEvent(event) || !text) return send(422, { status: "error", code: "invalid" });
+
+      const ip = clientIp(req);
+      const denial = deps.voice.limits.admit(ip);
+      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+
+      const callStarted = now();
+      const result = await deps.voice.speak({ event, text });
+      const latencyMs = now() - callStarted;
+      Object.assign(entry, {
+        voiceEvent: event,
+        voiceCacheHit: result.ok ? result.cacheHit : undefined,
+        openaiMs: latencyMs,
+        code: result.ok ? undefined : result.code,
+      });
+
+      if (!result.ok) {
+        deps.voice.limits.record({ ok: false, latencyMs });
+        if (result.code === "invalid") return send(422, { status: "error", code: "invalid" });
+        if (result.code === "misconfigured") return send(503, { status: "error", code: "misconfigured" });
+        return send(502, { status: "error", code: "upstream" });
+      }
+
+      deps.voice.limits.record({
+        ok: true,
+        latencyMs,
+        extraUsd: result.cacheHit ? 0 : deps.voice.callUsd,
+      });
+
+      res.writeHead(200, {
+        "Content-Type": result.entry.contentType,
+        "Cache-Control": "public, max-age=604800",
+        "X-Voice-Cache": result.cacheHit ? "hit" : "miss",
+        "X-Voice-Model": result.entry.model,
+        "X-Voice-Voice": result.entry.voice,
+      });
+      res.end(result.entry.audio);
+      deps.log({ ...entry, status: 200, ms: now() - started });
     }
 
     async function createSharedList() {

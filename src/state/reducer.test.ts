@@ -55,6 +55,19 @@ it("bewaart de geluidsinstelling en zet die standaard uit", () => {
   expect(hydrated.settings.soundEnabled).toBe(false);
 });
 
+it("bewaart stembegeleiding apart van geluidseffecten", () => {
+  expect(initialState.settings.voiceEnabled).toBe(false);
+  const on = reducer(initialState, { type: "set-voice", enabled: true });
+  expect(on.settings.voiceEnabled).toBe(true);
+  expect(on.settings.voiceOptInSeen).toBe(true);
+  const hydrated = reducer(initialState, {
+    type: "hydrate",
+    data: { settings: { ...initialState.settings, voiceEnabled: true, voiceOptInSeen: true } },
+  });
+  expect(hydrated.settings.voiceEnabled).toBe(true);
+  expect(hydrated.settings.voiceOptInSeen).toBe(true);
+});
+
 it("bewaart een nieuw lijstje voor later zonder het avontuur te starten", () => {
   const banaan = recognizeList("banaan")[0].product!;
   let state = reducer(initialState, { type: "add-product", product: banaan });

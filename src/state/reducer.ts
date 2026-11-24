@@ -54,6 +54,10 @@ import {
 
 export type Settings = {
   soundEnabled: boolean;
+  /** AI voice guidance during shopping; separate from SFX. */
+  voiceEnabled: boolean;
+  /** Parent answered the first-time “Wil je dat Karrie met je praat?” prompt. */
+  voiceOptInSeen?: boolean;
   smartDiscovery: boolean;
   /** Look up reference pictures for products on the list; sends only product names, never photos. */
   referenceImages: boolean;
@@ -78,7 +82,12 @@ export type CustomEnrichment = {
 
 export const ENRICH_TRIES = 3;
 
-export const defaultSettings: Settings = { soundEnabled: false, smartDiscovery: true, referenceImages: true };
+export const defaultSettings: Settings = {
+  soundEnabled: false,
+  voiceEnabled: false,
+  smartDiscovery: true,
+  referenceImages: true,
+};
 
 export type AppState = {
   adventure: Adventure | null;
@@ -109,8 +118,10 @@ export const initialState: AppState = {
 };
 
 export type Action =
-  | { type: "hydrate"; data: Partial<AppState> }
+  | { type: "hydrate"; data: Omit<Partial<AppState>, "settings"> & { settings?: Partial<Settings> } }
   | { type: "set-sound"; enabled: boolean }
+  | { type: "set-voice"; enabled: boolean }
+  | { type: "voice-opt-in-seen" }
   | { type: "set-discovery"; enabled: boolean }
   | { type: "set-reference-images"; enabled: boolean }
   | { type: "set-retailer"; retailer: RetailerId | null }
@@ -522,7 +533,12 @@ export function reducer(state: AppState, action: Action): AppState {
             isRetailer(stored.retailer) ? stored.retailer : undefined,
           )
         : null;
-      const settings: Settings = { ...defaultSettings, ...action.data.settings };
+      const settings: Settings = {
+        ...defaultSettings,
+        ...action.data.settings,
+        voiceEnabled: action.data.settings?.voiceEnabled === true,
+        ...(action.data.settings?.voiceOptInSeen === true ? { voiceOptInSeen: true } : {}),
+      };
       if (!isRetailer(settings.retailer)) delete settings.retailer;
       return {
         adventure,
@@ -558,6 +574,13 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "set-sound":
       return { ...state, settings: { ...state.settings, soundEnabled: action.enabled } };
+    case "set-voice":
+      return {
+        ...state,
+        settings: { ...state.settings, voiceEnabled: action.enabled, voiceOptInSeen: true },
+      };
+    case "voice-opt-in-seen":
+      return state.settings.voiceOptInSeen ? state : { ...state, settings: { ...state.settings, voiceOptInSeen: true } };
     case "set-discovery": {
       const settings = { ...state.settings, smartDiscovery: action.enabled };
       if (action.enabled || state.adventure?.phase !== "shopping") return { ...state, settings };

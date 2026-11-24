@@ -154,6 +154,15 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `LIMIT_PER_IP_HOUR` / `LIMIT_PER_IP_DAY` | 20 / 60 | Per IP-adres |
 | `LIMIT_DAILY_REQUESTS` | 300 | Alle gebruikers samen, per UTC-dag |
 | `DAILY_BUDGET_USD` | 1 | Server stopt met herkennen boven dit bedrag per dag |
+| `OPENAI_VOICE_MODEL` | `gpt-4o-mini-tts` | Speech API-model voor korte winkelaudio (tot jan 2027; daarna Realtime-migratie) |
+| `OPENAI_VOICE` | `coral` | Vaste Karrie-stem |
+| `VOICE` | (aan) | Zet op `off` om stemroutes uit te zetten |
+| `VOICE_LIMIT_PER_IP_HOUR` / `VOICE_LIMIT_PER_IP_DAY` | 40 / 120 | Nieuwe audioclips per IP |
+| `VOICE_LIMIT_DAILY_REQUESTS` | 2000 | Alle gebruikers samen, per UTC-dag |
+| `VOICE_DAILY_BUDGET_USD` | 1 | Dagbudget voor cache-misses |
+| `PRICE_VOICE_CALL` | 0,015 | Geschatte kost per nieuwe clip (cache-hits zijn gratis) |
+
+Stemclips worden gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal. Alleen allowlisted zinnetjes of product-instructieshetjes worden gesproken — geen vrije tekst-TTS.
 
 Krijgt de server van Render een ander adres dan `https://karrie-api.onrender.com`? Zet dat adres dan in `VITE_API_ORIGIN` van `karrieapp` en bouw de site opnieuw.
 
