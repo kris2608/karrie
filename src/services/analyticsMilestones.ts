@@ -1,6 +1,7 @@
 import type { Persisted } from "../storage/db";
 import { readKv, writeKv } from "../storage/db";
 import { hasTracked, trackEvent, type ReturnBucket } from "./analytics";
+import { attributionEventData } from "./campaignAttribution";
 
 const KEY = "analyticsMilestones";
 const ADVENTURE_ACK_CAP = 100;
@@ -256,7 +257,11 @@ export function ensureAdventureStarted(adventure: AdventureAckTarget): boolean {
   const id = adventure.id;
   const current = getMilestones();
   if (current.startedAdventureIds.includes(id)) return true;
-  const accepted = trackEvent({ name: "adventure_started", data: { item_count: adventure.items.length } }, id);
+  const campaign = attributionEventData();
+  const accepted = trackEvent(
+    { name: "adventure_started", data: { item_count: adventure.items.length, ...campaign } },
+    id,
+  );
   if (!delivered("adventure_started", id, accepted)) return false;
   ackAdventureStarted(id);
   maybeFirstStarted(id);

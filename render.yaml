@@ -9,6 +9,19 @@ services:
       - type: redirect
         source: /s/*
         destination: https://karrie-api.onrender.com/l/*
+      # Public marketing pages (static HTML) before the SPA catch-all.
+      - type: rewrite
+        source: /ontdek
+        destination: /ontdek.html
+      - type: rewrite
+        source: /over
+        destination: /over.html
+      - type: rewrite
+        source: /boodschappen-met-kinderen
+        destination: /boodschappen-met-kinderen.html
+      - type: rewrite
+        source: /boodschappenlijstje-met-plaatjes
+        destination: /boodschappenlijstje-met-plaatjes.html
       - type: rewrite
         source: /*
         destination: /index.html
@@ -17,6 +30,18 @@ services:
         name: Cache-Control
         value: public, max-age=31536000, immutable
       - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /ontdek.html
+        name: Cache-Control
+        value: no-cache
+      - path: /over.html
+        name: Cache-Control
+        value: no-cache
+      - path: /boodschappen-met-kinderen.html
+        name: Cache-Control
+        value: no-cache
+      - path: /boodschappenlijstje-met-plaatjes.html
         name: Cache-Control
         value: no-cache
       - path: /sw.js
@@ -32,6 +57,18 @@ services:
         name: X-Robots-Tag
         value: noindex, nofollow
       - path: /s/*
+        name: X-Robots-Tag
+        value: noindex, nofollow
+      - path: /toevoegen
+        name: X-Robots-Tag
+        value: noindex, nofollow
+      - path: /controleren
+        name: X-Robots-Tag
+        value: noindex, nofollow
+      - path: /winkel
+        name: X-Robots-Tag
+        value: noindex, nofollow
+      - path: /klaar
         name: X-Robots-Tag
         value: noindex, nofollow
       - path: /*

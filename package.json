@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "marketing": "vite-node scripts/build-marketing-pages.ts",
+    "marketing:screenshots": "vite-node scripts/generate-marketing-screenshots.ts",
+    "build": "tsc --noEmit && npm run marketing && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:server": "npm test --prefix server",

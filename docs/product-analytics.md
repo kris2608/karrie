@@ -89,6 +89,23 @@ Do **not** describe anonymous browser visits as verified individual families.
 - `voice_muted` — speaker turned off in shop or settings
 - `voice_playback_failed` — `reason` (`play` | `element` | `network` | `fetch`); `fetch` may include `code` (e.g. `upstream`, `offline`)
 
+## Report F — Campaign landing → adventure
+
+Pageviews still strip query strings (`data-exclude-search`). Campaign attribution uses **allowlisted custom events** only:
+
+1. `landing_view` — marketing page open (`page`, optional `utm_source` / `utm_medium` / `utm_campaign`)
+2. `landing_cta_clicked` — CTA on a marketing page (`page`, `placement`, optional UTMs)
+3. `new_adventure_clicked` — may include the same UTM fields when captured earlier in the tab session
+4. `adventure_started` — may include the same UTM fields
+
+Only `utm_source`, `utm_medium` and `utm_campaign` are stored (sessionStorage, max ~7 days) and never arbitrary query params, list tokens or shopping contents.
+
+Example links (canonical host):
+
+- `https://www.karrie.eu/ontdek?utm_source=chatgpt&utm_medium=paid&utm_campaign=launch_nl`
+- `https://www.karrie.eu/ontdek?utm_source=instagram&utm_medium=paid&utm_campaign=launch_nl`
+- `https://www.karrie.eu/ontdek?utm_source=creator&utm_medium=referral&utm_campaign=launch_nl`
+
 ## Delivery notes
 
 - `trackEvent` returns whether Umami **accepted** the invoke (not network delivery).

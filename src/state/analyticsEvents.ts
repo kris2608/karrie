@@ -1,4 +1,5 @@
 import type { AddMethod, RecognitionSource, Tracked } from "../services/analytics";
+import { attributionEventData } from "../services/campaignAttribution";
 import { ackAdventureCompleted, ackAdventureStarted, getMilestones, markMilestoneSent } from "../services/analyticsMilestones";
 import type { BarcodeOutcome } from "../services/barcode/lookup";
 import type { Action, AppState } from "./reducer";
@@ -63,7 +64,11 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
   }
 
   if (action.type === "start-shopping" && previous?.phase !== "shopping" && next.phase === "shopping") {
-    events.push({ event: { name: "adventure_started", data: { item_count: next.items.length } }, once: next.id });
+    const campaign = attributionEventData();
+    events.push({
+      event: { name: "adventure_started", data: { item_count: next.items.length, ...campaign } },
+      once: next.id,
+    });
     if (!getMilestones().firstAdventureStartedTracked) {
       events.push({ event: { name: "first_adventure_started" }, once: `first-start:${next.id}` });
     }

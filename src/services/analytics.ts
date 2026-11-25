@@ -37,7 +37,7 @@ export type AnalyticsEvent =
   | { name: "photo_recognition_outcome"; data: { outcome: PhotoRecognitionOutcome; candidate_count: number; latency_bucket: LatencyBucket } }
   | { name: "recognition_chooser"; data: { action: RecognitionChooserAction; candidate_count: number } }
   | { name: "barcode_lookup_result"; data: { source: BarcodeLookupSource; outcome: BarcodeLookupOutcome } }
-  | { name: "adventure_started"; data: { item_count: number } }
+  | { name: "adventure_started"; data: { item_count: number; utm_source?: string; utm_medium?: string; utm_campaign?: string } }
   | { name: "adventure_first_item_found"; data: { item_count: number } }
   | { name: "adventure_resumed"; data: { phase: "draft" | "shopping" } }
   | { name: "adventure_completed"; data: { item_count: number; completed_missions: number } }
@@ -47,7 +47,15 @@ export type AnalyticsEvent =
   | { name: "bonus_play_completed"; data: { kind: "guess" | "color" | "drag" } }
   | { name: "offer_opened"; data: { retailer: "jumbo" | "ah" | "lidl"; match_type: "exact" | "likely" } }
   | { name: "app_first_open" }
-  | { name: "new_adventure_clicked" }
+  | { name: "new_adventure_clicked"; data?: { utm_source?: string; utm_medium?: string; utm_campaign?: string } }
+  | {
+      name: "landing_view";
+      data: { page: string; utm_source?: string; utm_medium?: string; utm_campaign?: string };
+    }
+  | {
+      name: "landing_cta_clicked";
+      data: { page: string; placement: string; utm_source?: string; utm_medium?: string; utm_campaign?: string };
+    }
   | { name: "onboarding_opened" }
   | { name: "onboarding_finished"; data: { action: OnboardingAction } }
   | { name: "first_list_created" }
@@ -99,7 +107,11 @@ let flushTimer: ReturnType<typeof setTimeout> | undefined;
 
 function invoke(umami: { track: (name: string, data?: Record<string, string | number>) => unknown }, event: AnalyticsEvent): boolean {
   try {
-    const result = "data" in event ? umami.track(event.name, event.data as Record<string, string | number>) : umami.track(event.name);
+    const data = "data" in event ? event.data : undefined;
+    const result =
+      data && typeof data === "object"
+        ? umami.track(event.name, data as Record<string, string | number>)
+        : umami.track(event.name);
     if (result instanceof Promise) result.catch(() => undefined);
     return true;
   } catch {

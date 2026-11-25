@@ -1,0 +1,26 @@
+# Public marketing and the app home are indexable.
+# App flow and share routes are private; X-Robots-Tag also applies where configured.
+
+User-agent: *
+Allow: /
+Allow: /ontdek
+Allow: /over
+Allow: /boodschappen-met-kinderen
+Allow: /boodschappenlijstje-met-plaatjes
+Disallow: /toevoegen
+Disallow: /controleren
+Disallow: /winkel
+Disallow: /klaar
+Disallow: /l/
+Disallow: /s/
+Disallow: /api/
+
+# ChatGPT Search crawler — allow public discovery pages.
+User-agent: OAI-SearchBot
+Allow: /
+
+# Training crawler — blocked by default (separate from search discovery).
+User-agent: GPTBot
+Disallow: /
+
+Sitemap: https://www.karrie.eu/sitemap.xml

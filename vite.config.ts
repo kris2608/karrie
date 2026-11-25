@@ -1,8 +1,13 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadEnv, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { MARKETING_NAV_FALLBACK_DENYLIST } from "./src/content/marketing/routing";
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string };
 /** Prefer Render's commit; local builds fall back to today's date so Settings always shows something. */
@@ -71,7 +76,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/privacy\.html$/],
+        navigateFallbackDenylist: [...MARKETING_NAV_FALLBACK_DENYLIST],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2,webp,mp3,opus}"],
         globIgnores: ["og-image.png"],
         runtimeCaching: [
@@ -103,6 +108,13 @@ export default defineConfig({
   preview: { proxy: { "/api": "http://localhost:8787" } },
   build: {
     rollupOptions: {
+      input: {
+        main: path.resolve(rootDir, "index.html"),
+        ontdek: path.resolve(rootDir, "ontdek.html"),
+        over: path.resolve(rootDir, "over.html"),
+        tips: path.resolve(rootDir, "boodschappen-met-kinderen.html"),
+        visualList: path.resolve(rootDir, "boodschappenlijstje-met-plaatjes.html"),
+      },
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;

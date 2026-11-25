@@ -1,30 +1,30 @@
 import type { Ref } from "react";
+import { ABOUT_CLOSING, ABOUT_HEADING, ABOUT_IMAGE, ABOUT_PARAGRAPHS } from "../../content/marketing/about";
 
 export function AboutKarrie({ headingRef }: { headingRef: Ref<HTMLHeadingElement> }) {
   return (
     <article className="about-story" data-testid="about-karrie">
       <img
         className="about-art"
-        src="/images/karrie_thomas_over-ons.webp"
-        alt="Thomas duwt het vrolijke winkelwagentje Karrie"
-        width={720}
-        height={900}
+        src={ABOUT_IMAGE.src}
+        alt={ABOUT_IMAGE.alt}
+        width={ABOUT_IMAGE.width}
+        height={ABOUT_IMAGE.height}
         decoding="async"
       />
       <h2 ref={headingRef} tabIndex={-1}>
-        Hoe Karrie begon... 🛒
+        {ABOUT_HEADING}
       </h2>
-      <p>
-        <strong>Het begon met Thomas en een winkelwagentje...</strong>
-      </p>
-      <p>Samen met Kristian boodschappen doen? Dat was voor Thomas één groot avontuur!</p>
-      <p>Bananen zoeken, naar de appels wijzen en natuurlijk het liefst zélf het winkelwagentje duwen.</p>
-      <p>Terwijl Thomas vrolijk door de supermarkt speurde, kreeg Kristian een idee: wat als boodschappen doen gewoon een spelletje wordt?</p>
-      <p>
-        En zo werd Karrie geboren! Een vrolijk winkelwagentje dat kinderen helpt om thuis boodschappen te verzamelen en ze daarna in de winkel terug
-        te vinden.
-      </p>
-      <p className="about-pill">Biep! Gevonden! ⭐</p>
+      {ABOUT_PARAGRAPHS.map((paragraph, index) =>
+        index === 0 ? (
+          <p key={paragraph}>
+            <strong>{paragraph}</strong>
+          </p>
+        ) : (
+          <p key={paragraph}>{paragraph}</p>
+        ),
+      )}
+      <p className="about-pill">{ABOUT_CLOSING}</p>
     </article>
   );
 }

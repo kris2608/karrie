@@ -21,6 +21,8 @@ import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
 import { shareKarrie } from "../../domain/share";
 import { trackEvent } from "../../services/analytics";
+import { attributionEventData } from "../../services/campaignAttribution";
+import { PUBLIC_PATHS } from "../../content/marketing/site";
 import { InstallCard } from "../install/InstallCard";
 import { ListsSheet } from "../lists/ListsSheet";
 import { AboutKarrie } from "./AboutKarrie";
@@ -89,7 +91,8 @@ export function HomeScreen() {
   }
 
   function clickNewAdventure() {
-    trackEvent({ name: "new_adventure_clicked" });
+    const campaign = attributionEventData();
+    trackEvent(campaign ? { name: "new_adventure_clicked", data: campaign } : { name: "new_adventure_clicked" });
     if (needsIntro(state)) {
       trackEvent({ name: "onboarding_opened" }, "onboarding-open");
       setIntroOpen(true);
@@ -301,6 +304,24 @@ export function HomeScreen() {
                 💬 Geef feedback
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M14 5h5v5M19 5l-9 9M10 5H5v14h14v-5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+              <a className="settings-link" href={PUBLIC_PATHS.ontdek} data-testid="open-ontdek">
+                ✨ Ontdek Karrie
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+              <a className="settings-link" href={PUBLIC_PATHS.over} data-testid="open-over-page">
+                📖 Verhaal achter Karrie
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+              <a className="settings-link" href={PUBLIC_PATHS.tips} data-testid="open-tips-page">
+                💡 Tips voor ouders
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </a>
               <button
