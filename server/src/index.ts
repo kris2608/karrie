@@ -286,7 +286,7 @@ const handler = createHandler({
     const provider = client
       ? createSpeechApiProvider(client, {
           model: env.OPENAI_VOICE_MODEL || "gpt-4o-mini-tts",
-          voice: env.OPENAI_VOICE || "coral",
+          voice: env.OPENAI_VOICE || "nova",
           callUsd,
         })
       : null;

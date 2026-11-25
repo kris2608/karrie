@@ -155,7 +155,7 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `LIMIT_DAILY_REQUESTS` | 300 | Alle gebruikers samen, per UTC-dag |
 | `DAILY_BUDGET_USD` | 1 | Server stopt met herkennen boven dit bedrag per dag |
 | `OPENAI_VOICE_MODEL` | `gpt-4o-mini-tts` | Speech API-model voor korte winkelaudio (tot jan 2027; daarna Realtime-migratie) |
-| `OPENAI_VOICE` | `coral` | Vaste Karrie-stem |
+| `OPENAI_VOICE` | `nova` | Vaste Karrie-stem (helder, kindgericht) |
 | `VOICE` | (aan) | Zet op `off` om stemroutes uit te zetten |
 | `VOICE_LIMIT_PER_IP_HOUR` / `VOICE_LIMIT_PER_IP_DAY` | 40 / 120 | Nieuwe audioclips per IP |
 | `VOICE_LIMIT_DAILY_REQUESTS` | 2000 | Alle gebruikers samen, per UTC-dag |

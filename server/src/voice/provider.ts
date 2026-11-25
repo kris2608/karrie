@@ -1,10 +1,10 @@
 import type OpenAI from "openai";
 
-export const VOICE_INSTRUCTION_VERSION = "v1";
+export const VOICE_INSTRUCTION_VERSION = "v2";
 export const VOICE_LANGUAGE = "nl-NL";
 
 export const DEFAULT_VOICE_PERSONALITY =
-  "Speak in natural Netherlands Dutch. You are Karrie, a friendly and playful shopping companion for young children. Speak warmly, clearly and conversationally, with a gentle smile in your voice. Use natural intonation and short pauses. Be encouraging but not overly enthusiastic. Avoid baby talk, exaggerated excitement and robotic delivery. Speak slightly slower than normal conversational speech.";
+  "Speak in natural Netherlands Dutch. You are Karrie, a warm and playful shopping friend for children aged 2 to 5. Sound bright, friendly and a little lively — like a kind adult talking to a small child with a smile. Keep sentences clear and short. Be encouraging and fun. Do not use baby talk, squeaky cartoon voices or exaggerated shouting. Speak at a natural, easy pace for young children — not slow or sleepy.";
 
 export type SpeechProviderResult = {
   audio: Buffer;
@@ -38,7 +38,7 @@ export type SpeechProviderConfig = {
  */
 export function createSpeechApiProvider(client: OpenAI, config: SpeechProviderConfig = {}): SpeechProvider {
   const model = config.model || "gpt-4o-mini-tts";
-  const voice = config.voice || "coral";
+  const voice = config.voice || "nova";
   const instructions = config.instructions || DEFAULT_VOICE_PERSONALITY;
   const format = config.responseFormat || "mp3";
   const callUsd = config.callUsd ?? 0.015;

@@ -1,9 +1,9 @@
 import { cacheKeyParts, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE } from "../../domain/voiceScripts";
 
-const CACHE_NAME = "karrie-voice-v1";
+const CACHE_NAME = "karrie-voice-v2";
 /** Client-side model/voice labels must match server defaults for cache hits across sessions. */
 export const CLIENT_VOICE_MODEL = "gpt-4o-mini-tts";
-export const CLIENT_VOICE_NAME = "coral";
+export const CLIENT_VOICE_NAME = "nova";
 
 const memory = new Map<string, Blob>();
 
@@ -19,6 +19,11 @@ export function localCacheKey(text: string): string {
 
 function cacheUrl(key: string): string {
   return `https://voice.karrie.local/${encodeURIComponent(key)}`;
+}
+
+/** Sync memory peek — used so product speech never waits on Cache API I/O. */
+export function peekVoiceBlob(text: string): Blob | null {
+  return memory.get(localCacheKey(text)) ?? null;
 }
 
 export async function readVoiceBlob(text: string): Promise<Blob | null> {

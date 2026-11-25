@@ -3,6 +3,7 @@ import { StorageLoadError } from "../components/StorageLoadError";
 import { setSoundEnabled } from "../feedback/sound";
 import { trackEvent } from "../services/analytics";
 import { voiceController } from "../services/voice/controller";
+import { staticFeedbackPhrases } from "../features/shop/useShopVoice";
 import { trackStorageFailure } from "../services/analyticsHelpers";
 import { bootstrapAnalytics } from "../services/analyticsMilestones";
 import { catalogSync } from "../services/catalog/sync";
@@ -139,7 +140,12 @@ export function AdventureProvider({ children }: { children: ReactNode }) {
   }, [state.settings.soundEnabled]);
 
   useEffect(() => {
-    voiceController.setEnabled(state.settings.voiceEnabled === true);
+    const on = state.settings.voiceEnabled === true;
+    voiceController.setEnabled(on);
+    if (on) {
+      // Warm short feedback clips in the background once voice is allowed.
+      voiceController.prefetch(staticFeedbackPhrases());
+    }
   }, [state.settings.voiceEnabled]);
 
   const ready = persistStatus === "ready" || persistStatus === "save_failed";

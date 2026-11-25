@@ -8,11 +8,11 @@ describe("createSpeakService", () => {
     let calls = 0;
     const provider: SpeechProvider = {
       model: "gpt-4o-mini-tts",
-      voice: "coral",
-      instructionVersion: "v1",
+      voice: "nova",
+      instructionVersion: "v2",
       async generate(text) {
         calls += 1;
-        return { audio: Buffer.from(`audio:${text}`), contentType: "audio/mpeg", model: "gpt-4o-mini-tts", voice: "coral" };
+        return { audio: Buffer.from(`audio:${text}`), contentType: "audio/mpeg", model: "gpt-4o-mini-tts", voice: "nova" };
       },
     };
     const service = createSpeakService({ provider, cache: createMemoryVoiceCache() });

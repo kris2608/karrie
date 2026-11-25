@@ -1,7 +1,7 @@
 import type { VoiceEvent, VoicePhrase } from "../../domain/voiceScripts";
 import { unlockAudio } from "../../feedback/sound";
 import { trackEvent } from "../analytics";
-import { readVoiceBlob } from "./cache";
+import { peekVoiceBlob, readVoiceBlob } from "./cache";
 import { voiceClient } from "./client";
 
 export type PlayOptions = {
@@ -92,9 +92,12 @@ export function createVoiceController() {
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = "nl-NL";
       if (dutch) utter.voice = dutch;
-      utter.rate = 0.92;
+      utter.rate = 0.95;
       utter.onend = () => {
-        if (playToken === token) playingPriority = null;
+        if (playToken === token) {
+          playingPriority = null;
+          void drain();
+        }
       };
       speechSynthesis.cancel();
       speechSynthesis.speak(utter);
@@ -104,9 +107,31 @@ export function createVoiceController() {
     }
   }
 
+  function finishClip() {
+    playingPriority = null;
+    void drain();
+  }
+
   async function playBlob(blob: Blob, playToken: number, priority: PlayOptions["priority"]): Promise<void> {
-    if (playToken !== token || !enabled) return;
-    stopCurrent();
+    if (playToken !== token || !enabled) {
+      finishClip();
+      return;
+    }
+    if (current) {
+      current.onended = null;
+      current.onerror = null;
+      try {
+        current.pause();
+      } catch {
+        // ignore
+      }
+      current.src = "";
+      current = null;
+    }
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrl = null;
+    }
     unlockAudio();
     const url = URL.createObjectURL(blob);
     objectUrl = url;
@@ -114,52 +139,47 @@ export function createVoiceController() {
     current = audio;
     playingPriority = priority ?? "normal";
     await new Promise<void>((resolve) => {
-      audio.onended = () => {
+      const done = () => {
         if (objectUrl === url) {
           URL.revokeObjectURL(url);
           objectUrl = null;
         }
         if (current === audio) current = null;
-        playingPriority = null;
         resolve();
-        void drain();
+        finishClip();
       };
+      audio.onended = () => done();
       audio.onerror = () => {
         trackEvent({ name: "voice_playback_failed", data: { reason: "element" } });
-        if (objectUrl === url) {
-          URL.revokeObjectURL(url);
-          objectUrl = null;
-        }
-        if (current === audio) current = null;
-        playingPriority = null;
-        resolve();
-        void drain();
+        done();
       };
       void audio.play().catch(() => {
         trackEvent({ name: "voice_playback_failed", data: { reason: "play" } });
-        stopCurrent();
-        resolve();
-        void drain();
+        done();
       });
     });
   }
 
+  /** Runs a clip that already reserved `playingPriority` via play() or drain(). */
   async function run(phrase: VoicePhrase, options: PlayOptions): Promise<void> {
-    if (!enabled || options.token !== token) return;
+    const priority = options.priority ?? "normal";
+    if (!enabled || options.token !== token) {
+      finishClip();
+      return;
+    }
     if (options.delayMs && options.delayMs > 0) {
       await new Promise((resolve) => window.setTimeout(resolve, options.delayMs));
-      if (!enabled || options.token !== token) return;
-    }
-
-    const priority = options.priority ?? "normal";
-    if (playingPriority === "high" && priority !== "high") {
-      if (priority === "low") return;
-      queue = { phrase, options };
-      return;
+      if (!enabled || options.token !== token) {
+        finishClip();
+        return;
+      }
     }
 
     const blob = await resolveBlob(phrase);
-    if (!enabled || options.token !== token) return;
+    if (!enabled || options.token !== token) {
+      finishClip();
+      return;
+    }
 
     lastByEvent.set(phrase.event, phrase.text);
 
@@ -172,7 +192,9 @@ export function createVoiceController() {
       playingPriority = priority;
       return;
     }
-    // Silent failure — shopping continues.
+
+    // Silent failure — free the speaker for the next clip.
+    finishClip();
   }
 
   async function drain() {
@@ -180,6 +202,7 @@ export function createVoiceController() {
     queue = null;
     if (!next || !enabled) return;
     if (next.options.token !== token) return;
+    playingPriority = next.options.priority ?? "normal";
     await run(next.phrase, next.options);
   }
 
@@ -187,11 +210,20 @@ export function createVoiceController() {
     if (!enabled) return token;
     const playToken = options?.token ?? token;
     if (playToken !== token) return token;
-    void run(phrase, {
+    const priority = options?.priority ?? "normal";
+    const next: PlayOptions = {
       token: playToken,
       delayMs: options?.delayMs,
-      priority: options?.priority,
-    });
+      priority,
+    };
+    // Reserve synchronously so a same-tick follow-up (product after welcome) queues cleanly.
+    if (playingPriority !== null) {
+      if (priority === "low") return playToken;
+      queue = { phrase, options: { ...next, delayMs: 0 } };
+      return playToken;
+    }
+    playingPriority = priority;
+    void run(phrase, next);
     return playToken;
   }
 
@@ -200,14 +232,21 @@ export function createVoiceController() {
   }
 
   function prefetch(phrases: VoicePhrase[]) {
-    if (!enabled) return;
-    for (const phrase of phrases.slice(0, 4)) {
+    for (const phrase of phrases.slice(0, 6)) {
       void (async () => {
         const cached = await readVoiceBlob(phrase.text);
         if (cached) return;
         await voiceClient.fetchClip(phrase.event, phrase.text);
       })();
     }
+  }
+
+  function isCachedSync(text: string): boolean {
+    return Boolean(peekVoiceBlob(text));
+  }
+
+  async function isCached(text: string): Promise<boolean> {
+    return Boolean(await readVoiceBlob(text));
   }
 
   return {
@@ -219,6 +258,8 @@ export function createVoiceController() {
     play,
     avoidText,
     prefetch,
+    isCached,
+    isCachedSync,
     /** Test hook */
     _stopCurrent: stopCurrent,
   };

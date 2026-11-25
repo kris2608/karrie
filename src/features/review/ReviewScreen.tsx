@@ -23,9 +23,11 @@ import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
 import { RetailerPicker } from "../offers/RetailerPicker";
 import { unlockAudio } from "../../feedback/sound";
+import { voiceController } from "../../services/voice/controller";
 import { markAppUsed } from "../install/installPrompt";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ShareIcon } from "../../components/ui/ShareIcon";
+import { shoppingPrefetchPhrases, staticFeedbackPhrases } from "../shop/useShopVoice";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
@@ -104,6 +106,11 @@ export function ReviewScreen() {
     const fresh = adventure.phase !== "shopping";
     // User gesture unlocks Web Audio / HTMLAudio for voice guidance on iOS.
     unlockAudio();
+    if (settings.voiceEnabled) {
+      voiceController.setEnabled(true);
+      // Warm first product clips during navigation / intro so speech is ready on arrival.
+      voiceController.prefetch([...shoppingPrefetchPhrases(adventure.id, adventure.items), ...staticFeedbackPhrases()]);
+    }
     if (fresh) dispatch({ type: "start-shopping" });
     navigate("/winkel", fresh && discoveredCount(adventure) > 0 ? { state: { intro: true } } : undefined);
   }

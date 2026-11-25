@@ -23,8 +23,29 @@ type Options = {
   showGuess: boolean;
 };
 
+/** Prefetch helpers shared with ReviewScreen start. */
+export function shoppingPrefetchPhrases(adventureId: string, items: AdventureItem[]): VoicePhrase[] {
+  const open = items.filter((item) => item.status !== "found");
+  const phrases: VoicePhrase[] = [welcomePhrase(`${adventureId}:warm`)];
+  for (const item of open.slice(0, 3)) {
+    phrases.push(productPhrase(item, `${adventureId}:pre:${item.id}`));
+  }
+  return phrases;
+}
+
+export function staticFeedbackPhrases(): VoicePhrase[] {
+  return [
+    positivePhrase("warm:pos:0"),
+    positivePhrase("warm:pos:1"),
+    positivePhrase("warm:pos:2"),
+    incorrectPhrase("warm:bad:0"),
+    incorrectPhrase("warm:bad:1"),
+    incorrectPhrase("warm:bad:2"),
+  ];
+}
+
 /**
- * Drives Phase 1 shopping voice: welcome once, product on each new active item, replay helper.
+ * Drives Phase 1 shopping voice: product-first instructions, optional cached welcome, replay.
  * Never blocks scanning / found progression.
  */
 export function useShopVoice(options: Options) {
@@ -43,33 +64,32 @@ export function useShopVoice(options: Options) {
     };
   }, [enabled]);
 
+  // Prefetch during intro (and whenever the queue is known) so clips are warm when speech may start.
+  useEffect(() => {
+    if (!enabled || !adventureId) return;
+    voiceController.prefetch(shoppingPrefetchPhrases(adventureId, items));
+  }, [enabled, adventureId, items, currentId]);
+
   useEffect(() => {
     if (!enabled || !adventureId || intro || locked || showGuess) return;
     const current = items.find((item) => item.id === currentId) ?? activeItem(items);
     if (!current) return;
 
-    const justWelcomed = welcomed.current !== adventureId;
+    const justStarted = welcomed.current !== adventureId;
     const alreadySpoken = spokenProduct.current === current.id;
-    if (!justWelcomed && alreadySpoken) return;
-
-    const token = voiceController.bump();
-    const seed = `${adventureId}:${current.id}`;
-
-    if (justWelcomed) {
-      welcomed.current = adventureId;
-      const welcome = welcomePhrase(seed, voiceController.avoidText("welcome"));
-      voiceController.play(welcome, { token, priority: "high" });
-    }
-
+    if (!justStarted && alreadySpoken) return;
     if (alreadySpoken) return;
+
+    if (justStarted) welcomed.current = adventureId;
     spokenProduct.current = current.id;
 
+    const seed = `${adventureId}:${current.id}`;
+    const token = voiceController.bump();
     const product = productPhrase(current, seed, voiceController.avoidText("product"));
-    voiceController.play(product, {
-      token,
-      priority: "high",
-      delayMs: justWelcomed ? 700 : 0,
-    });
+
+    // Product-first: speak the find-instruction immediately (no welcome/700ms ahead of it).
+    // Welcome stays in prefetch for warmth but must not delay "what to find".
+    voiceController.play(product, { token, priority: "high", delayMs: 0 });
 
     const open = items.filter((item) => item.status !== "found");
     const upcoming = open.slice(1, 4).map((item) => productPhrase(item, `${adventureId}:pre:${item.id}`));
@@ -89,7 +109,6 @@ export function useShopVoice(options: Options) {
   function onFoundSuccess() {
     if (!enabled || !adventureId) return;
     const now = Date.now();
-    // Intermittent positive feedback — not after every find, and not within 4s.
     const shouldPraise = now - lastPositiveAt.current > 4000 && Math.random() > 0.45;
     const token = voiceController.bump();
     spokenProduct.current = null;
@@ -120,7 +139,10 @@ export function useShopVoice(options: Options) {
   function prepareOptIn(choice: boolean) {
     unlockAudio();
     trackEvent({ name: "voice_opt_in", data: { enabled: choice ? 1 : 0 } });
-    if (choice) voiceController.setEnabled(true);
+    if (choice) {
+      voiceController.setEnabled(true);
+      voiceController.prefetch(staticFeedbackPhrases());
+    }
   }
 
   function prefetchList(phrases: VoicePhrase[]) {
