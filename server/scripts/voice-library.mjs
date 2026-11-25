@@ -5,6 +5,7 @@
  * Does NOT regenerate on every deploy — run intentionally / CI artifact.
  */
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -283,33 +284,56 @@ async function main() {
   }
 
   const entries = [];
+  const failed = [];
   for (let i = 0; i < unique.length; i += 1) {
     const line = unique[i];
     const id = libraryFileId(line.text);
     const rel = join(line.event, `${id}.wav`).replace(/\\/g, "/");
     const abs = join(OUT, rel);
     await mkdir(dirname(abs), { recursive: true });
-    console.log(`[${i + 1}/${unique.length}] ${line.event}: ${line.text}`);
-    let wav;
-    try {
-      wav = await speakOnce(line.text, line.event);
-    } catch (error) {
-      console.warn("retry", error.message);
-      wav = await speakOnce(line.text, line.event);
-    }
-    await writeFile(abs, wav);
-    const pubDir = join(PUBLIC_OUT, line.event);
-    await mkdir(pubDir, { recursive: true });
-    await copyFile(abs, join(PUBLIC_OUT, rel));
-    entries.push({
+    const pubAbs = join(PUBLIC_OUT, rel);
+    await mkdir(dirname(pubAbs), { recursive: true });
+
+    const entry = {
       event: line.event,
       text: line.text,
       file: rel,
       cacheKey: voiceCacheKey(line.text, line.event),
       productId: line.productId,
-    });
+    };
+
+    if (existsSync(abs)) {
+      console.log(`[${i + 1}/${unique.length}] skip (exists): ${line.text}`);
+      if (!existsSync(pubAbs)) await copyFile(abs, pubAbs);
+      entries.push(entry);
+      continue;
+    }
+
+    console.log(`[${i + 1}/${unique.length}] ${line.event}: ${line.text}`);
+    let wav = null;
+    let lastError = null;
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      try {
+        wav = await speakOnce(line.text, line.event);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        const wait = attempt * 1500;
+        console.warn(`retry ${attempt}/4 after ${wait}ms: ${error.message || error}`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+    if (!wav) {
+      console.error(`FAILED: ${line.text} — ${lastError?.message || lastError}`);
+      failed.push(line.text);
+      continue;
+    }
+    await writeFile(abs, wav);
+    await copyFile(abs, pubAbs);
+    entries.push(entry);
     // Gentle pacing to avoid rate limits.
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 400));
   }
 
   const manifest = {
@@ -321,10 +345,15 @@ async function main() {
     templateVersion: TEMPLATE,
     generatedAt: new Date().toISOString(),
     entries,
+    failed,
   };
   await writeFile(join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
   await writeFile(join(PUBLIC_OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
   console.log(`Wrote ${entries.length} clips to ${OUT}`);
+  if (failed.length) {
+    console.error(`Failed ${failed.length} clips — re-run to retry missing files.`);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error) => {
