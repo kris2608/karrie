@@ -2,6 +2,9 @@
 # App flow and share routes are private; X-Robots-Tag also applies where configured.
 
 User-agent: *
+# Explicit allows so Disallow:/s/ cannot be misread as blocking /sitemap.xml
+Allow: /sitemap.xml
+Allow: /robots.txt
 Allow: /
 Allow: /ontdek
 Allow: /over
@@ -12,6 +15,7 @@ Disallow: /controleren
 Disallow: /winkel
 Disallow: /klaar
 Disallow: /l/
+# Trailing slash required: /s/token only. Do not use "Disallow: /s" (that would block /sitemap.xml).
 Disallow: /s/
 Disallow: /api/
 

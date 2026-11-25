@@ -10,7 +10,7 @@
     "dev": "vite",
     "marketing": "vite-node scripts/build-marketing-pages.ts",
     "marketing:screenshots": "vite-node scripts/generate-marketing-screenshots.ts",
-    "build": "tsc --noEmit && npm run marketing && vite build",
+    "build": "tsc --noEmit && npm run marketing && vite build && vite-node scripts/verify-seo-assets.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:server": "npm test --prefix server",

@@ -12,6 +12,7 @@ describe("marketing routing", () => {
       "/privacy.html",
       "/robots.txt",
       "/sitemap.xml",
+      "/sitemap",
       "/api/health",
     ];
     for (const path of paths) {
@@ -30,6 +31,7 @@ describe("marketing routing", () => {
       "/over",
       "/boodschappen-met-kinderen",
       "/boodschappenlijstje-met-plaatjes",
+      "/sitemap",
     ]);
   });
 });

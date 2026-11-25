@@ -22,6 +22,12 @@ services:
       - type: rewrite
         source: /boodschappenlijstje-met-plaatjes
         destination: /boodschappenlijstje-met-plaatjes.html
+      # Extensionless sitemap alias (avoids Cloudflare .xml MIME quirks for some crawlers).
+      - type: rewrite
+        source: /sitemap
+        destination: /sitemap.xml
+      # Existing files (robots.txt, sitemap.xml, *.html) are served before rewrites.
+      # Catch-all only applies when no file exists at the request path.
       - type: rewrite
         source: /*
         destination: /index.html
@@ -44,6 +50,18 @@ services:
       - path: /boodschappenlijstje-met-plaatjes.html
         name: Cache-Control
         value: no-cache
+      - path: /sitemap.xml
+        name: Content-Type
+        value: application/xml; charset=utf-8
+      - path: /sitemap.xml
+        name: Cache-Control
+        value: public, max-age=300
+      - path: /robots.txt
+        name: Content-Type
+        value: text/plain; charset=utf-8
+      - path: /robots.txt
+        name: Cache-Control
+        value: public, max-age=300
       - path: /sw.js
         name: Cache-Control
         value: no-cache
