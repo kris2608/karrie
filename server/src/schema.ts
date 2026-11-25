@@ -25,9 +25,9 @@ export const FOOD_TYPES = [
   "brood", "bolletjes", "krentenbollen", "croissant", "stokbrood",
   "kipfilet", "gehakt", "zalm", "vegaburger",
   "beschuit", "crackers", "havermout", "pindakaas", "noten", "jam", "hagelslag", "muesli", "honing", "appelstroop", "ontbijtkoek",
-  "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "bloem", "suiker", "koekjes", "chips", "chocoladereep", "pastasaus", "mais",
+  "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "suiker", "koekjes", "chips", "chocoladereep", "pastasaus", "mais",
   "augurk", "olijven", "babyvoeding",
-  "melk", "yoghurt", "kwark", "kaas", "ham", "salami", "mozzarella", "feta", "boter", "eieren", "vla", "karnemelk", "roomkaas", "eiersalade",
+  "melk", "yoghurt", "kwark", "kaas", "ham", "salami", "mozzarella", "feta", "boter", "eieren", "vla", "karnemelk", "roomkaas", "slagroom",
   "koffie", "thee", "sinaasappelsap", "water", "drinkpakje", "frisdrank", "siroop",
   "ijs", "pizza", "vissticks", "spinazie", "bessen", "kant-en-klaar", "maaltijdsalade",
 ] as const;
