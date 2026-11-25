@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import {
   incorrectPhrase,
+  missionPhrase,
+  playPhrase,
   positivePhrase,
   productPhrase,
-  welcomePhrase,
   type VoicePhrase,
 } from "../../domain/voiceScripts";
 import type { AdventureItem } from "../../domain/types";
@@ -21,14 +22,19 @@ type Options = {
   intro: boolean;
   locked: boolean;
   showGuess: boolean;
+  /** Healthier mission offered/active for the current item. */
+  missionActive?: boolean;
+  /** Colour / drag / guess play prompts. */
+  playKind?: "color" | "drag" | "guess" | null;
+  playColorLabel?: string;
 };
 
-/** Prefetch helpers shared with ReviewScreen start. */
+/** Prefetch helpers shared with ReviewScreen start — no welcome until intro combo exists. */
 export function shoppingPrefetchPhrases(adventureId: string, items: AdventureItem[]): VoicePhrase[] {
   const open = items.filter((item) => item.status !== "found");
-  const phrases: VoicePhrase[] = [welcomePhrase(`${adventureId}:warm`)];
+  const phrases: VoicePhrase[] = [];
   for (const item of open.slice(0, 3)) {
-    phrases.push(productPhrase(item, `${adventureId}:pre:${item.id}`));
+    phrases.push(productPhrase(item, `${adventureId}:${item.id}`));
   }
   return phrases;
 }
@@ -41,18 +47,36 @@ export function staticFeedbackPhrases(): VoicePhrase[] {
     incorrectPhrase("warm:bad:0"),
     incorrectPhrase("warm:bad:1"),
     incorrectPhrase("warm:bad:2"),
+    missionPhrase("warm:mission:0"),
+    missionPhrase("warm:mission:1"),
   ];
 }
 
 /**
- * Drives Phase 1 shopping voice: product-first instructions, optional cached welcome, replay.
+ * Shopping voice: stable product phrases, optional mission/play lines, replay of the same text.
  * Never blocks scanning / found progression.
  */
 export function useShopVoice(options: Options) {
-  const { enabled, optInSeen, adventureId, items, currentId, intro, locked, showGuess } = options;
-  const welcomed = useRef<string | null>(null);
+  const {
+    enabled,
+    optInSeen,
+    adventureId,
+    items,
+    currentId,
+    intro,
+    locked,
+    showGuess,
+    missionActive,
+    playKind,
+    playColorLabel,
+  } = options;
   const spokenProduct = useRef<string | null>(null);
+  /** Exact phrase for the current step — prefetch, play, and replay share this. */
+  const currentPhrase = useRef<VoicePhrase | null>(null);
   const lastPositiveAt = useRef(0);
+  const missionSpoken = useRef<string | null>(null);
+  const playSpoken = useRef<string | null>(null);
+  const finalSpoken = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) {
@@ -64,7 +88,7 @@ export function useShopVoice(options: Options) {
     };
   }, [enabled]);
 
-  // Prefetch during intro (and whenever the queue is known) so clips are warm when speech may start.
+  // Prefetch upcoming product clips with the same adventureId:itemId seed as play.
   useEffect(() => {
     if (!enabled || !adventureId) return;
     voiceController.prefetch(shoppingPrefetchPhrases(adventureId, items));
@@ -75,34 +99,73 @@ export function useShopVoice(options: Options) {
     const current = items.find((item) => item.id === currentId) ?? activeItem(items);
     if (!current) return;
 
-    const justStarted = welcomed.current !== adventureId;
     const alreadySpoken = spokenProduct.current === current.id;
-    if (!justStarted && alreadySpoken) return;
     if (alreadySpoken) return;
 
-    if (justStarted) welcomed.current = adventureId;
     spokenProduct.current = current.id;
 
     const seed = `${adventureId}:${current.id}`;
-    const token = voiceController.bump();
     const product = productPhrase(current, seed, voiceController.avoidText("product"));
+    currentPhrase.current = product;
 
-    // Product-first: speak the find-instruction immediately (no welcome/700ms ahead of it).
-    // Welcome stays in prefetch for warmth but must not delay "what to find".
+    const token = voiceController.bump();
     voiceController.play(product, { token, priority: "high", delayMs: 0 });
 
     const open = items.filter((item) => item.status !== "found");
-    const upcoming = open.slice(1, 4).map((item) => productPhrase(item, `${adventureId}:pre:${item.id}`));
+    // Occasional final nudge — low priority so it never interrupts the product line.
+    if (open.length === 1 && finalSpoken.current !== adventureId) {
+      finalSpoken.current = adventureId;
+      if (Math.random() > 0.4) {
+        const finalLine: VoicePhrase = {
+          event: "encouragement",
+          phraseId: "encouragement:final",
+          text: "Nog eentje te gaan!",
+        };
+        voiceController.play(finalLine, { token, priority: "low", delayMs: 500 });
+      }
+    }
+
+    const upcoming = open.slice(1, 4).map((item) => productPhrase(item, `${adventureId}:${item.id}`));
     voiceController.prefetch(upcoming);
   }, [enabled, adventureId, currentId, items, intro, locked, showGuess]);
+
+  // Mission whisper — never names the secret alternative. Delay so product bump wins first.
+  useEffect(() => {
+    if (!enabled || !adventureId || !missionActive || intro || locked) return;
+    const key = `${adventureId}:${currentId}:mission`;
+    if (missionSpoken.current === key) return;
+    missionSpoken.current = key;
+    const phrase = missionPhrase(key, voiceController.avoidText("mission"));
+    const timer = window.setTimeout(() => {
+      voiceController.play(phrase, { token: voiceController.currentToken(), priority: "normal" });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [enabled, adventureId, currentId, missionActive, intro, locked]);
+
+  // Colour / drag / guess play prompts from UI copy; guess never spoils the answer.
+  useEffect(() => {
+    if (!enabled || !adventureId || !playKind || intro || locked) return;
+    const key = `${adventureId}:${currentId}:play:${playKind}:${playColorLabel ?? ""}`;
+    if (playSpoken.current === key) return;
+    playSpoken.current = key;
+    const phrase = playPhrase(key, playKind, playColorLabel);
+    const timer = window.setTimeout(() => {
+      voiceController.play(phrase, { token: voiceController.currentToken(), priority: "normal" });
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [enabled, adventureId, currentId, playKind, playColorLabel, intro, locked]);
 
   function replay() {
     if (!enabled) return;
     const current = items.find((item) => item.id === currentId) ?? activeItem(items);
     if (!current || !adventureId) return;
     unlockAudio();
-    const token = voiceController.currentToken();
-    const phrase = productPhrase(current, `${adventureId}:replay:${current.id}:${Date.now()}`);
+    const phrase =
+      currentPhrase.current && currentPhrase.current.phraseId.startsWith("product:")
+        ? currentPhrase.current
+        : productPhrase(current, `${adventureId}:${current.id}`);
+    currentPhrase.current = phrase;
+    const token = voiceController.bump();
     voiceController.play(phrase, { token, priority: "high" });
   }
 
@@ -112,10 +175,12 @@ export function useShopVoice(options: Options) {
     const shouldPraise = now - lastPositiveAt.current > 4000 && Math.random() > 0.45;
     const token = voiceController.bump();
     spokenProduct.current = null;
+    currentPhrase.current = null;
 
     if (shouldPraise) {
       lastPositiveAt.current = now;
-      const praise = positivePhrase(`${adventureId}:pos:${now}`, voiceController.avoidText("positive"));
+      const praise = positivePhrase(`${adventureId}:pos:${currentId ?? "x"}`, voiceController.avoidText("positive"));
+      // After found SFX (~220ms) so we don't overlap beep/pop/star.
       voiceController.play(praise, { token, priority: "normal", delayMs: 220 });
     }
   }
@@ -125,14 +190,14 @@ export function useShopVoice(options: Options) {
     const now = Date.now();
     lastPositiveAt.current = now;
     const token = voiceController.currentToken();
-    const praise = positivePhrase(`${adventureId}:guess:${now}`, voiceController.avoidText("positive"));
+    const praise = positivePhrase(`${adventureId}:guess:${currentId ?? "x"}`, voiceController.avoidText("positive"));
     voiceController.play(praise, { token, priority: "normal", delayMs: 80 });
   }
 
   function onGuessWrong() {
     if (!enabled || !adventureId) return;
     const token = voiceController.bump();
-    const phrase = incorrectPhrase(`${adventureId}:wrong:${Date.now()}`, voiceController.avoidText("incorrect"));
+    const phrase = incorrectPhrase(`${adventureId}:wrong:${currentId ?? "x"}`, voiceController.avoidText("incorrect"));
     voiceController.play(phrase, { token, priority: "normal", delayMs: 80 });
   }
 

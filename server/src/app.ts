@@ -110,12 +110,23 @@ export type HealthierDeps = {
   limits: Limits;
 };
 
+export type VoiceConfigPayload = {
+  model: string;
+  voice: string;
+  language: string;
+  instructionVersion: string;
+  deliveryVersion: string;
+  templateVersion: string;
+  cacheNamespace: string;
+};
+
 export type VoiceDeps = {
   speak: (request: import("./voice/speak.js").SpeakRequest) => Promise<import("./voice/speak.js").SpeakResult>;
+  config: () => VoiceConfigPayload;
   limits: Limits;
   stats: () => Record<string, unknown>;
-  /** Flat USD charged on cache misses when the provider reports extraUsd. */
-  callUsd: number;
+  /** USD per 1M Realtime audio output tokens (text tokens use limits prices). */
+  audioOutputUsdPerMTok: number;
 };
 
 const ROUTES = [
@@ -290,6 +301,7 @@ export function createHandler(deps: AppDeps) {
     }
 
     if (url.pathname === "/api/voice/speak" && req.method === "POST") return speakVoice();
+    if (url.pathname === "/api/voice/config" && req.method === "GET") return voiceConfig();
 
     if (url.pathname === "/api/lists/share" && req.method === "POST") return createSharedList();
     if (url.pathname.startsWith("/api/lists/share/") && req.method === "GET") return readSharedList();
@@ -731,6 +743,13 @@ export function createHandler(deps: AppDeps) {
       return send(200, { status: "ok", alternative: result.alternative, cached: result.cached });
     }
 
+    /** Public voice cache identity — clients build Cache API keys from this. */
+    async function voiceConfig() {
+      if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
+      if (!deps.voice) return send(503, { status: "error", code: "unavailable" });
+      return send(200, { status: "ok", ...deps.voice.config() });
+    }
+
     /** Short AI voice clips for shopping guidance. Allowlisted text only; never free-form TTS. */
     async function speakVoice() {
       if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
@@ -778,18 +797,35 @@ export function createHandler(deps: AppDeps) {
         return send(502, { status: "error", code: "upstream" });
       }
 
+      const usage = result.cacheHit ? undefined : result.usage;
+      const audioTokens = usage?.audioOutputTokens ?? 0;
+      const audioExtra =
+        !result.cacheHit && audioTokens > 0 ? (audioTokens * deps.voice.audioOutputUsdPerMTok) / 1_000_000 : 0;
       deps.voice.limits.record({
         ok: true,
         latencyMs,
-        extraUsd: result.cacheHit ? 0 : deps.voice.callUsd,
+        usage: usage
+          ? {
+              inputTokens: usage.inputTokens,
+              cachedInputTokens: usage.cachedInputTokens,
+              // Text output tokens only — audio billed via extraUsd.
+              outputTokens: Math.max(0, usage.outputTokens - audioTokens),
+            }
+          : undefined,
+        extraUsd: audioExtra,
       });
 
+      const cfg = deps.voice.config();
       res.writeHead(200, {
         "Content-Type": result.entry.contentType,
         "Cache-Control": "public, max-age=604800",
         "X-Voice-Cache": result.cacheHit ? "hit" : "miss",
         "X-Voice-Model": result.entry.model,
         "X-Voice-Voice": result.entry.voice,
+        "X-Voice-Instruction": cfg.instructionVersion,
+        "X-Voice-Delivery": cfg.deliveryVersion,
+        "X-Voice-Template": cfg.templateVersion,
+        "X-Voice-Namespace": cfg.cacheNamespace,
       });
       res.end(result.entry.audio);
       deps.log({ ...entry, status: 200, ms: now() - started });

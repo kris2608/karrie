@@ -14,8 +14,10 @@ import { stickerLabel } from "../../domain/stickers";
 import { buzz } from "../../feedback/haptics";
 import { playFanfare } from "../../feedback/sound";
 import { softSpring } from "../../motion/variants";
+import { celebrationPhrase } from "../../domain/voiceScripts";
 import { trackEvent } from "../../services/analytics";
 import { ensureAdventureCompleted } from "../../services/analyticsMilestones";
+import { voiceController } from "../../services/voice/controller";
 import { useAdventure } from "../../state/AdventureContext";
 import { SaveListSheet } from "../review/SaveListSheet";
 import { ShareListSheet } from "../share/ShareListSheet";
@@ -23,9 +25,11 @@ import { ShareListSheet } from "../share/ShareListSheet";
 const CHEST_AT = 0.5;
 /** After the sticker has appeared, so the child's celebration is never interrupted. */
 const FEEDBACK_AT = CHEST_AT + 1.7;
+/** Speak once the sticker animation has landed. */
+const VOICE_AT = CHEST_AT + 1.2;
 
 export function CompleteScreen() {
-  const { adventure, saved, completedAdventures, feedbackAsked, dispatch } = useAdventure();
+  const { adventure, saved, completedAdventures, feedbackAsked, settings, dispatch } = useAdventure();
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const stars = adventure ? starTotal(adventure.items) : 0;
@@ -35,6 +39,7 @@ export function CompleteScreen() {
   const [sharing, setSharing] = useState(false);
   const [inviteReady, setInviteReady] = useState(reduced);
   const fired = useRef(false);
+  const voiceFired = useRef(false);
   const invite = wantsFeedbackInvite(completedAdventures, feedbackAsked);
 
   useEffect(() => {
@@ -44,6 +49,21 @@ export function CompleteScreen() {
     playFanfare();
     buzz([20, 60, 30]);
   }, [adventure]);
+
+  useEffect(() => {
+    if (!adventure || adventure.phase !== "done" || settings.voiceEnabled !== true || voiceFired.current) return;
+    voiceFired.current = true;
+    const phrase = celebrationPhrase(`${adventure.id}:complete`);
+    const delayMs = reduced ? 200 : VOICE_AT * 1000;
+    const token = voiceController.bump();
+    voiceController.play(phrase, { token, priority: "normal", delayMs });
+  }, [adventure, settings.voiceEnabled, reduced]);
+
+  useEffect(() => {
+    return () => {
+      voiceController.cancel();
+    };
+  }, []);
 
   /** Catch-up adventure_started + adventure_completed when Umami missed the reducer transition. */
   useEffect(() => {

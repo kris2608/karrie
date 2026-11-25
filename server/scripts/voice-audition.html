@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <title>Karrie voice audition</title>
+  <style>
+    body { font-family: Georgia, "Times New Roman", serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; background: #f7f3ea; color: #1c2a24; }
+    h1 { font-size: 1.5rem; }
+    p { line-height: 1.45; }
+    .row { display: grid; grid-template-columns: 90px 1fr auto; gap: 0.75rem; align-items: center; padding: 0.65rem 0; border-bottom: 1px solid #cfc6b4; }
+    .voice { font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; font-family: ui-sans-serif, system-ui, sans-serif; }
+    audio { height: 32px; }
+    .hint { font-size: 0.9rem; color: #5a6a62; }
+  </style>
+</head>
+<body>
+  <h1>Karrie Realtime audition</h1>
+  <p class="hint">Run <code>npm run voice:audition</code> in <code>server/</code> first. Clips land in <code>tmp/voice-audition/</code>. This page is for local listening only — not shipped in the PWA.</p>
+  <p class="hint">Voices: marin, coral, shimmer, cedar on gpt-realtime-2.1-mini. Nova is Speech-API-only and is not auditioned here.</p>
+  <p>After generation, open <code>tmp/voice-audition/index.html</code> for the filled playlist.</p>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import type { VoiceEvent } from "../../domain/voiceScripts";
-import { writeVoiceBlob } from "./cache";
+import { applyVoiceCacheConfig, ensureVoiceCacheConfig, writeVoiceBlob } from "./cache";
 
 export type VoiceFetchResult =
   | { status: "ok"; blob: Blob; cache: "server-hit" | "server-miss" }
@@ -48,11 +48,31 @@ function deviceBump(storage: Storage | null, now: number) {
   }
 }
 
+function syncConfigFromHeaders(headers: Headers) {
+  const model = headers.get("X-Voice-Model");
+  const voice = headers.get("X-Voice-Voice");
+  const instructionVersion = headers.get("X-Voice-Instruction");
+  const deliveryVersion = headers.get("X-Voice-Delivery");
+  const templateVersion = headers.get("X-Voice-Template");
+  const cacheNamespace = headers.get("X-Voice-Namespace");
+  if (model || voice || instructionVersion || deliveryVersion || templateVersion || cacheNamespace) {
+    applyVoiceCacheConfig({
+      ...(model ? { model } : {}),
+      ...(voice ? { voice } : {}),
+      ...(instructionVersion ? { instructionVersion } : {}),
+      ...(deliveryVersion ? { deliveryVersion } : {}),
+      ...(templateVersion ? { templateVersion } : {}),
+      ...(cacheNamespace ? { cacheNamespace } : {}),
+    });
+  }
+}
+
 export function createVoiceClient(deps: VoiceClientDeps) {
   const pending = new Map<string, Promise<VoiceFetchResult>>();
 
   async function fetchClip(event: VoiceEvent, text: string): Promise<VoiceFetchResult> {
     if (!deps.online()) return { status: "offline" };
+    await ensureVoiceCacheConfig(deps.origin);
     const storage = typeof localStorage === "undefined" ? null : localStorage;
     const now = Date.now();
     if (!deviceAllowed(storage, now)) return { status: "limit", code: "device-limit" };
@@ -77,9 +97,10 @@ export function createVoiceClient(deps: VoiceClientDeps) {
           const body = await response.json().catch(() => null);
           return { status: "error", code: typeof body?.code === "string" ? body.code : `http-${response.status}` };
         }
+        syncConfigFromHeaders(response.headers);
         const blob = await response.blob();
         deviceBump(storage, now);
-        await writeVoiceBlob(text, blob);
+        await writeVoiceBlob(text, blob, event);
         const cache = response.headers.get("X-Voice-Cache") === "hit" ? "server-hit" : "server-miss";
         return { status: "ok", blob, cache };
       } catch {

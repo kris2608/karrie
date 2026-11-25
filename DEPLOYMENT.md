@@ -154,15 +154,16 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `LIMIT_PER_IP_HOUR` / `LIMIT_PER_IP_DAY` | 20 / 60 | Per IP-adres |
 | `LIMIT_DAILY_REQUESTS` | 300 | Alle gebruikers samen, per UTC-dag |
 | `DAILY_BUDGET_USD` | 1 | Server stopt met herkennen boven dit bedrag per dag |
-| `OPENAI_VOICE_MODEL` | `gpt-4o-mini-tts` | Speech API-model voor korte winkelaudio (tot jan 2027; daarna Realtime-migratie) |
-| `OPENAI_VOICE` | `nova` | Vaste Karrie-stem (helder, kindgericht) |
+| `OPENAI_VOICE_MODEL` | `gpt-realtime-2.1-mini` | Realtime-model voor korte winkelaudio (geen Speech API) |
+| `OPENAI_VOICE` | `marin` | Vaste Karrie-stem op Realtime (`marin` / `coral` / `shimmer` / `cedar`) |
 | `VOICE` | (aan) | Zet op `off` om stemroutes uit te zetten |
 | `VOICE_LIMIT_PER_IP_HOUR` / `VOICE_LIMIT_PER_IP_DAY` | 40 / 120 | Nieuwe audioclips per IP |
 | `VOICE_LIMIT_DAILY_REQUESTS` | 2000 | Alle gebruikers samen, per UTC-dag |
 | `VOICE_DAILY_BUDGET_USD` | 1 | Dagbudget voor cache-misses |
-| `PRICE_VOICE_CALL` | 0,015 | Geschatte kost per nieuwe clip (cache-hits zijn gratis) |
+| `PRICE_VOICE_INPUT_PER_MTOK` / `PRICE_VOICE_CACHED_INPUT_PER_MTOK` / `PRICE_VOICE_OUTPUT_PER_MTOK` | 0,6 / 0,06 / 2,4 | Realtime tekst-tokenprijzen |
+| `PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK` | 12 | Realtime audio-outputprijs |
 
-Stemclips worden gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal. Alleen allowlisted zinnetjes of product-instructieshetjes worden gesproken — geen vrije tekst-TTS.
+Stemclips worden via Realtime (WebSocket one-shot) gegenereerd en gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal onder namespace `karrie-voice-v3`. Alleen allowlisted zinnetjes of product-instructieshetjes worden gesproken — geen vrije tekst-TTS, geen Speech API-fallback.
 
 Krijgt de server van Render een ander adres dan `https://karrie-api.onrender.com`? Zet dat adres dan in `VITE_API_ORIGIN` van `karrieapp` en bouw de site opnieuw.
 

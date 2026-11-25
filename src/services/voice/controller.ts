@@ -1,7 +1,7 @@
 import type { VoiceEvent, VoicePhrase } from "../../domain/voiceScripts";
 import { unlockAudio } from "../../feedback/sound";
 import { trackEvent } from "../analytics";
-import { peekVoiceBlob, readVoiceBlob } from "./cache";
+import { ensureVoiceCacheConfig, peekVoiceBlob, readVoiceBlob } from "./cache";
 import { voiceClient } from "./client";
 
 export type PlayOptions = {
@@ -21,23 +21,35 @@ type Queued = {
 /**
  * Single-speaker controller: one clip at a time, never blocks shopping.
  * Stale tokens and disabled voice discard playback but keep cached audio.
+ * Order: local cache → server → generate → silent (no speechSynthesis by default).
  */
-export function createVoiceController() {
+export function createVoiceController(options?: { synthFallback?: boolean }) {
   let enabled = false;
   let token = 0;
   let current: HTMLAudioElement | null = null;
   let objectUrl: string | null = null;
   let playingPriority: "high" | "normal" | "low" | null = null;
+  let activePlayToken: number | null = null;
   let queue: Queued | null = null;
   const lastByEvent = new Map<VoiceEvent, string>();
-  let synthFallback = true;
+  let synthFallback = options?.synthFallback === true;
 
   function bump(): number {
     token += 1;
     return token;
   }
 
+  function stopSynth() {
+    if (typeof speechSynthesis === "undefined") return;
+    try {
+      speechSynthesis.cancel();
+    } catch {
+      // ignore
+    }
+  }
+
   function stopCurrent() {
+    stopSynth();
     if (current) {
       current.onended = null;
       current.onerror = null;
@@ -54,6 +66,7 @@ export function createVoiceController() {
       objectUrl = null;
     }
     playingPriority = null;
+    activePlayToken = null;
   }
 
   function cancel() {
@@ -76,7 +89,8 @@ export function createVoiceController() {
   }
 
   async function resolveBlob(phrase: VoicePhrase): Promise<Blob | null> {
-    const cached = await readVoiceBlob(phrase.text);
+    await ensureVoiceCacheConfig();
+    const cached = await readVoiceBlob(phrase.text, phrase.event);
     if (cached) return cached;
     const result = await voiceClient.fetchClip(phrase.event, phrase.text);
     if (result.status === "ok") return result.blob;
@@ -94,8 +108,10 @@ export function createVoiceController() {
       if (dutch) utter.voice = dutch;
       utter.rate = 0.95;
       utter.onend = () => {
-        if (playToken === token) {
+        // Only release speaker if this generation still owns it.
+        if (playToken === token && activePlayToken === playToken) {
           playingPriority = null;
+          activePlayToken = null;
           void drain();
         }
       };
@@ -107,14 +123,17 @@ export function createVoiceController() {
     }
   }
 
-  function finishClip() {
+  /** Release speaker only when this playToken still owns playback. */
+  function finishClip(playToken: number) {
+    if (activePlayToken !== playToken || playToken !== token) return;
     playingPriority = null;
+    activePlayToken = null;
     void drain();
   }
 
   async function playBlob(blob: Blob, playToken: number, priority: PlayOptions["priority"]): Promise<void> {
     if (playToken !== token || !enabled) {
-      finishClip();
+      finishClip(playToken);
       return;
     }
     if (current) {
@@ -138,6 +157,7 @@ export function createVoiceController() {
     const audio = new Audio(url);
     current = audio;
     playingPriority = priority ?? "normal";
+    activePlayToken = playToken;
     await new Promise<void>((resolve) => {
       const done = () => {
         if (objectUrl === url) {
@@ -146,7 +166,7 @@ export function createVoiceController() {
         }
         if (current === audio) current = null;
         resolve();
-        finishClip();
+        finishClip(playToken);
       };
       audio.onended = () => done();
       audio.onerror = () => {
@@ -163,38 +183,40 @@ export function createVoiceController() {
   /** Runs a clip that already reserved `playingPriority` via play() or drain(). */
   async function run(phrase: VoicePhrase, options: PlayOptions): Promise<void> {
     const priority = options.priority ?? "normal";
-    if (!enabled || options.token !== token) {
-      finishClip();
+    const playToken = options.token;
+    if (!enabled || playToken !== token) {
+      finishClip(playToken);
       return;
     }
     if (options.delayMs && options.delayMs > 0) {
-      await new Promise((resolve) => window.setTimeout(resolve, options.delayMs));
-      if (!enabled || options.token !== token) {
-        finishClip();
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+      if (!enabled || playToken !== token) {
+        finishClip(playToken);
         return;
       }
     }
 
     const blob = await resolveBlob(phrase);
-    if (!enabled || options.token !== token) {
-      finishClip();
+    if (!enabled || playToken !== token) {
+      finishClip(playToken);
       return;
     }
 
     lastByEvent.set(phrase.event, phrase.text);
 
     if (blob) {
-      await playBlob(blob, options.token, priority);
+      await playBlob(blob, playToken, priority);
       return;
     }
 
-    if (speakWithSynth(phrase.text, options.token)) {
+    if (speakWithSynth(phrase.text, playToken)) {
       playingPriority = priority;
+      activePlayToken = playToken;
       return;
     }
 
-    // Silent failure — free the speaker for the next clip.
-    finishClip();
+    // Silent failure — free the speaker for the next clip only if we still own it.
+    finishClip(playToken);
   }
 
   async function drain() {
@@ -203,6 +225,7 @@ export function createVoiceController() {
     if (!next || !enabled) return;
     if (next.options.token !== token) return;
     playingPriority = next.options.priority ?? "normal";
+    activePlayToken = next.options.token;
     await run(next.phrase, next.options);
   }
 
@@ -216,13 +239,25 @@ export function createVoiceController() {
       delayMs: options?.delayMs,
       priority,
     };
-    // Reserve synchronously so a same-tick follow-up (product after welcome) queues cleanly.
+
     if (playingPriority !== null) {
       if (priority === "low") return playToken;
+      // High priority (product / replay) beats optional praise — interrupt and clear queue.
+      if (priority === "high") {
+        queue = null;
+        stopCurrent();
+        playingPriority = priority;
+        activePlayToken = playToken;
+        void run(phrase, next);
+        return playToken;
+      }
+      // Normal: replace queued clip (replay / later praise overrides earlier queue).
       queue = { phrase, options: { ...next, delayMs: 0 } };
       return playToken;
     }
+
     playingPriority = priority;
+    activePlayToken = playToken;
     void run(phrase, next);
     return playToken;
   }
@@ -232,21 +267,22 @@ export function createVoiceController() {
   }
 
   function prefetch(phrases: VoicePhrase[]) {
+    void ensureVoiceCacheConfig();
     for (const phrase of phrases.slice(0, 6)) {
       void (async () => {
-        const cached = await readVoiceBlob(phrase.text);
+        const cached = await readVoiceBlob(phrase.text, phrase.event);
         if (cached) return;
         await voiceClient.fetchClip(phrase.event, phrase.text);
       })();
     }
   }
 
-  function isCachedSync(text: string): boolean {
-    return Boolean(peekVoiceBlob(text));
+  function isCachedSync(text: string, event?: string): boolean {
+    return Boolean(peekVoiceBlob(text, event));
   }
 
-  async function isCached(text: string): Promise<boolean> {
-    return Boolean(await readVoiceBlob(text));
+  async function isCached(text: string, event?: string): Promise<boolean> {
+    return Boolean(await readVoiceBlob(text, event));
   }
 
   return {

@@ -1,6 +1,7 @@
 import { isAllowedSpeechText, type VoiceEvent } from "./allowlist.js";
 import { voiceCacheKey, type VoiceCache, type VoiceCacheEntry } from "./cache.js";
-import { VOICE_LANGUAGE, type SpeechProvider } from "./provider.js";
+import { VOICE_DELIVERY_VERSION, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE } from "./personality.js";
+import type { SpeechProvider } from "./provider.js";
 
 export type SpeakRequest = {
   event: VoiceEvent;
@@ -8,7 +9,13 @@ export type SpeakRequest = {
 };
 
 export type SpeakResult =
-  | { ok: true; entry: VoiceCacheEntry; cacheHit: boolean; key: string }
+  | {
+      ok: true;
+      entry: VoiceCacheEntry;
+      cacheHit: boolean;
+      key: string;
+      usage?: { inputTokens: number; cachedInputTokens: number; outputTokens: number; audioOutputTokens?: number };
+    }
   | { ok: false; code: "invalid" | "misconfigured" | "upstream" };
 
 const inflight = new Map<string, Promise<SpeakResult>>();
@@ -16,11 +23,22 @@ const inflight = new Map<string, Promise<SpeakResult>>();
 export type SpeakService = {
   speak(request: SpeakRequest): Promise<SpeakResult>;
   stats(): ReturnType<VoiceCache["stats"]> & { generates: number; failures: number };
+  config(): {
+    model: string;
+    voice: string;
+    language: string;
+    instructionVersion: string;
+    deliveryVersion: string;
+    templateVersion: string;
+    cacheNamespace: string;
+  };
 };
 
 export function createSpeakService(deps: {
   provider: SpeechProvider | null;
   cache: VoiceCache;
+  templateVersion: string;
+  cacheNamespace: string;
 }): SpeakService {
   let generates = 0;
   let failures = 0;
@@ -34,7 +52,7 @@ export function createSpeakService(deps: {
       text,
       language: VOICE_LANGUAGE,
       voice: deps.provider.voice,
-      instructionVersion: deps.provider.instructionVersion,
+      instructionVersion: `${VOICE_INSTRUCTION_VERSION}|${VOICE_DELIVERY_VERSION}|${deps.templateVersion}|${request.event}`,
       model: deps.provider.model,
     });
 
@@ -46,7 +64,7 @@ export function createSpeakService(deps: {
 
     const work = (async (): Promise<SpeakResult> => {
       try {
-        const generated = await deps.provider!.generate(text);
+        const generated = await deps.provider!.generate(text, { event: request.event });
         const entry: VoiceCacheEntry = {
           audio: generated.audio,
           contentType: generated.contentType,
@@ -55,7 +73,7 @@ export function createSpeakService(deps: {
         };
         await deps.cache.set(key, entry);
         generates += 1;
-        return { ok: true, entry, cacheHit: false, key };
+        return { ok: true, entry, cacheHit: false, key, usage: generated.usage };
       } catch {
         failures += 1;
         return { ok: false, code: "upstream" };
@@ -71,5 +89,14 @@ export function createSpeakService(deps: {
   return {
     speak: generate,
     stats: () => ({ ...deps.cache.stats(), generates, failures }),
+    config: () => ({
+      model: deps.provider?.model ?? "gpt-realtime-2.1-mini",
+      voice: deps.provider?.voice ?? "marin",
+      language: VOICE_LANGUAGE,
+      instructionVersion: VOICE_INSTRUCTION_VERSION,
+      deliveryVersion: VOICE_DELIVERY_VERSION,
+      templateVersion: deps.templateVersion,
+      cacheNamespace: deps.cacheNamespace,
+    }),
   };
 }

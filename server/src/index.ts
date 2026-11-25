@@ -23,7 +23,8 @@ import { createOffSearch } from "./offSearch.js";
 import { createStoreImageLookup } from "./storeImage.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
 import { createMemoryVoiceCache, createPgVoiceCache } from "./voice/cache.js";
-import { createSpeechApiProvider } from "./voice/provider.js";
+import { VOICE_CACHE_NAMESPACE, VOICE_TEMPLATE_VERSION } from "./voice/personality.js";
+import { createRealtimeSpeechProvider } from "./voice/provider.js";
 import { createSpeakService } from "./voice/speak.js";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
@@ -273,26 +274,46 @@ const handler = createHandler({
     : undefined,
   voice: (() => {
     if (env.VOICE === "off") return undefined;
+    // Realtime gpt-realtime-2.1-mini text/audio token prices (USD per 1M tokens).
     const voiceLimits = createLimits({
       perIpPerHour: number("VOICE_LIMIT_PER_IP_HOUR", 40),
       perIpPerDay: number("VOICE_LIMIT_PER_IP_DAY", 120),
       dailyRequests: number("VOICE_LIMIT_DAILY_REQUESTS", 2000),
       dailyBudgetUsd: number("VOICE_DAILY_BUDGET_USD", 1),
-      inputUsdPerMTok: 0,
-      cachedInputUsdPerMTok: 0,
-      outputUsdPerMTok: 0,
+      inputUsdPerMTok: number("PRICE_VOICE_INPUT_PER_MTOK", 0.6),
+      cachedInputUsdPerMTok: number("PRICE_VOICE_CACHED_INPUT_PER_MTOK", 0.06),
+      outputUsdPerMTok: number("PRICE_VOICE_OUTPUT_PER_MTOK", 2.4),
     });
-    const callUsd = number("PRICE_VOICE_CALL", 0.015);
-    const provider = client
-      ? createSpeechApiProvider(client, {
-          model: env.OPENAI_VOICE_MODEL || "gpt-4o-mini-tts",
-          voice: env.OPENAI_VOICE || "nova",
-          callUsd,
-        })
-      : null;
+    const audioOutputUsdPerMTok = number("PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK", 12);
+    let provider = null;
+    if (apiKey) {
+      try {
+        provider = createRealtimeSpeechProvider({
+          apiKey,
+          model: env.OPENAI_VOICE_MODEL || "gpt-realtime-2.1-mini",
+          voice: env.OPENAI_VOICE || "marin",
+          timeoutMs: number("OPENAI_VOICE_TIMEOUT_MS", 12_000),
+          maxConcurrent: number("VOICE_MAX_CONCURRENT", 2),
+        });
+      } catch (error) {
+        console.error(JSON.stringify({ event: "voice_provider_error", error: String(error) }));
+        throw error;
+      }
+    }
     const cache = pgPool ? createPgVoiceCache(pgPool) : createMemoryVoiceCache();
-    const service = createSpeakService({ provider, cache });
-    return { speak: service.speak, limits: voiceLimits, stats: () => service.stats(), callUsd };
+    const service = createSpeakService({
+      provider,
+      cache,
+      templateVersion: VOICE_TEMPLATE_VERSION,
+      cacheNamespace: VOICE_CACHE_NAMESPACE,
+    });
+    return {
+      speak: service.speak,
+      config: service.config,
+      limits: voiceLimits,
+      stats: () => service.stats(),
+      audioOutputUsdPerMTok,
+    };
   })(),
   log: (entry) => console.log(JSON.stringify(entry)),
 });

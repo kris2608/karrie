@@ -7,6 +7,7 @@ dev-dist
 *.tsbuildinfo
 .env
 server/dist
+server/tmp/
 .testdata
 local-tests/
 

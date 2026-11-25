@@ -112,11 +112,11 @@ services:
         value: "300"
       - key: OFFERS_LIMIT_PER_IP_DAY
         value: "1500"
-      # Short Dutch shopping voice clips (Speech API). Set VOICE=off to disable.
+      # Short Dutch shopping voice clips (Realtime). Set VOICE=off to disable.
       - key: OPENAI_VOICE_MODEL
-        value: gpt-4o-mini-tts
+        value: gpt-realtime-2.1-mini
       - key: OPENAI_VOICE
-        value: nova
+        value: marin
       - key: VOICE_LIMIT_PER_IP_HOUR
         value: "40"
       - key: VOICE_LIMIT_PER_IP_DAY
@@ -125,5 +125,11 @@ services:
         value: "2000"
       - key: VOICE_DAILY_BUDGET_USD
         value: "1"
-      - key: PRICE_VOICE_CALL
-        value: "0.015"
+      - key: PRICE_VOICE_INPUT_PER_MTOK
+        value: "0.6"
+      - key: PRICE_VOICE_CACHED_INPUT_PER_MTOK
+        value: "0.06"
+      - key: PRICE_VOICE_OUTPUT_PER_MTOK
+        value: "2.4"
+      - key: PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK
+        value: "12"
