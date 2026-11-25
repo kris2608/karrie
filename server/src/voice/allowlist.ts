@@ -11,7 +11,7 @@ const STATIC = new Set([
   "Gevonden!",
   "Die mag in ons wagentje!",
   "Kijk eens aan!",
-  "Yes, die hebben we!",
+  "Ja, die hebben we!",
   "Goed gedaan!",
   "Dat is hem!",
   "Helemaal goed!",

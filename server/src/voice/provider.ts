@@ -181,7 +181,7 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
           }),
         );
         // Avoid hang if the API never emits session.updated.
-        fallbackCreate = setTimeout(() => createResponse(), 800);
+        fallbackCreate = setTimeout(() => createResponse(), 400);
       });
 
       ws.on("message", (raw) => {

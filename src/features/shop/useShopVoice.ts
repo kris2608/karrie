@@ -33,7 +33,7 @@ type Options = {
 export function shoppingPrefetchPhrases(adventureId: string, items: AdventureItem[]): VoicePhrase[] {
   const open = items.filter((item) => item.status !== "found");
   const phrases: VoicePhrase[] = [];
-  for (const item of open.slice(0, 3)) {
+  for (const item of open.slice(0, 5)) {
     phrases.push(productPhrase(item, `${adventureId}:${item.id}`));
   }
   return phrases;
@@ -44,11 +44,13 @@ export function staticFeedbackPhrases(): VoicePhrase[] {
     positivePhrase("warm:pos:0"),
     positivePhrase("warm:pos:1"),
     positivePhrase("warm:pos:2"),
+    positivePhrase("warm:pos:3"),
     incorrectPhrase("warm:bad:0"),
     incorrectPhrase("warm:bad:1"),
     incorrectPhrase("warm:bad:2"),
     missionPhrase("warm:mission:0"),
     missionPhrase("warm:mission:1"),
+    missionPhrase("warm:mission:2"),
   ];
 }
 
@@ -125,11 +127,11 @@ export function useShopVoice(options: Options) {
       }
     }
 
-    const upcoming = open.slice(1, 4).map((item) => productPhrase(item, `${adventureId}:${item.id}`));
+    const upcoming = open.slice(1, 6).map((item) => productPhrase(item, `${adventureId}:${item.id}`));
     voiceController.prefetch(upcoming);
   }, [enabled, adventureId, currentId, items, intro, locked, showGuess]);
 
-  // Mission whisper — never names the secret alternative. Delay so product bump wins first.
+  // Mission prompt — never names the secret alternative. Delay so product bump wins first.
   useEffect(() => {
     if (!enabled || !adventureId || !missionActive || intro || locked) return;
     const key = `${adventureId}:${currentId}:mission`;
@@ -138,7 +140,7 @@ export function useShopVoice(options: Options) {
     const phrase = missionPhrase(key, voiceController.avoidText("mission"));
     const timer = window.setTimeout(() => {
       voiceController.play(phrase, { token: voiceController.currentToken(), priority: "normal" });
-    }, 700);
+    }, 350);
     return () => window.clearTimeout(timer);
   }, [enabled, adventureId, currentId, missionActive, intro, locked]);
 
@@ -151,7 +153,7 @@ export function useShopVoice(options: Options) {
     const phrase = playPhrase(key, playKind, playColorLabel);
     const timer = window.setTimeout(() => {
       voiceController.play(phrase, { token: voiceController.currentToken(), priority: "normal" });
-    }, 500);
+    }, 250);
     return () => window.clearTimeout(timer);
   }, [enabled, adventureId, currentId, playKind, playColorLabel, intro, locked]);
 

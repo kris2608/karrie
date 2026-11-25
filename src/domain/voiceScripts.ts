@@ -2,12 +2,12 @@ import { spokenNameInSentence, spokenNounPhrase, spokenProductMeta } from "./spo
 
 export const VOICE_LANGUAGE = "nl-NL";
 /** Bump when personality instructions or template wording change so caches refresh. */
-export const VOICE_INSTRUCTION_VERSION = "v3";
-export const VOICE_DELIVERY_VERSION = "v3";
-export const VOICE_TEMPLATE_VERSION = "v3";
+export const VOICE_INSTRUCTION_VERSION = "v4";
+export const VOICE_DELIVERY_VERSION = "v4";
+export const VOICE_TEMPLATE_VERSION = "v4";
 
 export const VOICE_PERSONALITY =
-  "You are Karrie, a cheerful little shopping adventure companion for children aged two to five. Speak in authentic, natural Netherlands Dutch. Curious, playful, warm and expressive — like a lovable preschool TV character, never an exaggerated cartoon. Always speak the supplied Dutch text without adding extra words.";
+  "You are Karrie, one warm shopping friend for children aged two to five. Always the same calm mid pitch and speaker identity. Speak authentic Netherlands Dutch with clear vowels and natural Dutch rhythm — never English-accented. Always speak the supplied Dutch text without adding extra words.";
 
 export type VoiceEvent =
   | "welcome"
@@ -39,7 +39,7 @@ const POSITIVE = [
   "Gevonden!",
   "Die mag in ons wagentje!",
   "Kijk eens aan!",
-  "Yes, die hebben we!",
+  "Ja, die hebben we!",
   "Goed gedaan!",
   "Dat is hem!",
   "Helemaal goed!",

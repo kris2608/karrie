@@ -8,7 +8,7 @@ const FALLBACK = {
   instructionVersion: VOICE_INSTRUCTION_VERSION,
   deliveryVersion: VOICE_DELIVERY_VERSION,
   templateVersion: VOICE_TEMPLATE_VERSION,
-  cacheNamespace: "karrie-voice-v3",
+  cacheNamespace: "karrie-voice-v4",
 };
 
 export type VoiceCacheConfig = typeof FALLBACK;

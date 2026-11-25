@@ -1,5 +1,5 @@
 /**
- * Dev-only Realtime voice audition. Writes WAV samples under server/tmp/voice-audition/.
+ * Dev-only Realtime voice audition (personality v4). Writes WAV under server/tmp/voice-audition/.
  * Usage: npm run voice:audition
  * Never uses the Speech API.
  */
@@ -21,21 +21,31 @@ if (process.env.OPENAI_API_KEY === undefined) {
 
 const API_KEY = process.env.OPENAI_API_KEY;
 const MODEL = process.env.OPENAI_VOICE_MODEL || "gpt-realtime-2.1-mini";
-const VOICES = ["marin", "coral", "shimmer", "cedar"];
+const VOICES = ["marin", "coral", "cedar"];
 
-const PERSONALITY = `You are Karrie, a cheerful little shopping adventure companion for children aged two to five.
-Speak in authentic, natural Netherlands Dutch, with native Dutch pronunciation and natural conversational rhythm.
-You are curious, playful, warm and expressive. You sound like a lovable character in a high-quality preschool television programme, but never like an exaggerated cartoon or a baby.
-Always speak the supplied Dutch text without adding extra words.`;
+const PERSONALITY = `You are Karrie, one warm shopping friend for children aged two to five.
+
+Always use the same speaker identity, the same calm mid pitch, and the same speaking speed in every clip. Do not change character, timbre, or energy between sentences.
+
+Speak authentic Netherlands Dutch (Nederlands-Nederlands), not Belgian Flemish and not English-accented Dutch. Use clear Dutch vowels (aa, oo, ui, eu), natural Dutch rhythm and stress, and a soft conversational tone. Do not use an English cadence, rolled theatrical R, German consonants, or anglicized vowels.
+
+Sound like a kind adult talking gently to a small child in a Dutch supermarket — warm and clear, never a cartoon, baby voice, whisper, shout, teacher, or commercial announcer.
+
+Keep speech short and steady. Do not add laughter, gasps, song, or extra words.
+
+Always speak the supplied Dutch text exactly, and nothing else.`;
+
+const BASELINE =
+  "Same Karrie voice and pitch as always. Only a tiny mood shift, never a different speaker.";
 
 const LINES = [
-  { id: "welcome", event: "welcome", text: "Hoi! Zullen we samen boodschappen doen?", delivery: "friendly, inviting, with a gentle smile" },
-  { id: "banana", event: "product", text: "Hmm… waar zouden de bananen zijn?", delivery: "curious and conversational" },
-  { id: "milk", event: "product", text: "Zo, nu nog melk!", delivery: "curious and conversational" },
-  { id: "hebbes", event: "positive", text: "Hebbes!", delivery: "spontaneous, brief delight" },
-  { id: "apples", event: "product", text: "Hmm… waar zouden de drie appels zijn?", delivery: "curious and conversational" },
-  { id: "mission", event: "mission", text: "Psst… ik heb een speciale opdracht voor je!", delivery: "playful and slightly mysterious" },
-  { id: "tadaa", event: "complete", text: "Tadaa! Dat hebben we samen mooi gedaan!", delivery: "proud, celebratory and affectionate" },
+  { id: "welcome", text: "Hoi! Zullen we samen boodschappen doen?", mood: "Mood: warmly inviting." },
+  { id: "banana", text: "Hmm… waar zouden de bananen zijn?", mood: "Mood: gently curious." },
+  { id: "milk", text: "Zo, nu nog melk!", mood: "Mood: gently curious." },
+  { id: "hebbes", text: "Hebbes!", mood: "Mood: softly pleased." },
+  { id: "apples", text: "Hmm… waar zouden de drie appels zijn?", mood: "Mood: gently curious." },
+  { id: "mission", text: "Psst… ik heb een speciale opdracht voor je!", mood: "Mood: playfully attentive (not a whisper)." },
+  { id: "tadaa", text: "Tadaa! Dat hebben we samen mooi gedaan!", mood: "Mood: quietly proud." },
 ];
 
 function pcmToWav(pcm, sampleRate = 24_000) {
@@ -64,12 +74,15 @@ function speakOnce(voice, line) {
     const ws = new WebSocket(url, { headers: { Authorization: `Bearer ${API_KEY}` } });
     const chunks = [];
     let settled = false;
+    let responseCreated = false;
     const timer = setTimeout(() => fail(new Error("timeout")), 20_000);
+    let fallback;
 
     function fail(error) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (fallback) clearTimeout(fallback);
       try {
         ws.close();
       } catch {
@@ -82,12 +95,30 @@ function speakOnce(voice, line) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (fallback) clearTimeout(fallback);
       try {
         ws.close();
       } catch {
         // ignore
       }
       resolve(wav);
+    }
+
+    function createResponse() {
+      if (settled || responseCreated || ws.readyState !== WebSocket.OPEN) return;
+      responseCreated = true;
+      if (fallback) clearTimeout(fallback);
+      ws.send(
+        JSON.stringify({
+          type: "response.create",
+          response: {
+            conversation: "none",
+            output_modalities: ["audio"],
+            instructions: `${PERSONALITY}\n\n${BASELINE}\n${line.mood}\n\nSay exactly the following Dutch sentence and nothing else:\n${line.text}`,
+            audio: { output: { voice, format: { type: "audio/pcm", rate: 24_000 } } },
+          },
+        }),
+      );
     }
 
     ws.on("open", () => {
@@ -105,6 +136,7 @@ function speakOnce(voice, line) {
           },
         }),
       );
+      fallback = setTimeout(() => createResponse(), 400);
     });
 
     ws.on("message", (raw) => {
@@ -120,17 +152,7 @@ function speakOnce(voice, line) {
         return;
       }
       if (type === "session.updated") {
-        ws.send(
-          JSON.stringify({
-            type: "response.create",
-            response: {
-              conversation: "none",
-              output_modalities: ["audio"],
-              instructions: `${PERSONALITY}\n\nDelivery: ${line.delivery}.\n\nSay exactly the following Dutch sentence and nothing else:\n${line.text}`,
-              audio: { output: { voice, format: { type: "audio/pcm", rate: 24_000 } } },
-            },
-          }),
-        );
+        createResponse();
         return;
       }
       if (type === "response.output_audio.delta" || type === "response.audio.delta") {
@@ -171,8 +193,8 @@ async function main() {
       try {
         const wav = await speakOnce(voice, line);
         await writeFile(join(OUT, file), wav);
-        index.push({ voice, id: line.id, text: line.text, file });
-        console.log("ok");
+        index.push({ voice, id: line.id, text: line.text, file, bytes: wav.length });
+        console.log("ok", wav.length, "bytes");
       } catch (error) {
         console.log("FAIL", error instanceof Error ? error.message : error);
       }
@@ -183,18 +205,18 @@ async function main() {
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <title>Karrie voice audition</title>
+  <title>Karrie voice audition v4</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    body { font-family: Georgia, "Times New Roman", serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; background: #f7f3ea; color: #1c2a24; }
     h1 { font-size: 1.4rem; }
-    .row { display: grid; grid-template-columns: 90px 1fr auto; gap: 0.75rem; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #ddd; }
-    .voice { font-weight: 700; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.04em; }
+    .row { display: grid; grid-template-columns: 90px 1fr auto; gap: 0.75rem; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #cfc6b4; }
+    .voice { font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; font-family: ui-sans-serif, system-ui, sans-serif; }
     audio { height: 32px; }
   </style>
 </head>
 <body>
-  <h1>Karrie Realtime audition (${MODEL})</h1>
-  <p>Local preview only — not shipped in the PWA. Nova is not on Realtime; compare marin / coral / shimmer / cedar.</p>
+  <h1>Karrie Realtime audition v4 (${MODEL})</h1>
+  <p>Stable single-speaker personality. Compare marin / coral / cedar. Default remains marin unless a voice clearly wins for Dutch consistency.</p>
   ${index
     .map(
       (row) => `<div class="row"><span class="voice">${row.voice}</span><span>${row.text}</span><audio controls src="./${row.file}"></audio></div>`,
@@ -204,9 +226,9 @@ async function main() {
 </html>`;
 
   await writeFile(join(OUT, "index.html"), html);
-  await writeFile(join(__dirname, "voice-audition.html"), html.replaceAll('src="./', 'src="../tmp/voice-audition/'));
+  await writeFile(join(OUT, "summary.json"), JSON.stringify({ model: MODEL, personality: "v4", voices: VOICES, clips: index }, null, 2));
   console.log(`\nWrote ${index.length} clips + index to ${OUT}`);
-  console.log("Open server/tmp/voice-audition/index.html or server/scripts/voice-audition.html");
+  console.log("Default remains marin (locked) unless you change OPENAI_VOICE after listening.");
 }
 
 main().catch((error) => {

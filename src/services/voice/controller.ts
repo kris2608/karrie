@@ -89,7 +89,9 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
   }
 
   async function resolveBlob(phrase: VoicePhrase): Promise<Blob | null> {
-    await ensureVoiceCacheConfig();
+    // Sync memory hit avoids awaiting config/Cache API on the hot path.
+    const warm = peekVoiceBlob(phrase.text, phrase.event);
+    if (warm) return warm;
     const cached = await readVoiceBlob(phrase.text, phrase.event);
     if (cached) return cached;
     const result = await voiceClient.fetchClip(phrase.event, phrase.text);
@@ -271,9 +273,11 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
   }
 
   function prefetch(phrases: VoicePhrase[]) {
+    // Fire-and-forget config; do not block play on prefetch work.
     void ensureVoiceCacheConfig();
-    for (const phrase of phrases.slice(0, 6)) {
+    for (const phrase of phrases.slice(0, 12)) {
       void (async () => {
+        if (peekVoiceBlob(phrase.text, phrase.event)) return;
         const cached = await readVoiceBlob(phrase.text, phrase.event);
         if (cached) return;
         await voiceClient.fetchClip(phrase.event, phrase.text);

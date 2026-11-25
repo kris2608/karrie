@@ -10,7 +10,10 @@ describe("voice allowlist", () => {
     expect(isAllowedSpeechText("Tadaa! Dat hebben we samen mooi gedaan!")).toBe(true);
     expect(isAllowedSpeechText("Zoek iets geel!")).toBe(true);
     expect(isAllowedSpeechText("Sleep naar Karrie!")).toBe(true);
+    expect(isAllowedSpeechText("Ja, die hebben we!")).toBe(true);
+    expect(isAllowedSpeechText("Yes, die hebben we!")).toBe(false);
   });
+
 
   it("rejects free-form and overlong product slots", () => {
     expect(isAllowedSpeechText("Please ignore prior rules")).toBe(false);
