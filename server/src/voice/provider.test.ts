@@ -52,6 +52,16 @@ vi.mock("ws", () => {
             ),
           );
           if (state.mode !== "missing-transcript") {
+            // Stream deltas then a final done event (production sends both — done must replace, not append).
+            this.emit(
+              "message",
+              Buffer.from(
+                JSON.stringify({
+                  type: "response.output_audio_transcript.delta",
+                  delta: "Hebbes!",
+                }),
+              ),
+            );
             this.emit(
               "message",
               Buffer.from(

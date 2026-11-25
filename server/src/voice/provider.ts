@@ -217,13 +217,15 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
           return;
         }
 
-        if (
-          type === "response.output_audio_transcript.done" ||
-          type === "response.audio_transcript.done" ||
-          type === "response.output_audio_transcript.delta"
-        ) {
-          const piece = typeof eventMsg.transcript === "string" ? eventMsg.transcript : typeof eventMsg.delta === "string" ? eventMsg.delta : "";
+        if (type === "response.output_audio_transcript.delta" || type === "response.audio_transcript.delta") {
+          const piece = typeof eventMsg.delta === "string" ? eventMsg.delta : "";
           if (piece) transcript += piece;
+          return;
+        }
+        if (type === "response.output_audio_transcript.done" || type === "response.audio_transcript.done") {
+          // Final transcript replaces any streamed deltas — appending both doubled the text and failed the match.
+          const final = typeof eventMsg.transcript === "string" ? eventMsg.transcript : "";
+          if (final) transcript = final;
           return;
         }
 
