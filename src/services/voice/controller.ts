@@ -94,12 +94,7 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
     if (cached) return cached;
     const result = await voiceClient.fetchClip(phrase.event, phrase.text);
     if (result.status === "ok") return result.blob;
-    const code =
-      result.status === "limit" || result.status === "error"
-        ? result.code
-        : result.status === "offline"
-          ? "offline"
-          : result.status;
+    const code = result.status === "limit" || result.status === "error" ? result.code : "offline";
     trackEvent({ name: "voice_playback_failed", data: { reason: "fetch", code } });
     return null;
   }
