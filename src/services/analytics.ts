@@ -69,7 +69,13 @@ export type AnalyticsEvent =
   | { name: "sticker_book_opened" }
   | { name: "voice_opt_in"; data: { enabled: 0 | 1 } }
   | { name: "voice_muted" }
-  | { name: "voice_playback_failed"; data: { reason: "play" | "element" | "network" | "fetch"; code?: string } };
+  | { name: "voice_playback_failed"; data: { reason: "play" | "element" | "network" | "fetch"; code?: string } }
+  | { name: "voice_fetch"; data: { source: string; ms: number; event?: string } }
+  | { name: "voice_autoplay_reject"; data: { reason: string } }
+  | {
+      name: "voice_instruction";
+      data: { phase: "started" | "completed" | "failed" | "retry"; event?: string; code?: string };
+    };
 
 export function latencyBucket(ms: number): LatencyBucket {
   if (ms < 2_000) return "0-2s";

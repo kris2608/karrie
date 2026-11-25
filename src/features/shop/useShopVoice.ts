@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
-  incorrectPhrase,
+  completePhrase,
   missionPhrase,
-  playPhrase,
-  positivePhrase,
   productPhrase,
   type VoicePhrase,
 } from "../../domain/voiceScripts";
@@ -12,6 +10,8 @@ import { activeItem } from "../../domain/shopQueue";
 import { unlockAudio } from "../../feedback/sound";
 import { trackEvent } from "../../services/analytics";
 import { voiceController } from "../../services/voice/controller";
+
+type InstructionStatus = "requested" | "ready" | "started" | "completed" | "failed";
 
 type Options = {
   enabled: boolean;
@@ -24,39 +24,37 @@ type Options = {
   showGuess: boolean;
   /** Healthier mission offered/active for the current item. */
   missionActive?: boolean;
-  /** Colour / drag / guess play prompts. */
+  /** Colour / drag / guess play prompts — disabled for auto speech in P0. */
   playKind?: "color" | "drag" | "guess" | null;
   playColorLabel?: string;
 };
 
-/** Prefetch helpers shared with ReviewScreen start — no welcome until intro combo exists. */
+/** Prefetch current + next only — shared with ReviewScreen start. */
 export function shoppingPrefetchPhrases(adventureId: string, items: AdventureItem[]): VoicePhrase[] {
   const open = items.filter((item) => item.status !== "found");
   const phrases: VoicePhrase[] = [];
-  for (const item of open.slice(0, 5)) {
+  for (const item of open.slice(0, 2)) {
     phrases.push(productPhrase(item, `${adventureId}:${item.id}`));
   }
   return phrases;
 }
 
+/** Mission + complete lines only (praise disabled on happy path). */
 export function staticFeedbackPhrases(): VoicePhrase[] {
   return [
-    positivePhrase("warm:pos:0"),
-    positivePhrase("warm:pos:1"),
-    positivePhrase("warm:pos:2"),
-    positivePhrase("warm:pos:3"),
-    incorrectPhrase("warm:bad:0"),
-    incorrectPhrase("warm:bad:1"),
-    incorrectPhrase("warm:bad:2"),
     missionPhrase("warm:mission:0"),
     missionPhrase("warm:mission:1"),
     missionPhrase("warm:mission:2"),
+    completePhrase("warm:complete:0"),
+    completePhrase("warm:complete:1"),
   ];
 }
 
+const PERMANENT_FAIL = new Set(["invalid", "misconfigured"]);
+
 /**
- * Shopping voice: stable product phrases, optional mission/play lines, replay of the same text.
- * Never blocks scanning / found progression.
+ * Shopping voice P0: product instruction, mission (replaces product), complete via CompleteScreen.
+ * Guess missions: no automatic speech that could spoil; replay stays product-safe.
  */
 export function useShopVoice(options: Options) {
   const {
@@ -69,16 +67,14 @@ export function useShopVoice(options: Options) {
     locked,
     showGuess,
     missionActive,
-    playKind,
-    playColorLabel,
   } = options;
-  const spokenProduct = useRef<string | null>(null);
-  /** Exact phrase for the current step — prefetch, play, and replay share this. */
+
+  const instructionKey = useRef<string | null>(null);
+  const instructionStatus = useRef<InstructionStatus | null>(null);
+  const retryUsed = useRef(false);
+  /** Exact phrase for the current step — play and replay share this. */
   const currentPhrase = useRef<VoicePhrase | null>(null);
-  const lastPositiveAt = useRef(0);
-  const missionSpoken = useRef<string | null>(null);
-  const playSpoken = useRef<string | null>(null);
-  const finalSpoken = useRef<string | null>(null);
+  const wasEnabled = useRef(enabled);
 
   useEffect(() => {
     if (!enabled) {
@@ -90,117 +86,131 @@ export function useShopVoice(options: Options) {
     };
   }, [enabled]);
 
-  // Prefetch upcoming product clips with the same adventureId:itemId seed as play.
+  // Mute off→on: clear status so current instruction can request again.
+  useEffect(() => {
+    if (enabled && !wasEnabled.current) {
+      instructionKey.current = null;
+      instructionStatus.current = null;
+      retryUsed.current = false;
+    }
+    wasEnabled.current = enabled;
+  }, [enabled]);
+
+  // Prefetch current + next only.
   useEffect(() => {
     if (!enabled || !adventureId) return;
     voiceController.prefetch(shoppingPrefetchPhrases(adventureId, items));
   }, [enabled, adventureId, items, currentId]);
 
   useEffect(() => {
-    if (!enabled || !adventureId || intro || locked || showGuess) return;
+    if (!enabled || !adventureId || intro || locked) return;
+    // Guess missions: no automatic speech that could spoil.
+    if (showGuess) return;
+
     const current = items.find((item) => item.id === currentId) ?? activeItem(items);
     if (!current) return;
 
-    const alreadySpoken = spokenProduct.current === current.id;
-    if (alreadySpoken) return;
+    const stepKey = missionActive
+      ? `${adventureId}:${current.id}:mission`
+      : `${adventureId}:${current.id}:product`;
 
-    spokenProduct.current = current.id;
-
-    const seed = `${adventureId}:${current.id}`;
-    const product = productPhrase(current, seed, voiceController.avoidText("product"));
-    currentPhrase.current = product;
-
-    const token = voiceController.bump();
-    voiceController.play(product, { token, priority: "high", delayMs: 0 });
-
-    const open = items.filter((item) => item.status !== "found");
-    // Occasional final nudge — low priority so it never interrupts the product line.
-    if (open.length === 1 && finalSpoken.current !== adventureId) {
-      finalSpoken.current = adventureId;
-      if (Math.random() > 0.4) {
-        const finalLine: VoicePhrase = {
-          event: "encouragement",
-          phraseId: "encouragement:final",
-          text: "Nog eentje te gaan!",
-        };
-        voiceController.play(finalLine, { token, priority: "low", delayMs: 500 });
-      }
+    if (
+      instructionKey.current === stepKey &&
+      (instructionStatus.current === "completed" ||
+        instructionStatus.current === "started" ||
+        instructionStatus.current === "requested" ||
+        instructionStatus.current === "ready")
+    ) {
+      return;
     }
 
-    const upcoming = open.slice(1, 6).map((item) => productPhrase(item, `${adventureId}:${item.id}`));
+    // Permanent fail for this step — do not loop.
+    if (instructionKey.current === stepKey && instructionStatus.current === "failed" && retryUsed.current) {
+      return;
+    }
+
+    const seed = `${adventureId}:${current.id}`;
+    const phrase = missionActive
+      ? missionPhrase(seed, voiceController.avoidText("mission"))
+      : productPhrase(current, seed);
+
+    currentPhrase.current = phrase;
+    instructionKey.current = stepKey;
+    instructionStatus.current = "requested";
+    retryUsed.current = false;
+
+    const generation = voiceController.bump();
+
+    void (async () => {
+      instructionStatus.current = "started";
+      trackEvent({ name: "voice_instruction", data: { phase: "started", event: phrase.event } });
+      let outcome = await voiceController.play(phrase, { generation, priority: "high", delayMs: 0 });
+
+      if (instructionKey.current !== stepKey) return;
+
+      if (outcome.status === "failed" && outcome.code && !PERMANENT_FAIL.has(outcome.code) && !retryUsed.current) {
+        retryUsed.current = true;
+        trackEvent({ name: "voice_instruction", data: { phase: "retry", event: phrase.event, code: outcome.code } });
+        const retryGen = voiceController.currentToken();
+        outcome = await voiceController.play(phrase, { generation: retryGen, priority: "high" });
+      }
+
+      if (instructionKey.current !== stepKey) return;
+
+      if (outcome.status === "completed") {
+        instructionStatus.current = "completed";
+        trackEvent({ name: "voice_instruction", data: { phase: "completed", event: phrase.event } });
+      } else if (outcome.status === "failed") {
+        instructionStatus.current = "failed";
+        trackEvent({
+          name: "voice_instruction",
+          data: { phase: "failed", event: phrase.event, code: outcome.code },
+        });
+      } else if (outcome.status === "cancelled") {
+        // Step change / mute — allow re-request if still current later.
+        instructionStatus.current = null;
+        instructionKey.current = null;
+      }
+    })();
+
+    const open = items.filter((item) => item.status !== "found");
+    const upcoming = open.slice(1, 3).map((item) => productPhrase(item, `${adventureId}:${item.id}`));
     voiceController.prefetch(upcoming);
-  }, [enabled, adventureId, currentId, items, intro, locked, showGuess]);
-
-  // Mission prompt — never names the secret alternative. Delay so product bump wins first.
-  useEffect(() => {
-    if (!enabled || !adventureId || !missionActive || intro || locked) return;
-    const key = `${adventureId}:${currentId}:mission`;
-    if (missionSpoken.current === key) return;
-    missionSpoken.current = key;
-    const phrase = missionPhrase(key, voiceController.avoidText("mission"));
-    const timer = window.setTimeout(() => {
-      voiceController.play(phrase, { token: voiceController.currentToken(), priority: "normal" });
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [enabled, adventureId, currentId, missionActive, intro, locked]);
-
-  // Colour / drag / guess play prompts from UI copy; guess never spoils the answer.
-  useEffect(() => {
-    if (!enabled || !adventureId || !playKind || intro || locked) return;
-    const key = `${adventureId}:${currentId}:play:${playKind}:${playColorLabel ?? ""}`;
-    if (playSpoken.current === key) return;
-    playSpoken.current = key;
-    const phrase = playPhrase(key, playKind, playColorLabel);
-    const timer = window.setTimeout(() => {
-      voiceController.play(phrase, { token: voiceController.currentToken(), priority: "normal" });
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [enabled, adventureId, currentId, playKind, playColorLabel, intro, locked]);
+  }, [enabled, adventureId, currentId, items, intro, locked, showGuess, missionActive]);
 
   function replay() {
     if (!enabled) return;
     const current = items.find((item) => item.id === currentId) ?? activeItem(items);
     if (!current || !adventureId) return;
     unlockAudio();
-    const phrase =
-      currentPhrase.current && currentPhrase.current.phraseId.startsWith("product:")
+    // Replay: mission phrase when mission active, else product — never guess spoilers.
+    const seed = `${adventureId}:${current.id}`;
+    const phrase = missionActive
+      ? currentPhrase.current?.event === "mission"
         ? currentPhrase.current
-        : productPhrase(current, `${adventureId}:${current.id}`);
+        : missionPhrase(seed)
+      : currentPhrase.current?.event === "product"
+        ? currentPhrase.current
+        : productPhrase(current, seed);
     currentPhrase.current = phrase;
-    const token = voiceController.bump();
-    voiceController.play(phrase, { token, priority: "high" });
+    const generation = voiceController.bump();
+    void voiceController.play(phrase, { generation, priority: "high" });
   }
 
+  /** Praise disabled — SFX-only callers keep the hook. */
   function onFoundSuccess() {
-    if (!enabled || !adventureId) return;
-    const now = Date.now();
-    const shouldPraise = now - lastPositiveAt.current > 4000 && Math.random() > 0.45;
-    const token = voiceController.bump();
-    spokenProduct.current = null;
+    instructionKey.current = null;
+    instructionStatus.current = null;
+    retryUsed.current = false;
     currentPhrase.current = null;
-
-    if (shouldPraise) {
-      lastPositiveAt.current = now;
-      const praise = positivePhrase(`${adventureId}:pos:${currentId ?? "x"}`, voiceController.avoidText("positive"));
-      // After found SFX (~220ms) so we don't overlap beep/pop/star.
-      voiceController.play(praise, { token, priority: "normal", delayMs: 220 });
-    }
   }
 
   function onGuessCorrect() {
-    if (!enabled || !adventureId) return;
-    const now = Date.now();
-    lastPositiveAt.current = now;
-    const token = voiceController.currentToken();
-    const praise = positivePhrase(`${adventureId}:guess:${currentId ?? "x"}`, voiceController.avoidText("positive"));
-    voiceController.play(praise, { token, priority: "normal", delayMs: 80 });
+    // No automatic speech.
   }
 
   function onGuessWrong() {
-    if (!enabled || !adventureId) return;
-    const token = voiceController.bump();
-    const phrase = incorrectPhrase(`${adventureId}:wrong:${currentId ?? "x"}`, voiceController.avoidText("incorrect"));
-    voiceController.play(phrase, { token, priority: "normal", delayMs: 80 });
+    // No automatic speech.
   }
 
   function prepareOptIn(choice: boolean) {
@@ -213,7 +223,7 @@ export function useShopVoice(options: Options) {
   }
 
   function prefetchList(phrases: VoicePhrase[]) {
-    if (enabled) voiceController.prefetch(phrases);
+    if (enabled) voiceController.prefetch(phrases.slice(0, 3));
   }
 
   return {

@@ -1,7 +1,7 @@
 /**
- * Dev-only Realtime voice audition (personality v4). Writes WAV under server/tmp/voice-audition/.
+ * Dev-only Realtime voice audition (personality v5). Writes WAV under server/tmp/voice-audition/.
  * Usage: npm run voice:audition
- * Never uses the Speech API.
+ * Keep marin as baseline until samples are listened to. Never uses the Speech API.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -23,20 +23,9 @@ const API_KEY = process.env.OPENAI_API_KEY;
 const MODEL = process.env.OPENAI_VOICE_MODEL || "gpt-realtime-2.1-mini";
 const VOICES = ["marin", "coral", "cedar"];
 
-const PERSONALITY = `You are Karrie, one warm shopping friend for children aged two to five.
+const PERSONALITY = `Je bent Karrie, een vrolijk en nieuwsgierig winkelvriendje voor jonge kinderen. Je praat in natuurlijk Nederlands, met een warme stem en een glimlach. Je klinkt spontaan en vertrouwd. Spreek rustig, duidelijk en speels, alsof je samen met een kind boodschappen doet. Behoud steeds dezelfde herkenbare stem. Spreek uitsluitend de opgegeven tekst uit.`;
 
-Always use the same speaker identity, the same calm mid pitch, and the same speaking speed in every clip. Do not change character, timbre, or energy between sentences.
-
-Speak authentic Netherlands Dutch (Nederlands-Nederlands), not Belgian Flemish and not English-accented Dutch. Use clear Dutch vowels (aa, oo, ui, eu), natural Dutch rhythm and stress, and a soft conversational tone. Do not use an English cadence, rolled theatrical R, German consonants, or anglicized vowels.
-
-Sound like a kind adult talking gently to a small child in a Dutch supermarket — warm and clear, never a cartoon, baby voice, whisper, shout, teacher, or commercial announcer.
-
-Keep speech short and steady. Do not add laughter, gasps, song, or extra words.
-
-Always speak the supplied Dutch text exactly, and nothing else.`;
-
-const BASELINE =
-  "Same Karrie voice and pitch as always. Only a tiny mood shift, never a different speaker.";
+const BASELINE = "Zelfde Karrie-stem en toonhoogte. Geen andere spreker.";
 
 const LINES = [
   { id: "welcome", text: "Hoi! Zullen we samen boodschappen doen?", mood: "Mood: warmly inviting." },
@@ -205,7 +194,7 @@ async function main() {
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <title>Karrie voice audition v4</title>
+  <title>Karrie voice audition v5</title>
   <style>
     body { font-family: Georgia, "Times New Roman", serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; background: #f7f3ea; color: #1c2a24; }
     h1 { font-size: 1.4rem; }
@@ -215,7 +204,7 @@ async function main() {
   </style>
 </head>
 <body>
-  <h1>Karrie Realtime audition v4 (${MODEL})</h1>
+  <h1>Karrie Realtime audition v5 (${MODEL})</h1>
   <p>Stable single-speaker personality. Compare marin / coral / cedar. Default remains marin unless a voice clearly wins for Dutch consistency.</p>
   ${index
     .map(
@@ -226,7 +215,7 @@ async function main() {
 </html>`;
 
   await writeFile(join(OUT, "index.html"), html);
-  await writeFile(join(OUT, "summary.json"), JSON.stringify({ model: MODEL, personality: "v4", voices: VOICES, clips: index }, null, 2));
+  await writeFile(join(OUT, "summary.json"), JSON.stringify({ model: MODEL, personality: "v5", voices: VOICES, clips: index }, null, 2));
   console.log(`\nWrote ${index.length} clips + index to ${OUT}`);
   console.log("Default remains marin (locked) unless you change OPENAI_VOICE after listening.");
 }

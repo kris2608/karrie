@@ -163,7 +163,7 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `PRICE_VOICE_INPUT_PER_MTOK` / `PRICE_VOICE_CACHED_INPUT_PER_MTOK` / `PRICE_VOICE_OUTPUT_PER_MTOK` | 0,6 / 0,06 / 2,4 | Realtime tekst-tokenprijzen |
 | `PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK` | 12 | Realtime audio-outputprijs |
 
-Stemclips worden via Realtime (WebSocket one-shot) gegenereerd en gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal onder namespace `karrie-voice-v4`. Alleen allowlisted zinnetjes of product-instructieshetjes worden gesproken — geen vrije tekst-TTS, geen Speech API-fallback.
+Stemclips worden via Realtime (WebSocket one-shot) gegenereerd en gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal onder namespace `karrie-voice-v5`. Optionele permanente catalogusclips staan in `server/voice-library/` / `public/voice-library/` (genereer met `npm run voice:library` in `server/` — niet bij elke deploy). Alleen allowlisted zinnetjes of product-instructieshetjes worden gesproken — geen vrije tekst-TTS, geen Speech API-fallback.
 
 Krijgt de server van Render een ander adres dan `https://karrie-api.onrender.com`? Zet dat adres dan in `VITE_API_ORIGIN` van `karrieapp` en bouw de site opnieuw.
 

@@ -1,78 +1,116 @@
 import type { VoiceEvent, VoicePhrase } from "../../domain/voiceScripts";
-import { unlockAudio } from "../../feedback/sound";
+import { getSpeechElement, unlockAudio } from "../../feedback/sound";
 import { trackEvent } from "../analytics";
-import { ensureVoiceCacheConfig, peekVoiceBlob, readVoiceBlob } from "./cache";
-import { voiceClient } from "./client";
+import { peekVoiceBlob, readVoiceBlob } from "./cache";
+import { voiceScheduler } from "./scheduler";
+
+export type PlayPriority = "high" | "normal" | "low";
 
 export type PlayOptions = {
-  /** Cancel if this token no longer matches when audio is ready. */
-  token: number;
+  /** Shopping generation — bump on step change / mute / leave. */
+  generation?: number;
   /** Wait before speaking so SFX can finish. */
   delayMs?: number;
-  /** Prefer product instructions over optional encouragement. */
-  priority?: "high" | "normal" | "low";
+  priority?: PlayPriority;
 };
 
-type Queued = {
-  phrase: VoicePhrase;
-  options: PlayOptions;
+export type PlayOutcome = {
+  status: "completed" | "cancelled" | "failed" | "skipped";
+  playId: number;
+  code?: string;
+  fetchMs?: number;
+  source?: string;
+};
+
+type SpeakerState = "idle" | "loading" | "playing" | "cancelled" | "failed";
+
+type ActivePlay = {
+  playId: number;
+  generation: number;
+  priority: PlayPriority;
+  abort: AbortController;
+  settle: (outcome: PlayOutcome) => void;
+  settled: boolean;
 };
 
 /**
- * Single-speaker controller: one clip at a time, never blocks shopping.
- * Stale tokens and disabled voice discard playback but keep cached audio.
- * Order: local cache → server → generate → silent (no speechSynthesis by default).
+ * Single-speaker controller with playId ownership.
+ * generation invalidates shopping context; playId owns the active clip.
+ * Every play path settles its promise (completed / cancelled / failed / skipped).
  */
-export function createVoiceController(options?: { synthFallback?: boolean }) {
+export function createVoiceController(_options?: { synthFallback?: boolean }) {
   let enabled = false;
-  let token = 0;
-  let current: HTMLAudioElement | null = null;
+  let generation = 0;
+  let nextPlayId = 0;
+  let state: SpeakerState = "idle";
+  let active: ActivePlay | null = null;
   let objectUrl: string | null = null;
-  let playingPriority: "high" | "normal" | "low" | null = null;
-  let activePlayToken: number | null = null;
-  let queue: Queued | null = null;
+  let queue: { phrase: VoicePhrase; options: PlayOptions; playId: number; settle: (o: PlayOutcome) => void } | null =
+    null;
   const lastByEvent = new Map<VoiceEvent, string>();
-  let synthFallback = options?.synthFallback === true;
 
   function bump(): number {
-    token += 1;
-    return token;
+    generation += 1;
+    cancelActive("cancelled");
+    queue = null;
+    return generation;
   }
 
-  function stopSynth() {
-    if (typeof speechSynthesis === "undefined") return;
+  function currentToken() {
+    return generation;
+  }
+
+  function resolveActive(outcome: PlayOutcome) {
+    if (!active || active.settled) return;
+    if (active.playId !== outcome.playId) return;
+    active.settled = true;
+    active.settle(outcome);
+  }
+
+  function clearMedia() {
+    const el = getSpeechElement();
+    el.onended = null;
+    el.onerror = null;
     try {
-      speechSynthesis.cancel();
+      el.pause();
     } catch {
       // ignore
     }
-  }
-
-  function stopCurrent() {
-    stopSynth();
-    if (current) {
-      current.onended = null;
-      current.onerror = null;
-      try {
-        current.pause();
-      } catch {
-        // ignore
-      }
-      current.src = "";
-      current = null;
+    try {
+      el.removeAttribute("src");
+      el.load();
+    } catch {
+      // ignore
     }
     if (objectUrl) {
       URL.revokeObjectURL(objectUrl);
       objectUrl = null;
     }
-    playingPriority = null;
-    activePlayToken = null;
+  }
+
+  function cancelActive(status: PlayOutcome["status"] = "cancelled", code?: string) {
+    if (!active) {
+      clearMedia();
+      state = "idle";
+      return;
+    }
+    const play = active;
+    play.abort.abort();
+    clearMedia();
+    resolveActive({ status, playId: play.playId, code });
+    active = null;
+    state = status === "failed" ? "failed" : status === "cancelled" ? "cancelled" : "idle";
+    if (status === "cancelled" || status === "failed") {
+      // Transient — ready for next play.
+      state = "idle";
+    }
   }
 
   function cancel() {
     bump();
+    voiceScheduler.cancelBackground();
     queue = null;
-    stopCurrent();
+    state = "idle";
   }
 
   function setEnabled(value: boolean) {
@@ -84,188 +122,159 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
     return enabled;
   }
 
-  function currentToken() {
-    return token;
-  }
-
-  async function resolveBlob(phrase: VoicePhrase): Promise<Blob | null> {
-    // Sync memory hit avoids awaiting config/Cache API on the hot path.
-    const warm = peekVoiceBlob(phrase.text, phrase.event);
-    if (warm) return warm;
-    const cached = await readVoiceBlob(phrase.text, phrase.event);
-    if (cached) return cached;
-    const result = await voiceClient.fetchClip(phrase.event, phrase.text);
-    if (result.status === "ok") return result.blob;
-    const code = result.status === "limit" || result.status === "error" ? result.code : "offline";
-    trackEvent({ name: "voice_playback_failed", data: { reason: "fetch", code } });
-    return null;
-  }
-
-  function speakWithSynth(text: string, playToken: number): boolean {
-    if (!synthFallback || typeof speechSynthesis === "undefined") return false;
-    try {
-      const voices = speechSynthesis.getVoices();
-      const dutch = voices.find((voice) => /^nl(-|_)/i.test(voice.lang));
-      if (!dutch && voices.length) return false;
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = "nl-NL";
-      if (dutch) utter.voice = dutch;
-      utter.rate = 0.95;
-      utter.onend = () => {
-        // Only release speaker if this generation still owns it.
-        if (playToken === token && activePlayToken === playToken) {
-          playingPriority = null;
-          activePlayToken = null;
-          void drain();
-        }
-      };
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utter);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /** Release speaker only when this playToken still owns playback. */
-  function finishClip(playToken: number) {
-    if (activePlayToken !== playToken || playToken !== token) return;
-    playingPriority = null;
-    activePlayToken = null;
+  function finishOwner(playId: number, outcome: PlayOutcome) {
+    if (!active || active.playId !== playId) return;
+    resolveActive(outcome);
+    active = null;
+    clearMedia();
+    state = outcome.status === "failed" ? "failed" : "idle";
+    if (state === "failed") state = "idle";
     void drain();
   }
 
-  async function playBlob(blob: Blob, playToken: number, priority: PlayOptions["priority"]): Promise<void> {
-    if (playToken !== token || !enabled) {
-      finishClip(playToken);
-      return;
-    }
-    if (current) {
-      current.onended = null;
-      current.onerror = null;
-      try {
-        current.pause();
-      } catch {
-        // ignore
-      }
-      current.src = "";
-      current = null;
-    }
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-      objectUrl = null;
-    }
-    unlockAudio();
-    const url = URL.createObjectURL(blob);
-    objectUrl = url;
-    const audio = new Audio(url);
-    current = audio;
-    playingPriority = priority ?? "normal";
-    activePlayToken = playToken;
-    await new Promise<void>((resolve) => {
-      const done = () => {
-        if (objectUrl === url) {
-          URL.revokeObjectURL(url);
-          objectUrl = null;
-        }
-        if (current === audio) current = null;
-        resolve();
-        finishClip(playToken);
-      };
-      audio.onended = () => done();
-      audio.onerror = () => {
-        trackEvent({ name: "voice_playback_failed", data: { reason: "element" } });
-        done();
-      };
-      void audio.play().catch(() => {
-        trackEvent({ name: "voice_playback_failed", data: { reason: "play" } });
-        done();
-      });
-    });
-  }
-
-  /** Runs a clip that already reserved `playingPriority` via play() or drain(). */
-  async function run(phrase: VoicePhrase, options: PlayOptions): Promise<void> {
+  async function run(phrase: VoicePhrase, options: PlayOptions, playId: number, settle: (o: PlayOutcome) => void) {
     const priority = options.priority ?? "normal";
-    const playToken = options.token;
-    if (!enabled || playToken !== token) {
-      finishClip(playToken);
+    const gen = options.generation ?? generation;
+    const abort = new AbortController();
+    const play: ActivePlay = {
+      playId,
+      generation: gen,
+      priority,
+      abort,
+      settle,
+      settled: false,
+    };
+    active = play;
+    state = "loading";
+
+    if (!enabled || gen !== generation) {
+      finishOwner(playId, { status: "cancelled", playId });
       return;
     }
+
     if (options.delayMs && options.delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, options.delayMs));
-      if (!enabled || playToken !== token) {
-        finishClip(playToken);
+      if (!enabled || gen !== generation || abort.signal.aborted || active?.playId !== playId) {
+        finishOwner(playId, { status: "cancelled", playId });
         return;
       }
     }
 
-    const blob = await resolveBlob(phrase);
-    if (!enabled || playToken !== token) {
-      finishClip(playToken);
+    const fetched = await voiceScheduler.fetchInteractive(phrase, abort.signal);
+    if (!enabled || gen !== generation || abort.signal.aborted || active?.playId !== playId) {
+      finishOwner(playId, { status: "cancelled", playId, fetchMs: fetched.ms });
       return;
     }
 
     lastByEvent.set(phrase.event, phrase.text);
 
-    if (blob) {
-      await playBlob(blob, playToken, priority);
+    if (!fetched.ok) {
+      trackEvent({
+        name: "voice_playback_failed",
+        data: { reason: "fetch", code: fetched.code },
+      });
+      finishOwner(playId, { status: "failed", playId, code: fetched.code, fetchMs: fetched.ms });
       return;
     }
 
-    if (speakWithSynth(phrase.text, playToken)) {
-      playingPriority = priority;
-      activePlayToken = playToken;
+    trackEvent({
+      name: "voice_fetch",
+      data: { source: fetched.source, ms: fetched.ms, event: phrase.event },
+    });
+
+    // Stash timings on the active play via closure in playBlob settle.
+    const blob = fetched.blob;
+    const fetchMs = fetched.ms;
+    const source = fetched.source;
+    if (play.abort.signal.aborted || play.generation !== generation || !enabled || active?.playId !== playId) {
+      finishOwner(playId, { status: "cancelled", playId, fetchMs, source });
       return;
     }
-
-    // Silent failure — free the speaker for the next clip only if we still own it.
-    finishClip(playToken);
+    unlockAudio();
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrl = null;
+    }
+    const url = URL.createObjectURL(blob);
+    objectUrl = url;
+    const audio = getSpeechElement();
+    state = "playing";
+    await new Promise<void>((resolve) => {
+      const done = (status: PlayOutcome["status"], code?: string) => {
+        if (objectUrl === url) {
+          URL.revokeObjectURL(url);
+          objectUrl = null;
+        }
+        finishOwner(play.playId, { status, playId: play.playId, code, fetchMs, source });
+        resolve();
+      };
+      if (play.abort.signal.aborted || active?.playId !== play.playId) {
+        done("cancelled");
+        return;
+      }
+      audio.onended = () => done("completed");
+      audio.onerror = () => {
+        trackEvent({ name: "voice_playback_failed", data: { reason: "element" } });
+        trackEvent({ name: "voice_autoplay_reject", data: { reason: "element" } });
+        done("failed", "element");
+      };
+      audio.src = url;
+      void audio.play().catch(() => {
+        trackEvent({ name: "voice_playback_failed", data: { reason: "play" } });
+        trackEvent({ name: "voice_autoplay_reject", data: { reason: "play" } });
+        done("failed", "play");
+      });
+    });
   }
 
   async function drain() {
     const next = queue;
     queue = null;
     if (!next || !enabled) return;
-    if (next.options.token !== token) return;
-    playingPriority = next.options.priority ?? "normal";
-    activePlayToken = next.options.token;
-    await run(next.phrase, next.options);
+    if ((next.options.generation ?? generation) !== generation) {
+      next.settle({ status: "cancelled", playId: next.playId });
+      return;
+    }
+    await run(next.phrase, next.options, next.playId, next.settle);
   }
 
-  function play(phrase: VoicePhrase, options?: Partial<PlayOptions>): number {
-    if (!enabled) return token;
-    // Resume Web Audio / unlock media so autoplay after cold resume or CompleteScreen works.
+  function play(phrase: VoicePhrase, options?: Partial<PlayOptions>): Promise<PlayOutcome> {
+    if (!enabled) {
+      return Promise.resolve({ status: "skipped", playId: 0, code: "disabled" });
+    }
     unlockAudio();
-    const playToken = options?.token ?? token;
-    if (playToken !== token) return token;
+    const gen = options?.generation ?? generation;
+    if (gen !== generation) {
+      return Promise.resolve({ status: "cancelled", playId: 0, code: "stale-generation" });
+    }
     const priority = options?.priority ?? "normal";
-    const next: PlayOptions = {
-      token: playToken,
+    const playId = ++nextPlayId;
+    const nextOptions: PlayOptions = {
+      generation: gen,
       delayMs: options?.delayMs,
       priority,
     };
 
-    if (playingPriority !== null) {
-      if (priority === "low") return playToken;
-      // High priority (product / replay) beats optional praise — interrupt and clear queue.
-      if (priority === "high") {
-        queue = null;
-        stopCurrent();
-        playingPriority = priority;
-        activePlayToken = playToken;
-        void run(phrase, next);
-        return playToken;
+    return new Promise<PlayOutcome>((settle) => {
+      if (active) {
+        if (priority === "low") {
+          settle({ status: "skipped", playId, code: "busy" });
+          return;
+        }
+        if (priority === "high") {
+          queue = null;
+          cancelActive("cancelled");
+          void run(phrase, nextOptions, playId, settle);
+          return;
+        }
+        // Normal: replace queued clip only.
+        if (queue) queue.settle({ status: "cancelled", playId: queue.playId, code: "replaced" });
+        queue = { phrase, options: { ...nextOptions, delayMs: 0 }, playId, settle };
+        return;
       }
-      // Normal: replace queued clip (replay / later praise overrides earlier queue).
-      queue = { phrase, options: { ...next, delayMs: 0 } };
-      return playToken;
-    }
 
-    playingPriority = priority;
-    activePlayToken = playToken;
-    void run(phrase, next);
-    return playToken;
+      void run(phrase, nextOptions, playId, settle);
+    });
   }
 
   function avoidText(event: VoiceEvent): string | undefined {
@@ -273,16 +282,7 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
   }
 
   function prefetch(phrases: VoicePhrase[]) {
-    // Fire-and-forget config; do not block play on prefetch work.
-    void ensureVoiceCacheConfig();
-    for (const phrase of phrases.slice(0, 12)) {
-      void (async () => {
-        if (peekVoiceBlob(phrase.text, phrase.event)) return;
-        const cached = await readVoiceBlob(phrase.text, phrase.event);
-        if (cached) return;
-        await voiceClient.fetchClip(phrase.event, phrase.text);
-      })();
-    }
+    voiceScheduler.schedule(phrases);
   }
 
   function isCachedSync(text: string, event?: string): boolean {
@@ -291,6 +291,10 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
 
   async function isCached(text: string, event?: string): Promise<boolean> {
     return Boolean(await readVoiceBlob(text, event));
+  }
+
+  function speakerState(): SpeakerState {
+    return state;
   }
 
   return {
@@ -304,8 +308,9 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
     prefetch,
     isCached,
     isCachedSync,
-    /** Test hook */
-    _stopCurrent: stopCurrent,
+    speakerState,
+    /** Test hook — settles active waiters. */
+    _stopCurrent: () => cancelActive("cancelled"),
   };
 }
 

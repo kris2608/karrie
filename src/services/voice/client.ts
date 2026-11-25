@@ -5,7 +5,8 @@ export type VoiceFetchResult =
   | { status: "ok"; blob: Blob; cache: "server-hit" | "server-miss" }
   | { status: "offline" }
   | { status: "limit"; code: string }
-  | { status: "error"; code: string };
+  | { status: "error"; code: string }
+  | { status: "cancelled" };
 
 const LIMIT_CODES = new Set(["rate-limited", "daily-limit", "budget", "in-flight"]);
 
@@ -13,6 +14,11 @@ export type VoiceClientDeps = {
   fetch: typeof fetch;
   online: () => boolean;
   origin: string;
+};
+
+export type FetchClipOptions = {
+  priority?: "interactive" | "background";
+  signal?: AbortSignal;
 };
 
 /** Device daily soft cap; server still enforces real limits. */
@@ -70,24 +76,36 @@ function syncConfigFromHeaders(headers: Headers) {
 export function createVoiceClient(deps: VoiceClientDeps) {
   const pending = new Map<string, Promise<VoiceFetchResult>>();
 
-  async function fetchClip(event: VoiceEvent, text: string): Promise<VoiceFetchResult> {
+  async function fetchClip(
+    event: VoiceEvent,
+    text: string,
+    options?: FetchClipOptions,
+  ): Promise<VoiceFetchResult> {
+    if (options?.signal?.aborted) return { status: "cancelled" };
     if (!deps.online()) return { status: "offline" };
     await ensureVoiceCacheConfig(deps.origin);
+    if (options?.signal?.aborted) return { status: "cancelled" };
     const storage = typeof localStorage === "undefined" ? null : localStorage;
     const now = Date.now();
     if (!deviceAllowed(storage, now)) return { status: "limit", code: "device-limit" };
 
     const key = `${event}|${text}`;
     const existing = pending.get(key);
-    if (existing) return existing;
+    if (existing && !options?.signal) return existing;
 
     const work = (async (): Promise<VoiceFetchResult> => {
       try {
         const response = await deps.fetch(`${deps.origin}/api/voice/speak`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event, text }),
+          body: JSON.stringify({
+            event,
+            text,
+            priority: options?.priority ?? "interactive",
+          }),
+          signal: options?.signal,
         });
+        if (options?.signal?.aborted) return { status: "cancelled" };
         if (response.status === 429) {
           const body = await response.json().catch(() => null);
           const code = typeof body?.code === "string" ? body.code : "rate-limited";
@@ -103,14 +121,17 @@ export function createVoiceClient(deps: VoiceClientDeps) {
         await writeVoiceBlob(text, blob, event);
         const cache = response.headers.get("X-Voice-Cache") === "hit" ? "server-hit" : "server-miss";
         return { status: "ok", blob, cache };
-      } catch {
+      } catch (error) {
+        if (options?.signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+          return { status: "cancelled" };
+        }
         return deps.online() ? { status: "error", code: "network" } : { status: "offline" };
       } finally {
         pending.delete(key);
       }
     })();
 
-    pending.set(key, work);
+    if (!options?.signal) pending.set(key, work);
     return work;
   }
 

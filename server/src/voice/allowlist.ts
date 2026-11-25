@@ -39,20 +39,21 @@ const STATIC = new Set([
   "Raad het product!",
 ]);
 
-/** Product / quantity / article-free patterns. Captured groups must stay short product names. */
+/** Product patterns — v5 canonical + legacy so old clients do not 422. */
 const DYNAMIC_PATTERNS = [
+  /^Kun jij (.+) vinden\?$/,
+  /^Nu gaan we (.+) zoeken!$/,
+  /^Waar zijn (.+)\?$/,
+  /^Waar is (.+)\?$/,
+  /^Zoek maar (.+)!$/,
   /^Hmm… waar zouden (.+) zijn\?$/,
   /^Hmm… waar zou (.+) zijn\?$/,
   /^Zo, nu nog (.+)!$/,
   /^(.+)! Zie jij .+ al\?$/,
-  /^Kun jij (.+) vinden\?$/,
   /^Op zoek naar (.+)!$/,
-  /^Nu gaan we (.+) zoeken!$/,
-  /^Waar is (?:de|het) (.+)\?$/,
-  /^Waar is (.+)\?$/,
+  /^Nog eentje: (.+)!$/,
   /^We hebben .+ (.+) nodig\.$/,
   /^Zoek iets .+!$/,
-  /^Nog eentje: (.+)!$/,
 ];
 
 const MAX_SPOKEN_NAME = 40;

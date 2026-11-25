@@ -774,6 +774,8 @@ export function createHandler(deps: AppDeps) {
       }
       const event = (body as { event?: unknown })?.event;
       const text = typeof (body as { text?: unknown })?.text === "string" ? (body as { text: string }).text : "";
+      const priorityRaw = (body as { priority?: unknown })?.priority;
+      const priority = priorityRaw === "background" || priorityRaw === "interactive" ? priorityRaw : "interactive";
       if (!isVoiceEvent(event) || !text) return send(422, { status: "error", code: "invalid" });
 
       const ip = clientIp(req);
@@ -781,11 +783,13 @@ export function createHandler(deps: AppDeps) {
       if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
 
       const callStarted = now();
-      const result = await deps.voice.speak({ event, text });
+      const result = await deps.voice.speak({ event, text, priority });
       const latencyMs = now() - callStarted;
       Object.assign(entry, {
         voiceEvent: event,
+        voicePriority: priority,
         voiceCacheHit: result.ok ? result.cacheHit : undefined,
+        voiceLibraryHit: result.ok ? result.libraryHit : undefined,
         openaiMs: latencyMs,
         code: result.ok ? undefined : result.code,
         ...(!result.ok && result.error ? { voiceError: result.error } : {}),

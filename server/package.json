@@ -12,7 +12,8 @@
     "dev": "tsc -p tsconfig.json && node dist/index.js",
     "test": "vitest run",
     "candidates:export": "node scripts/export-candidates.mjs",
-    "voice:audition": "node scripts/voice-audition.mjs"
+    "voice:audition": "node scripts/voice-audition.mjs",
+    "voice:library": "node scripts/voice-library.mjs"
   },
   "dependencies": {
     "openai": "^7.53.0",

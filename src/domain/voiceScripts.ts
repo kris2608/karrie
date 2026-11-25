@@ -1,13 +1,13 @@
-import { spokenNameInSentence, spokenNounPhrase, spokenProductMeta } from "./spokenProductName";
+import { spokenNounPhrase, spokenProductMeta } from "./spokenProductName";
 
 export const VOICE_LANGUAGE = "nl-NL";
 /** Bump when personality instructions or template wording change so caches refresh. */
-export const VOICE_INSTRUCTION_VERSION = "v4";
-export const VOICE_DELIVERY_VERSION = "v4";
-export const VOICE_TEMPLATE_VERSION = "v4";
+export const VOICE_INSTRUCTION_VERSION = "v5";
+export const VOICE_DELIVERY_VERSION = "v5";
+export const VOICE_TEMPLATE_VERSION = "v5";
 
 export const VOICE_PERSONALITY =
-  "You are Karrie, one warm shopping friend for children aged two to five. Always the same calm mid pitch and speaker identity. Speak authentic Netherlands Dutch with clear vowels and natural Dutch rhythm — never English-accented. Always speak the supplied Dutch text without adding extra words.";
+  "Je bent Karrie, een vrolijk en nieuwsgierig winkelvriendje voor jonge kinderen. Je praat in natuurlijk Nederlands, met een warme stem en een glimlach. Je klinkt spontaan en vertrouwd. Spreek rustig, duidelijk en speels, alsof je samen met een kind boodschappen doet. Behoud steeds dezelfde herkenbare stem. Spreek uitsluitend de opgegeven tekst uit.";
 
 export type VoiceEvent =
   | "welcome"
@@ -89,33 +89,21 @@ type ProductItem = {
 
 type ProductBuilder = (item: ProductItem) => string;
 
+/** Four canonical product forms — one fixed phrase per catalog productId. */
 const PRODUCT: readonly ProductBuilder[] = [
   (item) => {
     const meta = spokenProductMeta(item);
     const np = spokenNounPhrase(item, { withArticle: Boolean(meta.article), withQuantity: true });
-    const plural = meta.number === "plural" || (meta.number !== "mass" && meta.quantity > 1);
-    return plural ? `Hmm… waar zouden ${np} zijn?` : `Hmm… waar zou ${np} zijn?`;
-  },
-  (item) => `Zo, nu nog ${spokenNounPhrase(item, { withQuantity: false })}!`,
-  (item) => {
-    const name = spokenNounPhrase(item, { withQuantity: false });
-    const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    return `${cap}! Zie jij ${spokenNameInSentence(name)} al?`;
-  },
-  (item) => {
-    const meta = spokenProductMeta(item);
-    // Prefer article when known so we never invent the wrong one; otherwise article-free.
-    const np = spokenNounPhrase(item, { withArticle: Boolean(meta.article), withQuantity: true });
     return `Kun jij ${np} vinden?`;
   },
-  (item) => `Op zoek naar ${spokenNounPhrase(item, { withQuantity: true })}!`,
   (item) => `Nu gaan we ${spokenNounPhrase(item, { withQuantity: false })} zoeken!`,
   (item) => {
     const meta = spokenProductMeta(item);
-    if (meta.article) return `Waar is ${meta.article} ${meta.spoken}?`;
-    return `Waar is ${meta.spoken}?`;
+    const np = spokenNounPhrase(item, { withArticle: Boolean(meta.article), withQuantity: true });
+    const plural = meta.number === "plural" || (meta.number !== "mass" && meta.quantity > 1);
+    return plural ? `Waar zijn ${np}?` : `Waar is ${np}?`;
   },
-  (item) => `Nog eentje: ${spokenNounPhrase(item, { withQuantity: false })}!`,
+  (item) => `Zoek maar ${spokenNounPhrase(item, { withArticle: false, withQuantity: true })}!`,
 ];
 
 /** Deterministic pick that still rotates; avoids the same line twice in a row when possible. */
@@ -184,9 +172,13 @@ export function celebrationPhrase(seed: string): VoicePhrase {
   return fixed("complete", lines, seed);
 }
 
-export function productPhrase(item: ProductItem, seed: string, avoidText?: string): VoicePhrase {
+/**
+ * Canonical product phrase: seed is productId for catalog reuse.
+ * Adventure seed is ignored so library + cache keys stay stable per product.
+ */
+export function productPhrase(item: ProductItem, _seed?: string, _avoidText?: string): VoicePhrase {
   const lines = PRODUCT.map((build) => build(item));
-  const text = pickVariant(lines, seed, avoidText);
+  const text = pickVariant(lines, item.productId || item.name);
   const spoken = spokenProductMeta(item).spoken;
   const phraseId = `product:${lines.indexOf(text)}:${normalizeKey(spoken)}`;
   return { event: "product", phraseId, text };
@@ -205,18 +197,20 @@ export const ALLOWED_STATIC_TEXTS = new Set<string>([
 ]);
 
 const PRODUCT_PATTERNS = [
+  /^Kun jij (.+) vinden\?$/,
+  /^Nu gaan we (.+) zoeken!$/,
+  /^Waar zijn (.+)\?$/,
+  /^Waar is (.+)\?$/,
+  /^Zoek maar (.+)!$/,
+  // Legacy templates still accepted so old clients / caches do not 422.
   /^Hmm… waar zouden (.+) zijn\?$/,
   /^Hmm… waar zou (.+) zijn\?$/,
   /^Zo, nu nog (.+)!$/,
   /^(.+)! Zie jij .+ al\?$/,
-  /^Kun jij (.+) vinden\?$/,
   /^Op zoek naar (.+)!$/,
-  /^Nu gaan we (.+) zoeken!$/,
-  /^Waar is (?:de|het) (.+)\?$/,
-  /^Waar is (.+)\?$/,
+  /^Nog eentje: (.+)!$/,
   /^We hebben .+ (.+) nodig\.$/,
   /^Zoek iets .+!$/,
-  /^Nog eentje: (.+)!$/,
 ];
 
 const MAX_SPOKEN_NAME = 40;

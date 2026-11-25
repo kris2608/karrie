@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AddScreen } from "./features/add/AddScreen";
 import { CompleteScreen } from "./features/complete/CompleteScreen";
+import { VoiceLabScreen } from "./features/dev/VoiceLabScreen";
 import { HomeScreen } from "./features/home/HomeScreen";
 import { ReviewScreen } from "./features/review/ReviewScreen";
 import { SharedListBoot } from "./features/share/SharedListBoot";
@@ -33,6 +34,7 @@ export function App() {
               <Route path="/controleren" element={<ReviewScreen />} />
               <Route path="/winkel" element={<ShopScreen />} />
               <Route path="/klaar" element={<CompleteScreen />} />
+              {import.meta.env.DEV ? <Route path="/dev/voice-lab" element={<VoiceLabScreen />} /> : null}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

@@ -55,8 +55,8 @@ export function CompleteScreen() {
     voiceFired.current = true;
     const phrase = celebrationPhrase(`${adventure.id}:complete`);
     const delayMs = reduced ? 200 : VOICE_AT * 1000;
-    const token = voiceController.bump();
-    voiceController.play(phrase, { token, priority: "normal", delayMs });
+    const generation = voiceController.bump();
+    void voiceController.play(phrase, { generation, priority: "high", delayMs });
   }, [adventure, settings.voiceEnabled, reduced]);
 
   useEffect(() => {

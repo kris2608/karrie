@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-type Mode = "match" | "missing-transcript" | "no-session-updated";
+type Mode = "match" | "missing-transcript" | "no-session-updated" | "incomplete-status";
 
 const state = {
   mode: "match" as Mode,
   openFail: false,
   instances: [] as Array<{ sent: string[]; readyState: number }>,
 };
+
+/** ~350ms of 16-bit mono PCM at 24 kHz — above min for short "Hebbes!". */
+const GOOD_PCM = Buffer.alloc(24_000 * 2 * 0.35, 1);
 
 vi.mock("ws", () => {
   class MockWebSocket {
@@ -40,7 +43,7 @@ vi.mock("ws", () => {
         void Promise.resolve().then(() => this.emit("message", Buffer.from(JSON.stringify({ type: "session.updated" }))));
       }
       if (msg.type === "response.create") {
-        const pcm = state.mode === "missing-transcript" ? Buffer.alloc(12_000, 1) : Buffer.alloc(4, 1);
+        const pcm = state.mode === "missing-transcript" ? GOOD_PCM : GOOD_PCM;
         void Promise.resolve().then(() => {
           this.emit(
             "message",
@@ -52,7 +55,6 @@ vi.mock("ws", () => {
             ),
           );
           if (state.mode !== "missing-transcript") {
-            // Stream deltas then a final done event (production sends both — done must replace, not append).
             this.emit(
               "message",
               Buffer.from(
@@ -72,12 +74,14 @@ vi.mock("ws", () => {
               ),
             );
           }
+          const status = state.mode === "incomplete-status" ? "incomplete" : "completed";
           this.emit(
             "message",
             Buffer.from(
               JSON.stringify({
                 type: "response.done",
                 response: {
+                  status,
                   usage: {
                     input_tokens: 12,
                     output_tokens: 40,
@@ -131,26 +135,33 @@ describe("createRealtimeSpeechProvider", () => {
     expect(result.usage?.audioOutputTokens).toBe(30);
   });
 
-  it("accepts audio when transcript is missing but PCM is present", async () => {
+  it("rejects missing transcript even when PCM is present", async () => {
     state.mode = "missing-transcript";
     const { createRealtimeSpeechProvider } = await import("./provider.js");
     const provider = createRealtimeSpeechProvider({ apiKey: "test-key", model: "gpt-realtime-2.1-mini", voice: "marin" });
-    const result = await provider.generate("Hebbes!", { event: "positive" });
-    expect(result.contentType).toBe("audio/wav");
-    expect(result.audio.length).toBeGreaterThan(44);
+    await expect(provider.generate("Hebbes!", { event: "positive" })).rejects.toThrow(/transcript missing/i);
   });
 
-  it("still creates a response if session.updated never arrives", async () => {
+  it("does not create a response if session.updated never arrives", async () => {
     state.mode = "no-session-updated";
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { createRealtimeSpeechProvider } = await import("./provider.js");
+    const provider = createRealtimeSpeechProvider({
+      apiKey: "test-key",
+      model: "gpt-realtime-2.1-mini",
+      voice: "marin",
+      timeoutMs: 80,
+    });
+    const pending = provider.generate("Hebbes!", { event: "positive" });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const created = state.instances.some((socket) => socket.sent.some((line) => line.includes("response.create")));
+    expect(created).toBe(false);
+    await expect(pending).rejects.toThrow(/timeout|closed/i);
+  }, 3_000);
+
+  it("rejects incomplete response status", async () => {
+    state.mode = "incomplete-status";
     const { createRealtimeSpeechProvider } = await import("./provider.js");
     const provider = createRealtimeSpeechProvider({ apiKey: "test-key", model: "gpt-realtime-2.1-mini", voice: "marin" });
-    const pending = provider.generate("Hebbes!", { event: "positive" });
-    await Promise.resolve();
-    await vi.advanceTimersByTimeAsync(900);
-    const result = await pending;
-    expect(result.contentType).toBe("audio/wav");
-    const created = state.instances.some((socket) => socket.sent.some((line) => line.includes("response.create")));
-    expect(created).toBe(true);
+    await expect(provider.generate("Hebbes!", { event: "positive" })).rejects.toThrow(/status/i);
   });
 });

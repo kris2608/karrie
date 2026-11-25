@@ -10,8 +10,8 @@ const ALLOWED_MODELS = new Set(["gpt-realtime-2.1-mini"]);
 const DEPRECATED_MODELS = new Set(["gpt-4o-mini-tts", "tts-1", "tts-1-hd", "gpt-4o-mini-tts-2025-03-20", "gpt-4o-mini-tts-2025-12-15"]);
 const ALLOWED_VOICES = new Set(["marin", "coral", "shimmer", "cedar", "alloy", "ash", "ballad", "echo", "sage", "verse"]);
 
-/** ~0.25s of 16-bit mono PCM at 24 kHz — enough to treat as real speech audio. */
-const MIN_PCM_BYTES = 24_000 * 2 * 0.25;
+const PCM_RATE = 24_000;
+const PCM_BYTES_PER_SEC = PCM_RATE * 2;
 
 export type SpeechProviderResult = {
   audio: Buffer;
@@ -74,9 +74,25 @@ function createGate(limit: number): Gate {
   };
 }
 
+function minPcmBytesForText(text: string): number {
+  // ~40ms per character, floor 200ms, cap 2.5s — reject empty / truncated clips.
+  const ms = Math.min(2_500, Math.max(200, text.trim().length * 40));
+  return Math.floor((PCM_BYTES_PER_SEC * ms) / 1000);
+}
+
+function isTransportError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /timeout|closed early|ECONN|socket|network|Realtime connection/i.test(message);
+}
+
+function isSchemaOrModelError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /Unsupported|invalid_request|schema|voice model|Realtime voice/i.test(message);
+}
+
 /**
  * One-shot Realtime TTS: opens a short WebSocket, speaks exact Dutch text, returns WAV.
- * Never uses /v1/audio/speech.
+ * Never uses /v1/audio/speech. Creates response only after session.updated.
  */
 export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): SpeechProvider {
   const model = assertModel(config.model || "gpt-realtime-2.1-mini");
@@ -85,14 +101,16 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
   const gate = createGate(Math.max(1, config.maxConcurrent ?? 2));
 
   async function generateOnce(text: string, event: VoiceEvent): Promise<SpeechProviderResult> {
+    const connectStarted = Date.now();
     const release = await gate.acquire();
+    const queueWaitMs = Date.now() - connectStarted;
     const url = `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`;
     const chunks: Buffer[] = [];
     let transcript = "";
     let usage: SpeechProviderResult["usage"];
     let settled = false;
     let responseCreated = false;
-    let sessionUpdateSent = false;
+    let openAt = 0;
 
     const ws = new WebSocket(url, {
       headers: {
@@ -105,14 +123,10 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
         fail(new Error("Realtime voice timeout"));
       }, timeoutMs);
 
-      /** If session.updated never arrives, still fire one-shot once after open+update. */
-      let fallbackCreate: ReturnType<typeof setTimeout> | undefined;
-
       function fail(error: Error) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        if (fallbackCreate) clearTimeout(fallbackCreate);
         try {
           ws.close();
         } catch {
@@ -125,7 +139,6 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        if (fallbackCreate) clearTimeout(fallbackCreate);
         try {
           ws.close();
         } catch {
@@ -137,10 +150,6 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
       function createResponse() {
         if (settled || responseCreated || ws.readyState !== WebSocket.OPEN) return;
         responseCreated = true;
-        if (fallbackCreate) {
-          clearTimeout(fallbackCreate);
-          fallbackCreate = undefined;
-        }
         ws.send(
           JSON.stringify({
             type: "response.create",
@@ -151,7 +160,7 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
               audio: {
                 output: {
                   voice,
-                  format: { type: "audio/pcm", rate: 24_000 },
+                  format: { type: "audio/pcm", rate: PCM_RATE },
                 },
               },
             },
@@ -160,7 +169,7 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
       }
 
       ws.on("open", () => {
-        sessionUpdateSent = true;
+        openAt = Date.now();
         ws.send(
           JSON.stringify({
             type: "session.update",
@@ -171,7 +180,7 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
               audio: {
                 output: {
                   voice,
-                  format: { type: "audio/pcm", rate: 24_000 },
+                  format: { type: "audio/pcm", rate: PCM_RATE },
                 },
                 input: {
                   turn_detection: null,
@@ -180,8 +189,7 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
             },
           }),
         );
-        // Avoid hang if the API never emits session.updated.
-        fallbackCreate = setTimeout(() => createResponse(), 400);
+        // No speculative create — wait for session.updated only.
       });
 
       ws.on("message", (raw) => {
@@ -204,13 +212,6 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
           return;
         }
 
-        // session.created alone is not enough (config may still be default); only use it
-        // as a second chance after we already sent session.update and somehow missed updated.
-        if (type === "session.created" && sessionUpdateSent && responseCreated === false) {
-          // Keep waiting for session.updated; fallback timer covers the miss.
-          return;
-        }
-
         if (type === "response.output_audio.delta" || type === "response.audio.delta") {
           const delta = typeof eventMsg.delta === "string" ? eventMsg.delta : "";
           if (delta) chunks.push(Buffer.from(delta, "base64"));
@@ -223,7 +224,6 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
           return;
         }
         if (type === "response.output_audio_transcript.done" || type === "response.audio_transcript.done") {
-          // Final transcript replaces any streamed deltas — appending both doubled the text and failed the match.
           const final = typeof eventMsg.transcript === "string" ? eventMsg.transcript : "";
           if (final) transcript = final;
           return;
@@ -232,6 +232,8 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
         if (type === "response.done") {
           const response = eventMsg.response as
             | {
+                status?: string;
+                status_details?: { type?: string; reason?: string };
                 usage?: {
                   input_tokens?: number;
                   output_tokens?: number;
@@ -241,6 +243,13 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
                 output?: Array<{ content?: Array<{ transcript?: string; type?: string }> }>;
               }
             | undefined;
+
+          const status = response?.status ?? "";
+          if (status && status !== "completed") {
+            fail(new Error(`Realtime response status: ${status}`));
+            return;
+          }
+
           if (response?.usage) {
             usage = {
               inputTokens: response.usage.input_tokens ?? 0,
@@ -258,30 +267,56 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
           }
 
           const pcm = Buffer.concat(chunks);
-          if (!pcm.length) {
-            fail(new Error("Realtime returned no audio"));
+          if (!pcm.length || pcm.length % 2 !== 0) {
+            fail(new Error("Realtime returned invalid PCM"));
             return;
           }
 
-          const matched = transcriptsMatch(text, transcript);
-          if (!matched) {
-            // Empty/missing transcript with real PCM was a common silent killer — accept audio.
-            if (!transcript.trim() && pcm.length >= MIN_PCM_BYTES) {
-              console.warn(
-                JSON.stringify({
-                  event: "voice_transcript_missing",
-                  intended: text.slice(0, 80),
-                  pcmBytes: pcm.length,
-                }),
-              );
-            } else {
-              fail(new Error(`Realtime transcript mismatch: got "${transcript}"`));
-              return;
-            }
+          const minBytes = minPcmBytesForText(text);
+          if (pcm.length < minBytes) {
+            fail(new Error(`Realtime audio too short: ${pcm.length} < ${minBytes}`));
+            return;
           }
 
+          if (!transcript.trim()) {
+            console.warn(
+              JSON.stringify({
+                event: "voice_transcript_missing",
+                pcmBytes: pcm.length,
+                textLen: text.length,
+              }),
+            );
+            fail(new Error("Realtime transcript missing"));
+            return;
+          }
+
+          if (!transcriptsMatch(text, transcript)) {
+            console.warn(
+              JSON.stringify({
+                event: "voice_transcript_mismatch",
+                pcmBytes: pcm.length,
+                textLen: text.length,
+                spokenLen: transcript.length,
+              }),
+            );
+            fail(new Error(`Realtime transcript mismatch`));
+            return;
+          }
+
+          const generateMs = Date.now() - (openAt || connectStarted);
+          console.info(
+            JSON.stringify({
+              event: "voice_generate_ok",
+              queueWaitMs,
+              connectMs: openAt ? openAt - connectStarted : 0,
+              generateMs,
+              pcmBytes: pcm.length,
+              textLen: text.length,
+            }),
+          );
+
           succeed({
-            audio: pcmToWav(pcm, 24_000),
+            audio: pcmToWav(pcm, PCM_RATE),
             contentType: "audio/wav",
             model,
             voice,
@@ -307,7 +342,13 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
       try {
         return await generateOnce(text, options.event);
       } catch (first) {
-        // One retry for transport / transcript glitches; surface the last error.
+        // Retry transport/timeout only — not model/voice/schema, and not transcript as permanent model error.
+        // Missing transcript / mismatch: one transient retry.
+        if (isSchemaOrModelError(first)) throw first;
+        const message = first instanceof Error ? first.message : String(first);
+        const retryable =
+          isTransportError(first) || /transcript missing|transcript mismatch|audio too short|invalid PCM|status:/i.test(message);
+        if (!retryable) throw first;
         try {
           return await generateOnce(text, options.event);
         } catch (second) {

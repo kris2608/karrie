@@ -1,0 +1,11 @@
+{
+  "version": "v5",
+  "model": "gpt-realtime-2.1-mini",
+  "voice": "marin",
+  "instructionVersion": "v5",
+  "deliveryVersion": "v5",
+  "templateVersion": "v5",
+  "generatedAt": null,
+  "entries": [],
+  "note": "Populate via server `npm run voice:library`."
+}

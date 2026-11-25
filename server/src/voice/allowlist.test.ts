@@ -2,15 +2,16 @@ import { describe, expect, it } from "vitest";
 import { isAllowedSpeechText, isVoiceEvent } from "./allowlist.js";
 
 describe("voice allowlist", () => {
-  it("allows new personality templates", () => {
+  it("allows v5 and legacy personality templates", () => {
     expect(isAllowedSpeechText("Hebbes!")).toBe(true);
+    expect(isAllowedSpeechText("Kun jij de bananen vinden?")).toBe(true);
+    expect(isAllowedSpeechText("Nu gaan we brood zoeken!")).toBe(true);
+    expect(isAllowedSpeechText("Waar zijn de appels?")).toBe(true);
+    expect(isAllowedSpeechText("Zoek maar twee komkommers!")).toBe(true);
     expect(isAllowedSpeechText("Hmm… waar zouden de bananen zijn?")).toBe(true);
-    expect(isAllowedSpeechText("Zo, nu nog melk!")).toBe(true);
     expect(isAllowedSpeechText("Psst… ik heb een speciale opdracht voor je!")).toBe(true);
     expect(isAllowedSpeechText("Tadaa! Dat hebben we samen mooi gedaan!")).toBe(true);
-    expect(isAllowedSpeechText("Zoek iets geel!")).toBe(true);
     expect(isAllowedSpeechText("Sleep naar Karrie!")).toBe(true);
-    expect(isAllowedSpeechText("Ja, die hebben we!")).toBe(true);
     expect(isAllowedSpeechText("Yes, die hebben we!")).toBe(false);
   });
 

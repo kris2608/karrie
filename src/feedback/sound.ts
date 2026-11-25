@@ -2,6 +2,13 @@ type WindowWithWebkitAudio = Window & { webkitAudioContext?: typeof AudioContext
 
 let context: AudioContext | null = null;
 let enabled = false;
+/** Persistent speech element — primed during unlock so iOS Safari/PWA can autoplay later. */
+let speechElement: HTMLAudioElement | null = null;
+let speechPrimed = false;
+
+/** Minimal silent WAV (44-byte header + tiny PCM) for unlock priming. */
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
 
 export function setSoundEnabled(value: boolean) {
   enabled = value;
@@ -15,6 +22,41 @@ export function unlockAudio() {
     context = new Ctor();
   }
   if (context.state === "suspended") void context.resume();
+
+  if (!speechElement) {
+    speechElement = new Audio();
+    speechElement.preload = "auto";
+    speechElement.setAttribute("playsinline", "true");
+  }
+  if (!speechPrimed) {
+    speechPrimed = true;
+    try {
+      speechElement.src = SILENT_WAV;
+      void speechElement.play().then(() => {
+        try {
+          speechElement?.pause();
+        } catch {
+          // ignore
+        }
+      }).catch(() => {
+        // Gesture may still unlock later on first real clip.
+        speechPrimed = false;
+      });
+    } catch {
+      speechPrimed = false;
+    }
+  }
+}
+
+/** Shared HTMLAudioElement for voice clips (same unlock path as SFX). */
+export function getSpeechElement(): HTMLAudioElement {
+  unlockAudio();
+  if (!speechElement) {
+    speechElement = new Audio();
+    speechElement.preload = "auto";
+    speechElement.setAttribute("playsinline", "true");
+  }
+  return speechElement;
 }
 
 function ready(): AudioContext | null {

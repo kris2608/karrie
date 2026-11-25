@@ -27,7 +27,7 @@ import { voiceController } from "../../services/voice/controller";
 import { markAppUsed } from "../install/installPrompt";
 import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ShareIcon } from "../../components/ui/ShareIcon";
-import { shoppingPrefetchPhrases, staticFeedbackPhrases } from "../shop/useShopVoice";
+import { shoppingPrefetchPhrases } from "../shop/useShopVoice";
 import { ShareListSheet } from "../share/ShareListSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
@@ -109,7 +109,8 @@ export function ReviewScreen() {
     if (settings.voiceEnabled) {
       voiceController.setEnabled(true);
       // Warm first product clips during navigation / intro so speech is ready on arrival.
-      voiceController.prefetch([...shoppingPrefetchPhrases(adventure.id, adventure.items), ...staticFeedbackPhrases()]);
+      // Current + next product only — max 1 background generate via scheduler.
+      voiceController.prefetch(shoppingPrefetchPhrases(adventure.id, adventure.items));
     }
     if (fresh) dispatch({ type: "start-shopping" });
     navigate("/winkel", fresh && discoveredCount(adventure) > 0 ? { state: { intro: true } } : undefined);
