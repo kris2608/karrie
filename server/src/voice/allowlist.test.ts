@@ -8,6 +8,8 @@ describe("voice allowlist", () => {
     expect(isAllowedSpeechText("Nu gaan we brood zoeken!")).toBe(true);
     expect(isAllowedSpeechText("Waar zijn de appels?")).toBe(true);
     expect(isAllowedSpeechText("Zoek maar twee komkommers!")).toBe(true);
+    expect(isAllowedSpeechText("Zoek jij de pindakaas?")).toBe(true);
+    expect(isAllowedSpeechText("Waar is de melk?")).toBe(true);
     expect(isAllowedSpeechText("Hmm… waar zouden de bananen zijn?")).toBe(true);
     expect(isAllowedSpeechText("Psst… ik heb een speciale opdracht voor je!")).toBe(true);
     expect(isAllowedSpeechText("Tadaa! Dat hebben we samen mooi gedaan!")).toBe(true);

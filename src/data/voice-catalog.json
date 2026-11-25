@@ -1,0 +1,511 @@
+{
+  "version": "v5",
+  "language": "nl-NL",
+  "products": [
+    {
+      "productId": "appel",
+      "spokenName": "appels",
+      "instruction": "Kun jij de appels vinden?"
+    },
+    {
+      "productId": "banaan",
+      "spokenName": "bananen",
+      "instruction": "Zoek maar bananen!"
+    },
+    {
+      "productId": "peer",
+      "spokenName": "peren",
+      "instruction": "Waar zijn de peren?"
+    },
+    {
+      "productId": "sinaasappel",
+      "spokenName": "sinaasappels",
+      "instruction": "Nu gaan we sinaasappels zoeken!"
+    },
+    {
+      "productId": "aardbei",
+      "spokenName": "aardbeien",
+      "instruction": "Kun jij de aardbeien vinden?"
+    },
+    {
+      "productId": "druiven",
+      "spokenName": "druiven",
+      "instruction": "Nu gaan we druiven zoeken!"
+    },
+    {
+      "productId": "mandarijn",
+      "spokenName": "mandarijn",
+      "instruction": "Waar is de mandarijn?"
+    },
+    {
+      "productId": "citroen",
+      "spokenName": "citroen",
+      "instruction": "Kun jij de citroen vinden?"
+    },
+    {
+      "productId": "kiwi",
+      "spokenName": "kiwi",
+      "instruction": "Kun jij de kiwi vinden?"
+    },
+    {
+      "productId": "tomaat",
+      "spokenName": "tomaten",
+      "instruction": "Waar zijn de tomaten?"
+    },
+    {
+      "productId": "komkommer",
+      "spokenName": "komkommer",
+      "instruction": "Waar is de komkommer?"
+    },
+    {
+      "productId": "paprika",
+      "spokenName": "paprika",
+      "instruction": "Kun jij paprika vinden?"
+    },
+    {
+      "productId": "wortel",
+      "spokenName": "wortels",
+      "instruction": "Nu gaan we wortels zoeken!"
+    },
+    {
+      "productId": "broccoli",
+      "spokenName": "broccoli",
+      "instruction": "Nu gaan we broccoli zoeken!"
+    },
+    {
+      "productId": "sla",
+      "spokenName": "sla",
+      "instruction": "Kun jij sla vinden?"
+    },
+    {
+      "productId": "avocado",
+      "spokenName": "avocado",
+      "instruction": "Zoek maar avocado!"
+    },
+    {
+      "productId": "aardappel",
+      "spokenName": "aardappelen",
+      "instruction": "Waar zijn de aardappelen?"
+    },
+    {
+      "productId": "aardappeltjes",
+      "spokenName": "aardappeltjes",
+      "instruction": "Waar zijn aardappeltjes?"
+    },
+    {
+      "productId": "ui",
+      "spokenName": "ui",
+      "instruction": "Kun jij ui vinden?"
+    },
+    {
+      "productId": "knoflook",
+      "spokenName": "knoflook",
+      "instruction": "Nu gaan we knoflook zoeken!"
+    },
+    {
+      "productId": "champignons",
+      "spokenName": "champignons",
+      "instruction": "Zoek maar champignons!"
+    },
+    {
+      "productId": "courgette",
+      "spokenName": "courgette",
+      "instruction": "Waar is courgette?"
+    },
+    {
+      "productId": "aubergine",
+      "spokenName": "aubergine",
+      "instruction": "Kun jij aubergine vinden?"
+    },
+    {
+      "productId": "sperziebonen",
+      "spokenName": "sperziebonen",
+      "instruction": "Waar zijn sperziebonen?"
+    },
+    {
+      "productId": "prei",
+      "spokenName": "prei",
+      "instruction": "Waar is prei?"
+    },
+    {
+      "productId": "verse-spinazie",
+      "spokenName": "verse spinazie",
+      "instruction": "Zoek maar verse spinazie!"
+    },
+    {
+      "productId": "wokgroenten",
+      "spokenName": "wokgroenten",
+      "instruction": "Zoek maar wokgroenten!"
+    },
+    {
+      "productId": "pastagroenten",
+      "spokenName": "pastagroenten",
+      "instruction": "Zoek maar pastagroenten!"
+    },
+    {
+      "productId": "brood",
+      "spokenName": "brood",
+      "instruction": "Kun jij het brood vinden?"
+    },
+    {
+      "productId": "bolletjes",
+      "spokenName": "bolletjes",
+      "instruction": "Kun jij bolletjes vinden?"
+    },
+    {
+      "productId": "krentenbollen",
+      "spokenName": "krentenbollen",
+      "instruction": "Zoek maar krentenbollen!"
+    },
+    {
+      "productId": "croissant",
+      "spokenName": "croissant",
+      "instruction": "Waar is croissant?"
+    },
+    {
+      "productId": "stokbrood",
+      "spokenName": "stokbrood",
+      "instruction": "Zoek maar stokbrood!"
+    },
+    {
+      "productId": "kipfilet",
+      "spokenName": "kipfilet",
+      "instruction": "Waar is kipfilet?"
+    },
+    {
+      "productId": "gehakt",
+      "spokenName": "gehakt",
+      "instruction": "Kun jij gehakt vinden?"
+    },
+    {
+      "productId": "zalm",
+      "spokenName": "zalm",
+      "instruction": "Kun jij zalm vinden?"
+    },
+    {
+      "productId": "vegaburger",
+      "spokenName": "vegaburger",
+      "instruction": "Waar is vegaburger?"
+    },
+    {
+      "productId": "beschuit",
+      "spokenName": "beschuit",
+      "instruction": "Zoek maar beschuit!"
+    },
+    {
+      "productId": "crackers",
+      "spokenName": "crackers",
+      "instruction": "Kun jij crackers vinden?"
+    },
+    {
+      "productId": "havermout",
+      "spokenName": "havermout",
+      "instruction": "Zoek maar havermout!"
+    },
+    {
+      "productId": "pindakaas",
+      "spokenName": "pindakaas",
+      "instruction": "Zoek jij de pindakaas?"
+    },
+    {
+      "productId": "noten",
+      "spokenName": "noten",
+      "instruction": "Kun jij noten vinden?"
+    },
+    {
+      "productId": "jam",
+      "spokenName": "jam",
+      "instruction": "Waar is jam?"
+    },
+    {
+      "productId": "hagelslag",
+      "spokenName": "hagelslag",
+      "instruction": "Kun jij de hagelslag vinden?"
+    },
+    {
+      "productId": "muesli",
+      "spokenName": "muesli",
+      "instruction": "Zoek maar muesli!"
+    },
+    {
+      "productId": "honing",
+      "spokenName": "honing",
+      "instruction": "Zoek maar honing!"
+    },
+    {
+      "productId": "appelstroop",
+      "spokenName": "appelstroop",
+      "instruction": "Zoek maar appelstroop!"
+    },
+    {
+      "productId": "pasta",
+      "spokenName": "pasta",
+      "instruction": "Zoek maar pasta!"
+    },
+    {
+      "productId": "rijst",
+      "spokenName": "rijst",
+      "instruction": "Kun jij de rijst vinden?"
+    },
+    {
+      "productId": "tomatenpuree",
+      "spokenName": "tomatenpuree",
+      "instruction": "Zoek maar tomatenpuree!"
+    },
+    {
+      "productId": "soep",
+      "spokenName": "soep",
+      "instruction": "Zoek maar soep!"
+    },
+    {
+      "productId": "olijfolie",
+      "spokenName": "olijfolie",
+      "instruction": "Nu gaan we olijfolie zoeken!"
+    },
+    {
+      "productId": "suiker",
+      "spokenName": "suiker",
+      "instruction": "Nu gaan we suiker zoeken!"
+    },
+    {
+      "productId": "koekjes",
+      "spokenName": "koekjes",
+      "instruction": "Waar zijn de koekjes?"
+    },
+    {
+      "productId": "chips",
+      "spokenName": "chips",
+      "instruction": "Zoek maar chips!"
+    },
+    {
+      "productId": "chocoladereep",
+      "spokenName": "chocoladereep",
+      "instruction": "Waar is chocoladereep?"
+    },
+    {
+      "productId": "ontbijtkoek",
+      "spokenName": "ontbijtkoek",
+      "instruction": "Kun jij ontbijtkoek vinden?"
+    },
+    {
+      "productId": "pastasaus",
+      "spokenName": "pastasaus",
+      "instruction": "Zoek maar pastasaus!"
+    },
+    {
+      "productId": "mais",
+      "spokenName": "mais",
+      "instruction": "Waar zijn mais?"
+    },
+    {
+      "productId": "augurk",
+      "spokenName": "augurk",
+      "instruction": "Zoek maar augurk!"
+    },
+    {
+      "productId": "olijven",
+      "spokenName": "olijven",
+      "instruction": "Nu gaan we olijven zoeken!"
+    },
+    {
+      "productId": "babyvoeding",
+      "spokenName": "babyvoeding",
+      "instruction": "Kun jij babyvoeding vinden?"
+    },
+    {
+      "productId": "melk",
+      "spokenName": "melk",
+      "instruction": "Waar is de melk?"
+    },
+    {
+      "productId": "yoghurt",
+      "spokenName": "yoghurt",
+      "instruction": "Kun jij de yoghurt vinden?"
+    },
+    {
+      "productId": "kwark",
+      "spokenName": "kwark",
+      "instruction": "Waar is kwark?"
+    },
+    {
+      "productId": "kaas",
+      "spokenName": "kaas",
+      "instruction": "Kun jij de kaas vinden?"
+    },
+    {
+      "productId": "ham",
+      "spokenName": "ham",
+      "instruction": "Kun jij ham vinden?"
+    },
+    {
+      "productId": "salami",
+      "spokenName": "salami",
+      "instruction": "Zoek maar salami!"
+    },
+    {
+      "productId": "mozzarella",
+      "spokenName": "mozzarella",
+      "instruction": "Zoek maar mozzarella!"
+    },
+    {
+      "productId": "feta",
+      "spokenName": "feta",
+      "instruction": "Kun jij feta vinden?"
+    },
+    {
+      "productId": "eieren",
+      "spokenName": "eieren",
+      "instruction": "Waar zijn de eieren?"
+    },
+    {
+      "productId": "boter",
+      "spokenName": "boter",
+      "instruction": "Kun jij de boter vinden?"
+    },
+    {
+      "productId": "vla",
+      "spokenName": "vla",
+      "instruction": "Zoek maar vla!"
+    },
+    {
+      "productId": "karnemelk",
+      "spokenName": "karnemelk",
+      "instruction": "Waar is karnemelk?"
+    },
+    {
+      "productId": "roomkaas",
+      "spokenName": "roomkaas",
+      "instruction": "Zoek maar roomkaas!"
+    },
+    {
+      "productId": "slagroom",
+      "spokenName": "slagroom",
+      "instruction": "Waar is slagroom?"
+    },
+    {
+      "productId": "koffie",
+      "spokenName": "koffie",
+      "instruction": "Kun jij koffie vinden?"
+    },
+    {
+      "productId": "thee",
+      "spokenName": "thee",
+      "instruction": "Kun jij thee vinden?"
+    },
+    {
+      "productId": "sinaasappelsap",
+      "spokenName": "sinaasappelsap",
+      "instruction": "Nu gaan we sinaasappelsap zoeken!"
+    },
+    {
+      "productId": "water",
+      "spokenName": "water",
+      "instruction": "Waar is het water?"
+    },
+    {
+      "productId": "drinkpakje",
+      "spokenName": "drinkpakje",
+      "instruction": "Nu gaan we drinkpakje zoeken!"
+    },
+    {
+      "productId": "frisdrank",
+      "spokenName": "frisdrank",
+      "instruction": "Waar is frisdrank?"
+    },
+    {
+      "productId": "siroop",
+      "spokenName": "siroop",
+      "instruction": "Kun jij siroop vinden?"
+    },
+    {
+      "productId": "ijs",
+      "spokenName": "ijs",
+      "instruction": "Waar is het ijs?"
+    },
+    {
+      "productId": "pizza",
+      "spokenName": "pizza",
+      "instruction": "Kun jij pizza vinden?"
+    },
+    {
+      "productId": "vissticks",
+      "spokenName": "vissticks",
+      "instruction": "Zoek maar vissticks!"
+    },
+    {
+      "productId": "spinazie",
+      "spokenName": "spinazie",
+      "instruction": "Zoek maar spinazie!"
+    },
+    {
+      "productId": "bessen",
+      "spokenName": "bessen",
+      "instruction": "Kun jij bessen vinden?"
+    },
+    {
+      "productId": "kant-en-klaar",
+      "spokenName": "kant-en-klaar",
+      "instruction": "Waar is kant-en-klaar?"
+    },
+    {
+      "productId": "maaltijdsalade",
+      "spokenName": "maaltijdsalade",
+      "instruction": "Waar is maaltijdsalade?"
+    },
+    {
+      "productId": "toiletpapier",
+      "spokenName": "toiletpapier",
+      "instruction": "Kun jij toiletpapier vinden?"
+    },
+    {
+      "productId": "keukenpapier",
+      "spokenName": "keukenpapier",
+      "instruction": "Kun jij keukenpapier vinden?"
+    },
+    {
+      "productId": "afwasmiddel",
+      "spokenName": "afwasmiddel",
+      "instruction": "Zoek maar afwasmiddel!"
+    },
+    {
+      "productId": "wasmiddel",
+      "spokenName": "wasmiddel",
+      "instruction": "Kun jij wasmiddel vinden?"
+    },
+    {
+      "productId": "vuilniszakken",
+      "spokenName": "vuilniszakken",
+      "instruction": "Waar zijn vuilniszakken?"
+    },
+    {
+      "productId": "schoonmaakmiddel",
+      "spokenName": "schoonmaakmiddel",
+      "instruction": "Zoek maar schoonmaakmiddel!"
+    },
+    {
+      "productId": "vaatwastabletten",
+      "spokenName": "vaatwastabletten",
+      "instruction": "Kun jij vaatwastabletten vinden?"
+    },
+    {
+      "productId": "handzeep",
+      "spokenName": "handzeep",
+      "instruction": "Nu gaan we handzeep zoeken!"
+    },
+    {
+      "productId": "tandpasta",
+      "spokenName": "tandpasta",
+      "instruction": "Kun jij tandpasta vinden?"
+    },
+    {
+      "productId": "shampoo",
+      "spokenName": "shampoo",
+      "instruction": "Zoek maar shampoo!"
+    },
+    {
+      "productId": "luiers",
+      "spokenName": "luiers",
+      "instruction": "Waar zijn luiers?"
+    }
+  ]
+}

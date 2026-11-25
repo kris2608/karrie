@@ -5,714 +5,817 @@
   "instructionVersion": "v5",
   "deliveryVersion": "v5",
   "templateVersion": "v5",
-  "generatedAt": "2026-11-25T21:48:39.710Z",
+  "generatedAt": "2026-11-25T22:01:52.805Z",
+  "reused": 95,
+  "generated": 16,
   "entries": [
     {
       "event": "product",
       "text": "Kun jij de appels vinden?",
       "file": "product/14ea47d3.wav",
       "cacheKey": "dd6da82df4af49b590a5b7866ac4254bf061ad20bde61d214b5b3ae7962b3fcf",
-      "productId": "appel"
+      "productId": "appel",
+      "spokenName": "appels"
     },
     {
       "event": "product",
       "text": "Zoek maar bananen!",
       "file": "product/f6d48235.wav",
       "cacheKey": "b4a858bab882f8cc7d6d4d5eec65ae149fdced708ff26e31c2fd0381dc7d4daa",
-      "productId": "banaan"
+      "productId": "banaan",
+      "spokenName": "bananen"
     },
     {
       "event": "product",
-      "text": "Waar zijn peren?",
-      "file": "product/140af6dc.wav",
-      "cacheKey": "c07c13272fe3c0e184da360ba75ae9e10142650e106a79318b6c6898e36a9e5e",
-      "productId": "peer"
+      "text": "Waar zijn de peren?",
+      "file": "product/ae9734fb.wav",
+      "cacheKey": "70dda1dd349987c72c3d46cd83b6df8d7e45d891dad1f93f50aaa273c192f802",
+      "productId": "peer",
+      "spokenName": "peren"
     },
     {
       "event": "product",
       "text": "Nu gaan we sinaasappels zoeken!",
       "file": "product/108108d2.wav",
       "cacheKey": "9550a559fedcec8dedc9b0b46c27d2d57e3029a8e1088cc5b7a9fa08609f49ff",
-      "productId": "sinaasappel"
+      "productId": "sinaasappel",
+      "spokenName": "sinaasappels"
     },
     {
       "event": "product",
-      "text": "Kun jij aardbei vinden?",
-      "file": "product/fdc4bead.wav",
-      "cacheKey": "4e03fcacd34a6aee991c9e6e23bab3e53a60b8446cac9911471bb1e4a2027ea1",
-      "productId": "aardbei"
+      "text": "Kun jij de aardbeien vinden?",
+      "file": "product/55b25209.wav",
+      "cacheKey": "ff20fb6b567fabc02ca956f52688d0a1a7cc084dfc6cf9e75db663123e94ae61",
+      "productId": "aardbei",
+      "spokenName": "aardbeien"
     },
     {
       "event": "product",
       "text": "Nu gaan we druiven zoeken!",
       "file": "product/d601db8f.wav",
       "cacheKey": "59763165d25295fef6ef3f8f44c99982af9f0f61332c6417da37655b9c02cf64",
-      "productId": "druiven"
+      "productId": "druiven",
+      "spokenName": "druiven"
     },
     {
       "event": "product",
-      "text": "Waar is mandarijn?",
-      "file": "product/1023d58d.wav",
-      "cacheKey": "0f92fa565ba17444e8fc1cad3af07c9c5b0b0a009f8abdac6b916b9ce024da0c",
-      "productId": "mandarijn"
+      "text": "Waar is de mandarijn?",
+      "file": "product/411299a4.wav",
+      "cacheKey": "a0da779677e3c536f80562401d33b3713b370004256c3f41ee345e7eab96a94a",
+      "productId": "mandarijn",
+      "spokenName": "mandarijn"
     },
     {
       "event": "product",
-      "text": "Kun jij citroen vinden?",
-      "file": "product/23976cb5.wav",
-      "cacheKey": "537e52b67cd8e43fbf2e2bee57a0d642372d48c2052304419c7cc628746c337d",
-      "productId": "citroen"
+      "text": "Kun jij de citroen vinden?",
+      "file": "product/19d3be2e.wav",
+      "cacheKey": "c6ad279d5f5e1f66575987c993db374dd43b30618828a1f2c514ce5ca25ba346",
+      "productId": "citroen",
+      "spokenName": "citroen"
     },
     {
       "event": "product",
-      "text": "Kun jij kiwi vinden?",
-      "file": "product/14fece61.wav",
-      "cacheKey": "117946de26c696bacd6d9d77208c3b6c14f082cb6219b3a59eada18c52f633d1",
-      "productId": "kiwi"
+      "text": "Kun jij de kiwi vinden?",
+      "file": "product/42104bf4.wav",
+      "cacheKey": "cdd2f11f8b71fe31b3e29b70be2a747b69ea2e03c20c848b83b903d27c5a364a",
+      "productId": "kiwi",
+      "spokenName": "kiwi"
     },
     {
       "event": "product",
       "text": "Waar zijn de tomaten?",
       "file": "product/b7203509.wav",
       "cacheKey": "b8d616d4330fb107b70ec828f52ff6df727bc8e226bc9a25af197ac26d110f32",
-      "productId": "tomaat"
+      "productId": "tomaat",
+      "spokenName": "tomaten"
     },
     {
       "event": "product",
       "text": "Waar is de komkommer?",
       "file": "product/8327c830.wav",
       "cacheKey": "546c55ab0295fcb7a0f67fcaa828ad6d91b627961783ef8d17e3d68461d8b0be",
-      "productId": "komkommer"
+      "productId": "komkommer",
+      "spokenName": "komkommer"
     },
     {
       "event": "product",
       "text": "Kun jij paprika vinden?",
       "file": "product/6a5c849d.wav",
       "cacheKey": "fcf685d2be426475b0c589b211bbf2ee06474f7c9543d309c11019518938a065",
-      "productId": "paprika"
+      "productId": "paprika",
+      "spokenName": "paprika"
     },
     {
       "event": "product",
       "text": "Nu gaan we wortels zoeken!",
       "file": "product/c2c807a4.wav",
       "cacheKey": "5bcbd9cd37c0b1c2ce148e86d434d545753d46d3e7e9e6afed5313c17bed4f15",
-      "productId": "wortel"
+      "productId": "wortel",
+      "spokenName": "wortels"
     },
     {
       "event": "product",
       "text": "Nu gaan we broccoli zoeken!",
       "file": "product/914b7c4f.wav",
       "cacheKey": "5e60d8eaa8cbd8c0d823623422d9117aab423f5dbfdf0e23c37600dad6825b35",
-      "productId": "broccoli"
+      "productId": "broccoli",
+      "spokenName": "broccoli"
     },
     {
       "event": "product",
       "text": "Kun jij sla vinden?",
       "file": "product/f32d11e7.wav",
       "cacheKey": "15081952a43599eb76dff9fb8da3ce133aa80b8a699b26718a02370b2476b115",
-      "productId": "sla"
+      "productId": "sla",
+      "spokenName": "sla"
     },
     {
       "event": "product",
       "text": "Zoek maar avocado!",
       "file": "product/b578d9ad.wav",
       "cacheKey": "3578cb464d7b230848da11a84453e12e45bad10896ebbac12414caf6a0c45fed",
-      "productId": "avocado"
+      "productId": "avocado",
+      "spokenName": "avocado"
     },
     {
       "event": "product",
-      "text": "Waar zijn aardappelen?",
-      "file": "product/1db026f7.wav",
-      "cacheKey": "321f04880635abcae485cfd7875292ec69c14c1f5a5808906439648a17e16956",
-      "productId": "aardappel"
+      "text": "Waar zijn de aardappelen?",
+      "file": "product/2c04cd18.wav",
+      "cacheKey": "d299818a8dea6649697043bdf48ffb68cbbf24dfab4bc20644eaa8e288e9bbcb",
+      "productId": "aardappel",
+      "spokenName": "aardappelen"
     },
     {
       "event": "product",
       "text": "Waar zijn aardappeltjes?",
       "file": "product/60ba5434.wav",
       "cacheKey": "ee93beff8ba2b1587bf19ff4f4be2c4d5c9015537a933706e5f5dcc30624dc98",
-      "productId": "aardappeltjes"
+      "productId": "aardappeltjes",
+      "spokenName": "aardappeltjes"
     },
     {
       "event": "product",
       "text": "Kun jij ui vinden?",
       "file": "product/69fc1297.wav",
       "cacheKey": "5852d7380a45c8405878c682afd7531c27a054a565ccb360950c37a8025f2ba9",
-      "productId": "ui"
+      "productId": "ui",
+      "spokenName": "ui"
     },
     {
       "event": "product",
       "text": "Nu gaan we knoflook zoeken!",
       "file": "product/1bcbc2c7.wav",
       "cacheKey": "739bd1bf7b19ee6ba310c697a6b496ef1d5076d360a25c945f8f3b3468566e3d",
-      "productId": "knoflook"
+      "productId": "knoflook",
+      "spokenName": "knoflook"
     },
     {
       "event": "product",
       "text": "Zoek maar champignons!",
       "file": "product/66390497.wav",
       "cacheKey": "966ea0a306dd6756662542e98187a6928a8d688fac06d20d82a7489bc112cc19",
-      "productId": "champignons"
+      "productId": "champignons",
+      "spokenName": "champignons"
     },
     {
       "event": "product",
       "text": "Waar is courgette?",
       "file": "product/f0b02163.wav",
       "cacheKey": "1800cd15dbfc878ae9d80f164df8279f3fe0e82b9f06f4b627c27175edc7e31b",
-      "productId": "courgette"
+      "productId": "courgette",
+      "spokenName": "courgette"
     },
     {
       "event": "product",
       "text": "Kun jij aubergine vinden?",
       "file": "product/fb3cc98b.wav",
       "cacheKey": "498a4ecebb1c23af4f5ccdfd959ed9bfa508ac412066b5c2944a917d5f79901d",
-      "productId": "aubergine"
+      "productId": "aubergine",
+      "spokenName": "aubergine"
     },
     {
       "event": "product",
       "text": "Waar zijn sperziebonen?",
       "file": "product/f1998db6.wav",
       "cacheKey": "ff8974dee1ee9865df6996aea17a21b9a8617256dd4b1db8ad7af50ac5e0c576",
-      "productId": "sperziebonen"
+      "productId": "sperziebonen",
+      "spokenName": "sperziebonen"
     },
     {
       "event": "product",
       "text": "Waar is prei?",
       "file": "product/bc64e1a7.wav",
       "cacheKey": "b97d9df3d9d979240c605e2a7a3dba298b9b5f3b122251a746ed9634299a70d7",
-      "productId": "prei"
+      "productId": "prei",
+      "spokenName": "prei"
     },
     {
       "event": "product",
       "text": "Zoek maar verse spinazie!",
       "file": "product/cdd94bae.wav",
       "cacheKey": "9d3ed8ff4c88be192c59713cd0832352c5a471ec526696905f1e10f0a3f46959",
-      "productId": "verse-spinazie"
+      "productId": "verse-spinazie",
+      "spokenName": "verse spinazie"
     },
     {
       "event": "product",
       "text": "Zoek maar wokgroenten!",
       "file": "product/3ecb42f7.wav",
       "cacheKey": "7d4e9e4c70073c10d60be2c0815f14cac796038d6d89bd3a8255288c50acac6c",
-      "productId": "wokgroenten"
+      "productId": "wokgroenten",
+      "spokenName": "wokgroenten"
     },
     {
       "event": "product",
       "text": "Zoek maar pastagroenten!",
       "file": "product/777de29b.wav",
       "cacheKey": "df93f0d29ff41d6816c624884403fbbd8b4976101877578ed0f3760ee9af4449",
-      "productId": "pastagroenten"
+      "productId": "pastagroenten",
+      "spokenName": "pastagroenten"
     },
     {
       "event": "product",
       "text": "Kun jij het brood vinden?",
       "file": "product/aa079376.wav",
       "cacheKey": "39b73b27660a16de88bc48938341fe2eea748602790afef225ceca04056dc98d",
-      "productId": "brood"
+      "productId": "brood",
+      "spokenName": "brood"
     },
     {
       "event": "product",
       "text": "Kun jij bolletjes vinden?",
       "file": "product/a159e149.wav",
       "cacheKey": "69e7c473b2c4fb9e2779bc992de017bd3a4b5430e3050d94ed3d221793b6a7df",
-      "productId": "bolletjes"
+      "productId": "bolletjes",
+      "spokenName": "bolletjes"
     },
     {
       "event": "product",
       "text": "Zoek maar krentenbollen!",
       "file": "product/8c2b9e79.wav",
       "cacheKey": "b6dc3b185328c7a4e6ae95dee4350147e6a2d3fa9f1789b1adaa327c71c22fd7",
-      "productId": "krentenbollen"
+      "productId": "krentenbollen",
+      "spokenName": "krentenbollen"
     },
     {
       "event": "product",
       "text": "Waar is croissant?",
       "file": "product/e37fcaf7.wav",
       "cacheKey": "add600618204063283a3648463c2d505fd06f83ea22e84afaaac91e552154cae",
-      "productId": "croissant"
+      "productId": "croissant",
+      "spokenName": "croissant"
     },
     {
       "event": "product",
       "text": "Zoek maar stokbrood!",
       "file": "product/64f19365.wav",
       "cacheKey": "cad9cab0a3c73a658f6cf75d9295080a0f27f84790ced468c6ff927be3cee728",
-      "productId": "stokbrood"
+      "productId": "stokbrood",
+      "spokenName": "stokbrood"
     },
     {
       "event": "product",
       "text": "Waar is kipfilet?",
       "file": "product/29858d11.wav",
       "cacheKey": "5a202f20c219723101f5288199813ea9819ddbf5c0efbbeb5eac7eeb79e460ba",
-      "productId": "kipfilet"
+      "productId": "kipfilet",
+      "spokenName": "kipfilet"
     },
     {
       "event": "product",
       "text": "Kun jij gehakt vinden?",
       "file": "product/d58132e1.wav",
       "cacheKey": "e6e573480f78c2ead159de4db36bce2b27968b6f0e0e101075b058ee0b252011",
-      "productId": "gehakt"
+      "productId": "gehakt",
+      "spokenName": "gehakt"
     },
     {
       "event": "product",
       "text": "Kun jij zalm vinden?",
       "file": "product/6324b947.wav",
       "cacheKey": "90c3efd749698f2c6f1c826c46dfdfb26647bd07d6009287523f2ab4d41f4ef5",
-      "productId": "zalm"
+      "productId": "zalm",
+      "spokenName": "zalm"
     },
     {
       "event": "product",
       "text": "Waar is vegaburger?",
       "file": "product/43da82d3.wav",
       "cacheKey": "2d87b3a97bdbd45ca14d2abb75e37bc479ef7b057052bf00615eb8966a7d8dd7",
-      "productId": "vegaburger"
+      "productId": "vegaburger",
+      "spokenName": "vegaburger"
     },
     {
       "event": "product",
       "text": "Zoek maar beschuit!",
       "file": "product/fa832db3.wav",
       "cacheKey": "17cf128558db153a1646c495aa32002021ebddd44c5912e58be65d3cdb656d9e",
-      "productId": "beschuit"
+      "productId": "beschuit",
+      "spokenName": "beschuit"
     },
     {
       "event": "product",
       "text": "Kun jij crackers vinden?",
       "file": "product/c8b007fb.wav",
       "cacheKey": "4b54303544605148d2e8bac2d8ec1d22b5f7a86ca46775971acc2aa8d5a5e743",
-      "productId": "crackers"
+      "productId": "crackers",
+      "spokenName": "crackers"
     },
     {
       "event": "product",
       "text": "Zoek maar havermout!",
       "file": "product/447f1625.wav",
       "cacheKey": "0ca046081190ed1ea79cdbc08a6439accd02489ce2f1be86e52e2bcd8785b25b",
-      "productId": "havermout"
+      "productId": "havermout",
+      "spokenName": "havermout"
     },
     {
       "event": "product",
-      "text": "Waar zijn pindakaas?",
-      "file": "product/7b7617e4.wav",
-      "cacheKey": "dce5b7eb23475dcfd442f3ba2d53a7efb8c00e9749019782daf970a9d56f4135",
-      "productId": "pindakaas"
+      "text": "Zoek jij de pindakaas?",
+      "file": "product/aa1b6487.wav",
+      "cacheKey": "22de7724c99cdb27cbcb09a6f8c95b8e80595324038e79f2dbc93ad01947e605",
+      "productId": "pindakaas",
+      "spokenName": "pindakaas"
     },
     {
       "event": "product",
       "text": "Kun jij noten vinden?",
       "file": "product/a7a62d53.wav",
       "cacheKey": "7f9789a4cd2adad3d73edbcbcd05647368a4594f45665d936089ae9c9989919d",
-      "productId": "noten"
+      "productId": "noten",
+      "spokenName": "noten"
     },
     {
       "event": "product",
       "text": "Waar is jam?",
       "file": "product/dcf1899b.wav",
       "cacheKey": "65ca699009c6e0e635c9bf2b4436466a49262e56571ee7bd642576892d426592",
-      "productId": "jam"
+      "productId": "jam",
+      "spokenName": "jam"
     },
     {
       "event": "product",
-      "text": "Kun jij hagelslag vinden?",
-      "file": "product/0640be67.wav",
-      "cacheKey": "beb6bd32c7139a96c4cd0a32fbc9d9e1e88b749a5e951f9951f8411357d179ef",
-      "productId": "hagelslag"
+      "text": "Kun jij de hagelslag vinden?",
+      "file": "product/e0508e28.wav",
+      "cacheKey": "a6f41507df11722fed6a8cc71cc3335ea46dbb327f3dc1c93ebdf8477f7b3478",
+      "productId": "hagelslag",
+      "spokenName": "hagelslag"
     },
     {
       "event": "product",
       "text": "Zoek maar muesli!",
       "file": "product/5007aa73.wav",
       "cacheKey": "081284f53ff005c5b0e0f5bbc9ef6dc9b517b7597fa9cce464c8c4b8c581bc37",
-      "productId": "muesli"
+      "productId": "muesli",
+      "spokenName": "muesli"
     },
     {
       "event": "product",
       "text": "Zoek maar honing!",
       "file": "product/f899861d.wav",
       "cacheKey": "c07c0805662a2993cd9efe1d90add32203e84c2c59c7b4b49a0cdc3e05f6f343",
-      "productId": "honing"
+      "productId": "honing",
+      "spokenName": "honing"
     },
     {
       "event": "product",
       "text": "Zoek maar appelstroop!",
       "file": "product/eab7a979.wav",
       "cacheKey": "257c6dd5967ed46fddb0663caeb04b49222374746709ac38c10a6a0417ff0fb9",
-      "productId": "appelstroop"
+      "productId": "appelstroop",
+      "spokenName": "appelstroop"
     },
     {
       "event": "product",
       "text": "Zoek maar pasta!",
       "file": "product/e3d94ccf.wav",
       "cacheKey": "5f6dd8033bbf8559bf7f5d72df53010b763072aff05ae8f75bca809f8c536eef",
-      "productId": "pasta"
+      "productId": "pasta",
+      "spokenName": "pasta"
     },
     {
       "event": "product",
-      "text": "Kun jij rijst vinden?",
-      "file": "product/42068dff.wav",
-      "cacheKey": "c7004d67509d6c215e67e66192aea6210f8df070127d716e4492a7718b6c1285",
-      "productId": "rijst"
+      "text": "Kun jij de rijst vinden?",
+      "file": "product/08716fe8.wav",
+      "cacheKey": "6fbbc7da1cb312b6f49ccfcfc61c89ef2b6a734a978a436ef917a66ad843fce7",
+      "productId": "rijst",
+      "spokenName": "rijst"
     },
     {
       "event": "product",
       "text": "Zoek maar tomatenpuree!",
       "file": "product/e03af5a1.wav",
       "cacheKey": "c82231757e7808c740e4068f1efbf1af88d2c42abc63bc480cc71dbc9f134a44",
-      "productId": "tomatenpuree"
+      "productId": "tomatenpuree",
+      "spokenName": "tomatenpuree"
     },
     {
       "event": "product",
       "text": "Zoek maar soep!",
       "file": "product/d3b70d69.wav",
       "cacheKey": "181f8883ae0b10ac3cb610ebd1aced76ffe48a706304313710ec8e9378831c33",
-      "productId": "soep"
+      "productId": "soep",
+      "spokenName": "soep"
     },
     {
       "event": "product",
       "text": "Nu gaan we olijfolie zoeken!",
       "file": "product/adf60d8d.wav",
       "cacheKey": "1f9386bb523dd82757f0432a3acc10af2fc37e26165d61b1c853910a3cd5594b",
-      "productId": "olijfolie"
+      "productId": "olijfolie",
+      "spokenName": "olijfolie"
     },
     {
       "event": "product",
       "text": "Nu gaan we suiker zoeken!",
       "file": "product/5eb4bedf.wav",
       "cacheKey": "26dfbf317b3eec9ef810c3b4b66add85ffffa5d468a0a7cb78e396205f21d8e0",
-      "productId": "suiker"
+      "productId": "suiker",
+      "spokenName": "suiker"
     },
     {
       "event": "product",
-      "text": "Waar zijn koekjes?",
-      "file": "product/3497153c.wav",
-      "cacheKey": "0be7dae6bd31682fd142bbd7a4a1f7f04da0d61f45f9168d7ea5affce54fbfa7",
-      "productId": "koekjes"
+      "text": "Waar zijn de koekjes?",
+      "file": "product/e3655d6b.wav",
+      "cacheKey": "e22f9a98a830b9da6ee5f73db43f3f6d998ec9e0478d13e5c0f15ab3be8c9d43",
+      "productId": "koekjes",
+      "spokenName": "koekjes"
     },
     {
       "event": "product",
       "text": "Zoek maar chips!",
       "file": "product/6833a6cf.wav",
       "cacheKey": "6703248e4ef9b985f4174f55a1bc79a0ac37ee7ea43b422a959619b9004b7cff",
-      "productId": "chips"
+      "productId": "chips",
+      "spokenName": "chips"
     },
     {
       "event": "product",
       "text": "Waar is chocoladereep?",
       "file": "product/b71ee52d.wav",
       "cacheKey": "f8ea287d0928b337f2d9672ea66a65bb319a2195feba0fdf0c9ee70ce069be9c",
-      "productId": "chocoladereep"
+      "productId": "chocoladereep",
+      "spokenName": "chocoladereep"
     },
     {
       "event": "product",
       "text": "Kun jij ontbijtkoek vinden?",
       "file": "product/d52b710b.wav",
       "cacheKey": "1aa3cab1dc3e7f64387b8791f74e15970381d30e70e7ff0d90c24a5b642537a9",
-      "productId": "ontbijtkoek"
+      "productId": "ontbijtkoek",
+      "spokenName": "ontbijtkoek"
     },
     {
       "event": "product",
       "text": "Zoek maar pastasaus!",
       "file": "product/a211df9b.wav",
       "cacheKey": "1d98a2e6b65b8badb4c782543878474d4b2f33bf4b46935bb2bfc6c250b6a402",
-      "productId": "pastasaus"
+      "productId": "pastasaus",
+      "spokenName": "pastasaus"
     },
     {
       "event": "product",
       "text": "Waar zijn mais?",
       "file": "product/730364fc.wav",
       "cacheKey": "a8b6ada45cc728d2e90cd76d9d47acd12e57040db11e08fdec190ddfda721af4",
-      "productId": "mais"
+      "productId": "mais",
+      "spokenName": "mais"
     },
     {
       "event": "product",
       "text": "Zoek maar augurk!",
       "file": "product/0155970b.wav",
       "cacheKey": "ec9f40f52b753bd4e6f4314c1ebdf8107133cf3d16ee47611f15be905d455909",
-      "productId": "augurk"
+      "productId": "augurk",
+      "spokenName": "augurk"
     },
     {
       "event": "product",
       "text": "Nu gaan we olijven zoeken!",
       "file": "product/4bc8990f.wav",
       "cacheKey": "dc54c2091698950c7789f95337d5c9a1be5a8320dba992ef342d1d780e417a97",
-      "productId": "olijven"
+      "productId": "olijven",
+      "spokenName": "olijven"
     },
     {
       "event": "product",
       "text": "Kun jij babyvoeding vinden?",
       "file": "product/a996a60b.wav",
       "cacheKey": "e9a65fcfc725c5483c242705b5644d6bbb9f8eba3c3fcce3811d5baf3c27eb0f",
-      "productId": "babyvoeding"
+      "productId": "babyvoeding",
+      "spokenName": "babyvoeding"
     },
     {
       "event": "product",
-      "text": "Zoek maar melk!",
-      "file": "product/12a6a43d.wav",
-      "cacheKey": "629836ad43da0e1e584a451f2164be7222efcf287ef8312b6484d7ed55d1c78f",
-      "productId": "melk"
+      "text": "Waar is de melk?",
+      "file": "product/dbd2819d.wav",
+      "cacheKey": "3e93e25b61b499513a14bcc973dd084c8120fd2b86b78492264ab2c0288a0eba",
+      "productId": "melk",
+      "spokenName": "melk"
     },
     {
       "event": "product",
-      "text": "Kun jij yoghurt vinden?",
-      "file": "product/3b352d69.wav",
-      "cacheKey": "dcd1f487edd694ff00936f853f31953ebd65e90eda882748fffb03b69898fcfa",
-      "productId": "yoghurt"
+      "text": "Kun jij de yoghurt vinden?",
+      "file": "product/b5cb273a.wav",
+      "cacheKey": "08ce516a38458ff663bf0addb8d2cd205e9ffaeaa785bd5ab4231e0775bbc60b",
+      "productId": "yoghurt",
+      "spokenName": "yoghurt"
     },
     {
       "event": "product",
       "text": "Waar is kwark?",
       "file": "product/f6bfc6a5.wav",
       "cacheKey": "5d4f9cbc8f6e7735c7beecd014b2793696ad53532b32b7f30e1e1c8017ad13e7",
-      "productId": "kwark"
+      "productId": "kwark",
+      "spokenName": "kwark"
     },
     {
       "event": "product",
-      "text": "Kun jij kaas vinden?",
-      "file": "product/79318d1d.wav",
-      "cacheKey": "fbdf6f17ec8406a63386f5e1dfaa32200de8a9afab4a34383654ab7deed1d5dd",
-      "productId": "kaas"
+      "text": "Kun jij de kaas vinden?",
+      "file": "product/cd24df34.wav",
+      "cacheKey": "ad76abf5e7502b86504be8ea991e6b66ebc109869de44e71242913cf3fe7e7ab",
+      "productId": "kaas",
+      "spokenName": "kaas"
     },
     {
       "event": "product",
       "text": "Kun jij ham vinden?",
       "file": "product/7d5aba4f.wav",
       "cacheKey": "7d9b7e108e68469f79809cbb2a10fa7a778ab0d9f13e235aad09ed87ea0c9a47",
-      "productId": "ham"
+      "productId": "ham",
+      "spokenName": "ham"
     },
     {
       "event": "product",
       "text": "Zoek maar salami!",
       "file": "product/e35a291f.wav",
       "cacheKey": "6fac0efe4624171c20a9ebb695403af873c02735d75286fb8ce8b22b2e7047df",
-      "productId": "salami"
+      "productId": "salami",
+      "spokenName": "salami"
     },
     {
       "event": "product",
       "text": "Zoek maar mozzarella!",
       "file": "product/d96153df.wav",
       "cacheKey": "abc8dbee5579a5029fd453ed97451e70758b4179910da4bf84c42962ab690fd4",
-      "productId": "mozzarella"
+      "productId": "mozzarella",
+      "spokenName": "mozzarella"
     },
     {
       "event": "product",
       "text": "Kun jij feta vinden?",
       "file": "product/0f745c1b.wav",
       "cacheKey": "4f568dae614ee20f63b652efe69b9616d01b835be5677b516390143de94d3bf5",
-      "productId": "feta"
+      "productId": "feta",
+      "spokenName": "feta"
     },
     {
       "event": "product",
       "text": "Waar zijn de eieren?",
       "file": "product/0ca22ba1.wav",
       "cacheKey": "25c828e78230a15a8f14c6ddf59271edf0f9ae92c48ccfee653272ccc6fd3323",
-      "productId": "eieren"
+      "productId": "eieren",
+      "spokenName": "eieren"
     },
     {
       "event": "product",
-      "text": "Kun jij boter vinden?",
-      "file": "product/d833fd9b.wav",
-      "cacheKey": "c3a0d5ac6d9271e171bc24807120963eeb04263144c90e65fa9c320d6524c802",
-      "productId": "boter"
+      "text": "Kun jij de boter vinden?",
+      "file": "product/bf4b17d4.wav",
+      "cacheKey": "deaa68b9fce3be2c318a6bb5a5b8c2bff746712eb4c68517962bf6365c8b3c9f",
+      "productId": "boter",
+      "spokenName": "boter"
     },
     {
       "event": "product",
       "text": "Zoek maar vla!",
       "file": "product/741c6f01.wav",
       "cacheKey": "992704a985604a18fb4d640fa3b616be2c6e3e1489e18f01c2ed2d285c3b0446",
-      "productId": "vla"
+      "productId": "vla",
+      "spokenName": "vla"
     },
     {
       "event": "product",
       "text": "Waar is karnemelk?",
       "file": "product/234b9e8b.wav",
       "cacheKey": "affcc5ce5af3647c4b517dfbd4128a5c4317d973158f0d7083f4595cfa8d924c",
-      "productId": "karnemelk"
+      "productId": "karnemelk",
+      "spokenName": "karnemelk"
     },
     {
       "event": "product",
       "text": "Zoek maar roomkaas!",
       "file": "product/29ec6139.wav",
       "cacheKey": "c1d0569c67037da7e13e4d48742ddae7165a4d85b7d2ae08a9eae3bf64941ed3",
-      "productId": "roomkaas"
+      "productId": "roomkaas",
+      "spokenName": "roomkaas"
     },
     {
       "event": "product",
       "text": "Waar is slagroom?",
       "file": "product/322a5e77.wav",
       "cacheKey": "a9425b6da8c29e86892f9760b810f0cdc21b53ee1124ce541c49d903277ea5a7",
-      "productId": "slagroom"
+      "productId": "slagroom",
+      "spokenName": "slagroom"
     },
     {
       "event": "product",
       "text": "Kun jij koffie vinden?",
       "file": "product/f09ff7a5.wav",
       "cacheKey": "67d819337cbda4ce1c9bee500fe3e09a9ad050feb0441961a45bf116d117cc20",
-      "productId": "koffie"
+      "productId": "koffie",
+      "spokenName": "koffie"
     },
     {
       "event": "product",
       "text": "Kun jij thee vinden?",
       "file": "product/96dfeb0f.wav",
       "cacheKey": "b236d04d6862655ccedf0086373d7953df3cbf58ef415018acd5a7e044835edd",
-      "productId": "thee"
+      "productId": "thee",
+      "spokenName": "thee"
     },
     {
       "event": "product",
       "text": "Nu gaan we sinaasappelsap zoeken!",
       "file": "product/1b9984a3.wav",
       "cacheKey": "26f2096643d8820f79ade2bffb435527cc1aa3687f6dad1f07329554579caa59",
-      "productId": "sinaasappelsap"
+      "productId": "sinaasappelsap",
+      "spokenName": "sinaasappelsap"
     },
     {
       "event": "product",
-      "text": "Zoek maar water!",
-      "file": "product/aebfabe3.wav",
-      "cacheKey": "a1f2ecaf1a7866a190fe3bebb0b601de47f82722d5806a5e73bcfe37a5bbd88b",
-      "productId": "water"
+      "text": "Waar is het water?",
+      "file": "product/f9918c49.wav",
+      "cacheKey": "734297a0dbae1b0bb81162271e906159c46502ee50c8c06d070bbf60792fe26b",
+      "productId": "water",
+      "spokenName": "water"
     },
     {
       "event": "product",
       "text": "Nu gaan we drinkpakje zoeken!",
       "file": "product/fe98fb37.wav",
       "cacheKey": "3b8a87f4222a81654a9aad7bc48ebfaef2a3939e3439e3948e909051c60c05de",
-      "productId": "drinkpakje"
+      "productId": "drinkpakje",
+      "spokenName": "drinkpakje"
     },
     {
       "event": "product",
       "text": "Waar is frisdrank?",
       "file": "product/c712abd9.wav",
       "cacheKey": "e6bd970daeabd229625e3c662edf438c3b91ac5f833b0a141065e899ecb067c0",
-      "productId": "frisdrank"
+      "productId": "frisdrank",
+      "spokenName": "frisdrank"
     },
     {
       "event": "product",
       "text": "Kun jij siroop vinden?",
       "file": "product/7ad72df1.wav",
       "cacheKey": "e8febdf9bbe8a5acdb259e52e1a1b2b900d0f18a89839e774a16476eb199c773",
-      "productId": "siroop"
+      "productId": "siroop",
+      "spokenName": "siroop"
     },
     {
       "event": "product",
-      "text": "Waar zijn iJs?",
-      "file": "product/7347ae98.wav",
-      "cacheKey": "069a24eaf9c7986340170efef9028bb049933cb44ea8ced46d03c9215cb33e28",
-      "productId": "ijs"
+      "text": "Waar is het ijs?",
+      "file": "product/bc0db400.wav",
+      "cacheKey": "822f3a6755ea3ecc964f363fa0db44b80e37ad8c0e6a013058ca0ad6295793c9",
+      "productId": "ijs",
+      "spokenName": "ijs"
     },
     {
       "event": "product",
       "text": "Kun jij pizza vinden?",
       "file": "product/92a13de3.wav",
       "cacheKey": "8a9aa9d76564af2e40d0d7db74accc2a7b8aa227031ea931496d2c8c45b39dac",
-      "productId": "pizza"
+      "productId": "pizza",
+      "spokenName": "pizza"
     },
     {
       "event": "product",
       "text": "Zoek maar vissticks!",
       "file": "product/60fd1e7b.wav",
       "cacheKey": "6c4b5038628078bfb1128c19de1ad2005690f4c0198cecf02f00280ef3d085f6",
-      "productId": "vissticks"
+      "productId": "vissticks",
+      "spokenName": "vissticks"
     },
     {
       "event": "product",
       "text": "Zoek maar spinazie!",
       "file": "product/8684f4bb.wav",
       "cacheKey": "ceab8c9c1cfeb8fce201be827c82a01798671548a89558a99d5d3c0d86122218",
-      "productId": "spinazie"
+      "productId": "spinazie",
+      "spokenName": "spinazie"
     },
     {
       "event": "product",
       "text": "Kun jij bessen vinden?",
       "file": "product/663e1b4d.wav",
       "cacheKey": "8d5a8e11fb1d25633e64ebc501ac98bee09aa7a293228919e4326650ef364b3b",
-      "productId": "bessen"
+      "productId": "bessen",
+      "spokenName": "bessen"
     },
     {
       "event": "product",
       "text": "Waar is kant-en-klaar?",
       "file": "product/de581b79.wav",
       "cacheKey": "8cc58e54322e03012e907980f8cf146090be7c56bd82bb0cdf8b4cffcdbec2ec",
-      "productId": "kant-en-klaar"
+      "productId": "kant-en-klaar",
+      "spokenName": "kant-en-klaar"
     },
     {
       "event": "product",
       "text": "Waar is maaltijdsalade?",
       "file": "product/51a66721.wav",
       "cacheKey": "781b054a80c66902103b88de93648e065f95c464143d5401731ad5145cd3da3e",
-      "productId": "maaltijdsalade"
+      "productId": "maaltijdsalade",
+      "spokenName": "maaltijdsalade"
     },
     {
       "event": "product",
       "text": "Kun jij toiletpapier vinden?",
       "file": "product/c2bfa173.wav",
       "cacheKey": "39c88eec39c8793aa735c175238bafd4325e4a28fae5173b03eb6bb84e4be5a0",
-      "productId": "toiletpapier"
+      "productId": "toiletpapier",
+      "spokenName": "toiletpapier"
     },
     {
       "event": "product",
       "text": "Kun jij keukenpapier vinden?",
       "file": "product/99c0fdd5.wav",
       "cacheKey": "28f470b4f11efdbb0a22047913c48028c07e307e54402dee91face723646e6fe",
-      "productId": "keukenpapier"
+      "productId": "keukenpapier",
+      "spokenName": "keukenpapier"
     },
     {
       "event": "product",
       "text": "Zoek maar afwasmiddel!",
       "file": "product/e90f12ef.wav",
       "cacheKey": "a9b0ed48d36700cda70ed7a402a38d1047effa403bee31f846ef4d007dd3922c",
-      "productId": "afwasmiddel"
+      "productId": "afwasmiddel",
+      "spokenName": "afwasmiddel"
     },
     {
       "event": "product",
       "text": "Kun jij wasmiddel vinden?",
       "file": "product/b7470097.wav",
       "cacheKey": "4c9d196e7f350f50308f1f8bff2c2371b0103a1c73a1bf2a6d82e1b02bfec599",
-      "productId": "wasmiddel"
+      "productId": "wasmiddel",
+      "spokenName": "wasmiddel"
     },
     {
       "event": "product",
       "text": "Waar zijn vuilniszakken?",
       "file": "product/5768606e.wav",
       "cacheKey": "39310c0798e290b1a0970b925e1aab2c51b703e1946bffbc8a24061bbd91951e",
-      "productId": "vuilniszakken"
+      "productId": "vuilniszakken",
+      "spokenName": "vuilniszakken"
     },
     {
       "event": "product",
       "text": "Zoek maar schoonmaakmiddel!",
       "file": "product/a2af831d.wav",
       "cacheKey": "9aa4cff5f499093eb0fd7ad5142662b56fbf1913195829d7f1f4d2e9ffb14468",
-      "productId": "schoonmaakmiddel"
+      "productId": "schoonmaakmiddel",
+      "spokenName": "schoonmaakmiddel"
     },
     {
       "event": "product",
       "text": "Kun jij vaatwastabletten vinden?",
       "file": "product/eb079279.wav",
       "cacheKey": "13c27949c4e1caee8661a30ac6c155f57f224d56b55eb4de626cfffca3b63694",
-      "productId": "vaatwastabletten"
+      "productId": "vaatwastabletten",
+      "spokenName": "vaatwastabletten"
     },
     {
       "event": "product",
       "text": "Nu gaan we handzeep zoeken!",
       "file": "product/51c76d09.wav",
       "cacheKey": "de33efbb53b42f016b074d654cd3ba31c90a6bfc3f039a44134bdb7e006cfa15",
-      "productId": "handzeep"
+      "productId": "handzeep",
+      "spokenName": "handzeep"
     },
     {
       "event": "product",
       "text": "Kun jij tandpasta vinden?",
       "file": "product/d9c21c31.wav",
       "cacheKey": "c8acb4473e1e21b8c519e097c6c64f0eecdbd1a8922a5aca81ab9ccacdc784a3",
-      "productId": "tandpasta"
+      "productId": "tandpasta",
+      "spokenName": "tandpasta"
     },
     {
       "event": "product",
       "text": "Zoek maar shampoo!",
       "file": "product/12423045.wav",
       "cacheKey": "70d45041177adc082a7114acdd43f69a2e0c5971b6c87c4eb9b047b5f5b7fcb8",
-      "productId": "shampoo"
+      "productId": "shampoo",
+      "spokenName": "shampoo"
     },
     {
       "event": "product",
       "text": "Waar zijn luiers?",
       "file": "product/e3e4fed0.wav",
       "cacheKey": "c199f2c1e76d7a0c3949fa75792526ef8b2b2ac145ea0f78974daa2167cbebe9",
-      "productId": "luiers"
+      "productId": "luiers",
+      "spokenName": "luiers"
     },
     {
       "event": "mission",

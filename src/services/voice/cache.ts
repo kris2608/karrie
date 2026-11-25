@@ -121,3 +121,16 @@ export async function writeVoiceBlob(text: string, blob: Blob, event?: string): 
     // Quota or private mode — memory still helps this session.
   }
 }
+
+/** Drop invalid/corrupt browser + memory cache entries. */
+export async function evictVoiceBlob(text: string, event?: string): Promise<void> {
+  const key = localCacheKey(text, event);
+  memory.delete(key);
+  if (typeof caches === "undefined") return;
+  try {
+    const cache = await caches.open(cacheName());
+    await cache.delete(cacheUrl(key));
+  } catch {
+    // ignore
+  }
+}

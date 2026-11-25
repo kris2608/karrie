@@ -4,6 +4,8 @@ let context: AudioContext | null = null;
 let enabled = false;
 /** Persistent speech element — primed during unlock so iOS Safari/PWA can autoplay later. */
 let speechElement: HTMLAudioElement | null = null;
+/** Separate element for silent unlock — never steals the speech element's src mid-play. */
+let unlockElement: HTMLAudioElement | null = null;
 let speechPrimed = false;
 
 /** Minimal silent WAV (44-byte header + tiny PCM) for unlock priming. */
@@ -31,17 +33,24 @@ export function unlockAudio() {
   if (!speechPrimed) {
     speechPrimed = true;
     try {
-      speechElement.src = SILENT_WAV;
-      void speechElement.play().then(() => {
-        try {
-          speechElement?.pause();
-        } catch {
-          // ignore
-        }
-      }).catch(() => {
-        // Gesture may still unlock later on first real clip.
-        speechPrimed = false;
-      });
+      if (!unlockElement) {
+        unlockElement = new Audio();
+        unlockElement.preload = "auto";
+        unlockElement.setAttribute("playsinline", "true");
+      }
+      unlockElement.src = SILENT_WAV;
+      void unlockElement
+        .play()
+        .then(() => {
+          try {
+            unlockElement?.pause();
+          } catch {
+            // ignore
+          }
+        })
+        .catch(() => {
+          speechPrimed = false;
+        });
     } catch {
       speechPrimed = false;
     }

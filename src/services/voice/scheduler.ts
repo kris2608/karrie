@@ -1,6 +1,7 @@
 import type { VoicePhrase } from "../../domain/voiceScripts";
-import { ensureVoiceCacheConfig, peekVoiceBlob, readVoiceBlob, writeVoiceBlob } from "./cache";
+import { ensureVoiceCacheConfig, peekVoiceBlob, readVoiceBlob, writeVoiceBlob, evictVoiceBlob } from "./cache";
 import { voiceClient, type VoiceFetchResult } from "./client";
+import { fetchManifestLibraryClip, assertValidWav } from "./libraryClient";
 
 export type FetchPriority = "interactive" | "background";
 
@@ -10,7 +11,7 @@ export type ScheduledFetchResult =
 
 type Job = {
   key: string;
-  phrase: VoicePhrase;
+  phrase: VoicePhrase & { productId?: string };
   priority: FetchPriority;
   deadlineAt: number;
   resolve: (result: ScheduledFetchResult) => void;
@@ -20,6 +21,7 @@ type Job = {
 const MAX_BACKGROUND = 1;
 const MAX_QUEUE = 3;
 const BACKGROUND_DEADLINE_MS = 12_000;
+const INTERACTIVE_DEADLINE_MS = 12_000;
 
 /**
  * Single client-side audio fetch scheduler: interactive preempts background,
@@ -35,29 +37,53 @@ export function createVoiceScheduler() {
     return `${phrase.event}|${phrase.text}`;
   }
 
-  async function runFetch(phrase: VoicePhrase, signal: AbortSignal, priority: FetchPriority): Promise<ScheduledFetchResult> {
+  function settleJob(job: Job, result: ScheduledFetchResult) {
+    pending.delete(job.key);
+    job.resolve(result);
+  }
+
+  async function runFetch(
+    phrase: VoicePhrase & { productId?: string },
+    signal: AbortSignal,
+    priority: FetchPriority,
+  ): Promise<ScheduledFetchResult> {
     const started = Date.now();
     if (signal.aborted) return { ok: false, code: "cancelled", ms: 0 };
 
-    const warm = peekVoiceBlob(phrase.text, phrase.event);
-    if (warm) return { ok: true, blob: warm, source: "memory", ms: Date.now() - started };
+    // Kick config refresh without blocking local/library hits.
+    void ensureVoiceCacheConfig();
 
+    const warm = peekVoiceBlob(phrase.text, phrase.event);
+    if (warm) {
+      if (await assertValidWav(warm)) {
+        return { ok: true, blob: warm, source: "memory", ms: Date.now() - started };
+      }
+      await evictVoiceBlob(phrase.text, phrase.event);
+    }
+    if (signal.aborted) return { ok: false, code: "cancelled", ms: Date.now() - started };
+
+    // Bundled catalog library via manifest — never invent hashed paths.
+    try {
+      const lib = await fetchManifestLibraryClip(phrase);
+      if (lib) {
+        await writeVoiceBlob(phrase.text, lib.blob, phrase.event);
+        return { ok: true, blob: lib.blob, source: "library", ms: Date.now() - started };
+      }
+    } catch {
+      // ignore library miss
+    }
+    if (signal.aborted) return { ok: false, code: "cancelled", ms: Date.now() - started };
+
+    // Cache API may need config for namespace — await only here.
     await ensureVoiceCacheConfig();
     if (signal.aborted) return { ok: false, code: "cancelled", ms: Date.now() - started };
 
     const cached = await readVoiceBlob(phrase.text, phrase.event);
-    if (signal.aborted) return { ok: false, code: "cancelled", ms: Date.now() - started };
-    if (cached) return { ok: true, blob: cached, source: "cache", ms: Date.now() - started };
-
-    // Bundled catalog library (optional public assets).
-    try {
-      const lib = await fetchLibraryClip(phrase);
-      if (lib) {
-        await writeVoiceBlob(phrase.text, lib, phrase.event);
-        return { ok: true, blob: lib, source: "library", ms: Date.now() - started };
+    if (cached) {
+      if (await assertValidWav(cached)) {
+        return { ok: true, blob: cached, source: "cache", ms: Date.now() - started };
       }
-    } catch {
-      // ignore library miss
+      await evictVoiceBlob(phrase.text, phrase.event);
     }
     if (signal.aborted) return { ok: false, code: "cancelled", ms: Date.now() - started };
 
@@ -67,10 +93,17 @@ export function createVoiceScheduler() {
     });
     if (signal.aborted) return { ok: false, code: "cancelled", ms: Date.now() - started };
     if (result.status === "ok") {
+      if (!(await assertValidWav(result.blob))) {
+        return { ok: false, code: "invalid-audio", ms: Date.now() - started };
+      }
       return { ok: true, blob: result.blob, source: "server", ms: Date.now() - started };
     }
     const code =
-      result.status === "limit" || result.status === "error" ? result.code : result.status === "offline" ? "offline" : result.status;
+      result.status === "limit" || result.status === "error"
+        ? result.code
+        : result.status === "offline"
+          ? "offline"
+          : result.status;
     return { ok: false, code, ms: Date.now() - started };
   }
 
@@ -79,12 +112,12 @@ export function createVoiceScheduler() {
       const job = queue.shift();
       if (!job) break;
       if (Date.now() > job.deadlineAt) {
-        job.resolve({ ok: false, code: "deadline", ms: 0 });
+        settleJob(job, { ok: false, code: "deadline", ms: 0 });
         continue;
       }
       backgroundActive += 1;
       void runFetch(job.phrase, job.abort.signal, "background")
-        .then(job.resolve)
+        .then((result) => settleJob(job, result))
         .finally(() => {
           backgroundActive -= 1;
           pending.delete(job.key);
@@ -93,7 +126,13 @@ export function createVoiceScheduler() {
     }
   }
 
-  function enqueueBackground(phrase: VoicePhrase): Promise<ScheduledFetchResult> {
+  function dequeue(key: string): Job | null {
+    const index = queue.findIndex((job) => job.key === key);
+    if (index < 0) return null;
+    return queue.splice(index, 1)[0] ?? null;
+  }
+
+  function enqueueBackground(phrase: VoicePhrase & { productId?: string }): Promise<ScheduledFetchResult> {
     const key = phraseKey(phrase);
     const existing = pending.get(key);
     if (existing) return existing;
@@ -106,16 +145,20 @@ export function createVoiceScheduler() {
     const work = new Promise<ScheduledFetchResult>((resolve) => {
       if (queue.length >= MAX_QUEUE) {
         const dropped = queue.pop();
-        dropped?.resolve({ ok: false, code: "queue-full", ms: 0 });
+        if (dropped) {
+          dropped.abort.abort();
+          settleJob(dropped, { ok: false, code: "queue-full", ms: 0 });
+        }
       }
-      queue.push({
+      const job: Job = {
         key,
         phrase,
         priority: "background",
         deadlineAt: Date.now() + BACKGROUND_DEADLINE_MS,
         resolve,
         abort,
-      });
+      };
+      queue.push(job);
       queue.sort((a, b) => a.deadlineAt - b.deadlineAt);
       pump();
     });
@@ -123,21 +166,38 @@ export function createVoiceScheduler() {
     return work;
   }
 
-  async function fetchInteractive(phrase: VoicePhrase, signal?: AbortSignal): Promise<ScheduledFetchResult> {
+  async function fetchInteractive(
+    phrase: VoicePhrase & { productId?: string },
+    signal?: AbortSignal,
+  ): Promise<ScheduledFetchResult> {
     const key = phraseKey(phrase);
+
+    // Promote queued background job to interactive.
+    const queued = dequeue(key);
+    if (queued) {
+      queued.abort.abort();
+      pending.delete(key);
+      queued.resolve({ ok: false, code: "promoted", ms: 0 });
+    }
+
     const existing = pending.get(key);
     if (existing) return existing;
 
     const abort = new AbortController();
     const onAbort = () => abort.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
+    const deadline = setTimeout(() => abort.abort(), INTERACTIVE_DEADLINE_MS);
 
     interactiveActive += 1;
-    // Pause background work implicitly: pump won't start new background while interactiveActive > 0.
     const work = (async (): Promise<ScheduledFetchResult> => {
       try {
-        return await runFetch(phrase, abort.signal, "interactive");
+        const result = await runFetch(phrase, abort.signal, "interactive");
+        if (abort.signal.aborted && result.ok === false && result.code === "cancelled") {
+          return { ok: false, code: "deadline", ms: result.ms };
+        }
+        return result;
       } finally {
+        clearTimeout(deadline);
         signal?.removeEventListener("abort", onAbort);
         interactiveActive = Math.max(0, interactiveActive - 1);
         pending.delete(key);
@@ -148,7 +208,7 @@ export function createVoiceScheduler() {
     return work;
   }
 
-  function schedule(phrases: VoicePhrase[]) {
+  function schedule(phrases: Array<VoicePhrase & { productId?: string }>) {
     for (const phrase of phrases.slice(0, 3)) {
       void enqueueBackground(phrase);
     }
@@ -157,8 +217,7 @@ export function createVoiceScheduler() {
   function cancelBackground() {
     for (const job of queue.splice(0, queue.length)) {
       job.abort.abort();
-      job.resolve({ ok: false, code: "cancelled", ms: 0 });
-      pending.delete(job.key);
+      settleJob(job, { ok: false, code: "cancelled", ms: 0 });
     }
   }
 
@@ -170,25 +229,4 @@ export function createVoiceScheduler() {
   };
 }
 
-async function fetchLibraryClip(phrase: VoicePhrase): Promise<Blob | null> {
-  if (typeof fetch === "undefined") return null;
-  const base = import.meta.env.BASE_URL || "/";
-  const url = `${base}voice-library/${encodeURIComponent(phrase.event)}/${hashText(phrase.text)}.wav`;
-  const response = await fetch(url, { method: "GET" });
-  if (!response.ok) return null;
-  return response.blob();
-}
-
-function hashText(text: string): string {
-  // Short stable id for static filenames — must match server library script.
-  let hash = 2166136261;
-  const normalized = text.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
-  for (let i = 0; i < normalized.length; i += 1) {
-    hash ^= normalized.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
 export const voiceScheduler = createVoiceScheduler();
-export { hashText as voiceLibraryFileId };

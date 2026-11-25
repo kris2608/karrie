@@ -182,23 +182,34 @@ export function useShopVoice(options: Options) {
     if (!enabled) return;
     const current = items.find((item) => item.id === currentId) ?? activeItem(items);
     if (!current || !adventureId) return;
+    // Guess missions: product-safe replay only — never spoil.
+    if (showGuess && !missionActive) {
+      unlockAudio();
+      const phrase = productPhrase(current, `${adventureId}:${current.id}`);
+      currentPhrase.current = phrase;
+      const generation = voiceController.bump();
+      void voiceController.play(phrase, { generation, priority: "high" });
+      return;
+    }
     unlockAudio();
-    // Replay: mission phrase when mission active, else product — never guess spoilers.
     const seed = `${adventureId}:${current.id}`;
-    const phrase = missionActive
-      ? currentPhrase.current?.event === "mission"
+    const stepKey = missionActive
+      ? `${adventureId}:${current.id}:mission`
+      : `${adventureId}:${current.id}:product`;
+    const phrase =
+      instructionKey.current === stepKey && currentPhrase.current
         ? currentPhrase.current
-        : missionPhrase(seed)
-      : currentPhrase.current?.event === "product"
-        ? currentPhrase.current
-        : productPhrase(current, seed);
+        : missionActive
+          ? missionPhrase(seed)
+          : productPhrase(current, seed);
     currentPhrase.current = phrase;
     const generation = voiceController.bump();
     void voiceController.play(phrase, { generation, priority: "high" });
   }
 
-  /** Praise disabled — SFX-only callers keep the hook. */
+  /** Praise disabled — SFX-only callers keep the hook. Stop speech immediately on found. */
   function onFoundSuccess() {
+    voiceController.bump();
     instructionKey.current = null;
     instructionStatus.current = null;
     retryUsed.current = false;

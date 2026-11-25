@@ -77,9 +77,19 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [...MARKETING_NAV_FALLBACK_DENYLIST],
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2,webp,mp3,opus}"],
-        globIgnores: ["og-image.png"],
+        // Precache tiny voice manifest only — full WAV library (~8.5MB) uses runtime cache below.
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2,webp,mp3,opus}", "voice-library/manifest.json"],
+        globIgnores: ["og-image.png", "voice-library/**/*.wav"],
         runtimeCaching: [
+          {
+            urlPattern: /\/voice-library\/.*\.(?:wav|json)$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "karrie-voice-library",
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 120, maxAgeSeconds: 365 * 24 * 60 * 60, purgeOnQuotaError: true },
+            },
+          },
           {
             urlPattern: /^https:\/\/images\.openfoodfacts\.org\//,
             handler: "CacheFirst",

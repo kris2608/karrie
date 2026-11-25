@@ -78,7 +78,8 @@ export function libraryLookup(input: {
   text: string;
 }): VoiceCacheEntry | null {
   const lib = loadVoiceLibrary();
-  return lib.byKey.get(input.cacheKey) ?? lib.byText.get(`${input.event}|${input.text}`) ?? null;
+  // Require cacheKey match — do not fall back to event|text (wrong-era audio risk).
+  return lib.byKey.get(input.cacheKey) ?? null;
 }
 
 /** Hash used in Postgres seed keys — same as voiceCacheKey. */

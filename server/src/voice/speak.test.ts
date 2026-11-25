@@ -1,9 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryVoiceCache } from "./cache.js";
 import { createSpeakService } from "./speak.js";
 import type { SpeechProvider } from "./provider.js";
 
+vi.mock("./library.js", () => ({
+  libraryLookup: () => null,
+}));
+
 describe("createSpeakService", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
   it("rejects free-form text and serves allowlisted clips from cache", async () => {
     let calls = 0;
     const provider: SpeechProvider = {
@@ -90,5 +98,3 @@ describe("createSpeakService", () => {
     expect(service.stats().failures).toBe(1);
   });
 });
-
-

@@ -1,4 +1,7 @@
+import { allVoiceCatalogInstructions, voiceCatalogEntry } from "./voiceCatalog";
 import { spokenNounPhrase, spokenProductMeta } from "./spokenProductName";
+
+const voiceCatalogEntryTexts = new Set(allVoiceCatalogInstructions());
 
 export const VOICE_LANGUAGE = "nl-NL";
 /** Bump when personality instructions or template wording change so caches refresh. */
@@ -25,6 +28,8 @@ export type VoicePhrase = {
   /** Stable id for analytics / replay; never includes personal data. */
   phraseId: string;
   text: string;
+  /** Catalog product id when phrase is a fixed generic instruction. */
+  productId?: string;
 };
 
 const WELCOME = [
@@ -173,10 +178,19 @@ export function celebrationPhrase(seed: string): VoicePhrase {
 }
 
 /**
- * Canonical product phrase: seed is productId for catalog reuse.
- * Adventure seed is ignored so library + cache keys stay stable per product.
+ * Catalog generics: fixed instruction from voice-catalog.json (qty/adventure ignored).
+ * Custom / unknown products: dynamic templates.
  */
 export function productPhrase(item: ProductItem, _seed?: string, _avoidText?: string): VoicePhrase {
+  const catalog = voiceCatalogEntry(item.productId);
+  if (catalog) {
+    return {
+      event: "product",
+      phraseId: `product:catalog:${normalizeKey(catalog.productId)}`,
+      text: catalog.instruction,
+      productId: catalog.productId,
+    };
+  }
   const lines = PRODUCT.map((build) => build(item));
   const text = pickVariant(lines, item.productId || item.name);
   const spoken = spokenProductMeta(item).spoken;
@@ -202,6 +216,7 @@ const PRODUCT_PATTERNS = [
   /^Waar zijn (.+)\?$/,
   /^Waar is (.+)\?$/,
   /^Zoek maar (.+)!$/,
+  /^Zoek jij (.+)\?$/,
   // Legacy templates still accepted so old clients / caches do not 422.
   /^Hmm… waar zouden (.+) zijn\?$/,
   /^Hmm… waar zou (.+) zijn\?$/,
@@ -216,11 +231,12 @@ const PRODUCT_PATTERNS = [
 const MAX_SPOKEN_NAME = 40;
 const MAX_TEXT = 140;
 
-/** Server-side allowlist: static phrases or known product-instruction templates. */
+/** Server-side allowlist: static phrases, catalog instructions, or known templates. */
 export function isAllowedSpeechText(text: string): boolean {
   const trimmed = text.replace(/\s+/g, " ").trim();
   if (!trimmed || trimmed.length > MAX_TEXT) return false;
   if (ALLOWED_STATIC_TEXTS.has(trimmed)) return true;
+  if (voiceCatalogEntryTexts.has(trimmed)) return true;
   for (const pattern of PRODUCT_PATTERNS) {
     const match = trimmed.match(pattern);
     if (!match) continue;

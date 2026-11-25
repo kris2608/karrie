@@ -1,5 +1,9 @@
 /** Mirrors client `voiceScripts` allowlist — keep in sync when templates change. */
 
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 const STATIC = new Set([
   // Welcome
   "Hoi! Zullen we samen boodschappen doen?",
@@ -39,6 +43,26 @@ const STATIC = new Set([
   "Raad het product!",
 ]);
 
+function loadCatalogInstructions(): Set<string> {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(here, "..", "..", "..", "src", "data", "voice-catalog.json"),
+    join(here, "..", "..", "voice-catalog.json"),
+  ];
+  for (const path of candidates) {
+    if (!existsSync(path)) continue;
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf8")) as { products?: Array<{ instruction?: string }> };
+      return new Set((raw.products ?? []).map((p) => p.instruction).filter((t): t is string => Boolean(t)));
+    } catch {
+      // try next
+    }
+  }
+  return new Set();
+}
+
+const CATALOG = loadCatalogInstructions();
+
 /** Product patterns — v5 canonical + legacy so old clients do not 422. */
 const DYNAMIC_PATTERNS = [
   /^Kun jij (.+) vinden\?$/,
@@ -46,6 +70,7 @@ const DYNAMIC_PATTERNS = [
   /^Waar zijn (.+)\?$/,
   /^Waar is (.+)\?$/,
   /^Zoek maar (.+)!$/,
+  /^Zoek jij (.+)\?$/,
   /^Hmm… waar zouden (.+) zijn\?$/,
   /^Hmm… waar zou (.+) zijn\?$/,
   /^Zo, nu nog (.+)!$/,
@@ -79,7 +104,7 @@ export function isVoiceEvent(value: unknown): value is VoiceEvent {
 export function isAllowedSpeechText(text: string): boolean {
   const trimmed = text.replace(/\s+/g, " ").trim();
   if (!trimmed || trimmed.length > MAX_TEXT) return false;
-  if (STATIC.has(trimmed)) return true;
+  if (STATIC.has(trimmed) || CATALOG.has(trimmed)) return true;
   for (const pattern of DYNAMIC_PATTERNS) {
     const match = trimmed.match(pattern);
     if (!match) continue;
