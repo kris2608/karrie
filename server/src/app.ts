@@ -788,12 +788,14 @@ export function createHandler(deps: AppDeps) {
         voiceCacheHit: result.ok ? result.cacheHit : undefined,
         openaiMs: latencyMs,
         code: result.ok ? undefined : result.code,
+        ...(!result.ok && result.error ? { voiceError: result.error } : {}),
       });
 
       if (!result.ok) {
         deps.voice.limits.record({ ok: false, latencyMs });
         if (result.code === "invalid") return send(422, { status: "error", code: "invalid" });
         if (result.code === "misconfigured") return send(503, { status: "error", code: "misconfigured" });
+        // voiceError stays in structured log via `entry`; not returned to clients.
         return send(502, { status: "error", code: "upstream" });
       }
 

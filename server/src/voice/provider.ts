@@ -10,6 +10,9 @@ const ALLOWED_MODELS = new Set(["gpt-realtime-2.1-mini"]);
 const DEPRECATED_MODELS = new Set(["gpt-4o-mini-tts", "tts-1", "tts-1-hd", "gpt-4o-mini-tts-2025-03-20", "gpt-4o-mini-tts-2025-12-15"]);
 const ALLOWED_VOICES = new Set(["marin", "coral", "shimmer", "cedar", "alloy", "ash", "ballad", "echo", "sage", "verse"]);
 
+/** ~0.25s of 16-bit mono PCM at 24 kHz — enough to treat as real speech audio. */
+const MIN_PCM_BYTES = 24_000 * 2 * 0.25;
+
 export type SpeechProviderResult = {
   audio: Buffer;
   contentType: string;
@@ -88,6 +91,8 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
     let transcript = "";
     let usage: SpeechProviderResult["usage"];
     let settled = false;
+    let responseCreated = false;
+    let sessionUpdateSent = false;
 
     const ws = new WebSocket(url, {
       headers: {
@@ -100,10 +105,14 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
         fail(new Error("Realtime voice timeout"));
       }, timeoutMs);
 
+      /** If session.updated never arrives, still fire one-shot once after open+update. */
+      let fallbackCreate: ReturnType<typeof setTimeout> | undefined;
+
       function fail(error: Error) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        if (fallbackCreate) clearTimeout(fallbackCreate);
         try {
           ws.close();
         } catch {
@@ -116,6 +125,7 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        if (fallbackCreate) clearTimeout(fallbackCreate);
         try {
           ws.close();
         } catch {
@@ -124,7 +134,33 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
         resolve(value);
       }
 
+      function createResponse() {
+        if (settled || responseCreated || ws.readyState !== WebSocket.OPEN) return;
+        responseCreated = true;
+        if (fallbackCreate) {
+          clearTimeout(fallbackCreate);
+          fallbackCreate = undefined;
+        }
+        ws.send(
+          JSON.stringify({
+            type: "response.create",
+            response: {
+              conversation: "none",
+              output_modalities: ["audio"],
+              instructions: buildSpeakInstructions(event, text),
+              audio: {
+                output: {
+                  voice,
+                  format: { type: "audio/pcm", rate: 24_000 },
+                },
+              },
+            },
+          }),
+        );
+      }
+
       ws.on("open", () => {
+        sessionUpdateSent = true;
         ws.send(
           JSON.stringify({
             type: "session.update",
@@ -144,6 +180,8 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
             },
           }),
         );
+        // Avoid hang if the API never emits session.updated.
+        fallbackCreate = setTimeout(() => createResponse(), 800);
       });
 
       ws.on("message", (raw) => {
@@ -161,26 +199,15 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
           return;
         }
 
-        if (type === "session.updated" || type === "session.created") {
-          // Fire the one-shot speak after session is ready; session.created may precede our update.
-          if (type === "session.updated") {
-            ws.send(
-              JSON.stringify({
-                type: "response.create",
-                response: {
-                  conversation: "none",
-                  output_modalities: ["audio"],
-                  instructions: buildSpeakInstructions(event, text),
-                  audio: {
-                    output: {
-                      voice,
-                      format: { type: "audio/pcm", rate: 24_000 },
-                    },
-                  },
-                },
-              }),
-            );
-          }
+        if (type === "session.updated") {
+          createResponse();
+          return;
+        }
+
+        // session.created alone is not enough (config may still be default); only use it
+        // as a second chance after we already sent session.update and somehow missed updated.
+        if (type === "session.created" && sessionUpdateSent && responseCreated === false) {
+          // Keep waiting for session.updated; fallback timer covers the miss.
           return;
         }
 
@@ -233,10 +260,24 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
             fail(new Error("Realtime returned no audio"));
             return;
           }
-          if (!transcriptsMatch(text, transcript)) {
-            fail(new Error(`Realtime transcript mismatch: got "${transcript}"`));
-            return;
+
+          const matched = transcriptsMatch(text, transcript);
+          if (!matched) {
+            // Empty/missing transcript with real PCM was a common silent killer — accept audio.
+            if (!transcript.trim() && pcm.length >= MIN_PCM_BYTES) {
+              console.warn(
+                JSON.stringify({
+                  event: "voice_transcript_missing",
+                  intended: text.slice(0, 80),
+                  pcmBytes: pcm.length,
+                }),
+              );
+            } else {
+              fail(new Error(`Realtime transcript mismatch: got "${transcript}"`));
+              return;
+            }
           }
+
           succeed({
             audio: pcmToWav(pcm, 24_000),
             contentType: "audio/wav",
@@ -263,9 +304,13 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
     async generate(text: string, options: SpeechGenerateOptions): Promise<SpeechProviderResult> {
       try {
         return await generateOnce(text, options.event);
-      } catch {
-        // One retry for transport / transcript glitches.
-        return await generateOnce(text, options.event);
+      } catch (first) {
+        // One retry for transport / transcript glitches; surface the last error.
+        try {
+          return await generateOnce(text, options.event);
+        } catch (second) {
+          throw second instanceof Error ? second : first;
+        }
       }
     },
   };

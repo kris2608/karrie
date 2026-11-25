@@ -87,7 +87,7 @@ Do **not** describe anonymous browser visits as verified individual families.
 - `adventure_resumed` — explicit Home continue (`phase`: `draft` | `shopping`)
 - `voice_opt_in` — parent answered the voice prompt (`enabled`: `0` | `1`); never includes product text
 - `voice_muted` — speaker turned off in shop or settings
-- `voice_playback_failed` — `reason` (`play` | `element` | `network`)
+- `voice_playback_failed` — `reason` (`play` | `element` | `network` | `fetch`); `fetch` may include `code` (e.g. `upstream`, `offline`)
 
 ## Delivery notes
 

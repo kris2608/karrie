@@ -64,4 +64,29 @@ describe("createSpeakService", () => {
     await service.speak({ event: "sticker", text: "Tadaa! Dat hebben we samen mooi gedaan!" });
     expect(texts).toHaveLength(2);
   });
+
+  it("records upstream failures with an error message", async () => {
+    const provider: SpeechProvider = {
+      model: "gpt-realtime-2.1-mini",
+      voice: "marin",
+      instructionVersion: "v3",
+      async generate() {
+        throw new Error("Realtime voice timeout");
+      },
+    };
+    const service = createSpeakService({
+      provider,
+      cache: createMemoryVoiceCache(),
+      templateVersion: "v3",
+      cacheNamespace: "karrie-voice-v3",
+    });
+    const result = await service.speak({ event: "positive", text: "Hebbes!" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("upstream");
+      expect(result.error).toMatch(/timeout/i);
+    }
+    expect(service.stats().failures).toBe(1);
+  });
 });
+

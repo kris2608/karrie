@@ -69,7 +69,7 @@ export type AnalyticsEvent =
   | { name: "sticker_book_opened" }
   | { name: "voice_opt_in"; data: { enabled: 0 | 1 } }
   | { name: "voice_muted" }
-  | { name: "voice_playback_failed"; data: { reason: "play" | "element" | "network" } };
+  | { name: "voice_playback_failed"; data: { reason: "play" | "element" | "network" | "fetch"; code?: string } };
 
 export function latencyBucket(ms: number): LatencyBucket {
   if (ms < 2_000) return "0-2s";

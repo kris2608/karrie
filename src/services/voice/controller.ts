@@ -94,6 +94,13 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
     if (cached) return cached;
     const result = await voiceClient.fetchClip(phrase.event, phrase.text);
     if (result.status === "ok") return result.blob;
+    const code =
+      result.status === "limit" || result.status === "error"
+        ? result.code
+        : result.status === "offline"
+          ? "offline"
+          : result.status;
+    trackEvent({ name: "voice_playback_failed", data: { reason: "fetch", code } });
     return null;
   }
 
@@ -231,6 +238,8 @@ export function createVoiceController(options?: { synthFallback?: boolean }) {
 
   function play(phrase: VoicePhrase, options?: Partial<PlayOptions>): number {
     if (!enabled) return token;
+    // Resume Web Audio / unlock media so autoplay after cold resume or CompleteScreen works.
+    unlockAudio();
     const playToken = options?.token ?? token;
     if (playToken !== token) return token;
     const priority = options?.priority ?? "normal";

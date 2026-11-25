@@ -16,7 +16,7 @@ export type SpeakResult =
       key: string;
       usage?: { inputTokens: number; cachedInputTokens: number; outputTokens: number; audioOutputTokens?: number };
     }
-  | { ok: false; code: "invalid" | "misconfigured" | "upstream" };
+  | { ok: false; code: "invalid" | "misconfigured" | "upstream"; error?: string };
 
 const inflight = new Map<string, Promise<SpeakResult>>();
 
@@ -74,9 +74,10 @@ export function createSpeakService(deps: {
         await deps.cache.set(key, entry);
         generates += 1;
         return { ok: true, entry, cacheHit: false, key, usage: generated.usage };
-      } catch {
+      } catch (error) {
         failures += 1;
-        return { ok: false, code: "upstream" };
+        const message = error instanceof Error ? error.message : String(error);
+        return { ok: false, code: "upstream", error: message.slice(0, 240) };
       } finally {
         inflight.delete(key);
       }
