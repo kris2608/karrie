@@ -1482,6 +1482,12 @@ a.settings-link { text-decoration: none; color: inherit; }
     "art name name"
     "art meta controls";
 }
+.item-row.has-offer {
+  grid-template-areas:
+    "art name name"
+    "art meta controls"
+    "art offer offer";
+}
 .item-row > .product-art { width: 52px; flex: none; }
 .item-art-button {
   position: relative;
@@ -1497,6 +1503,8 @@ a.settings-link { text-decoration: none; color: inherit; }
 .item-main { display: contents; }
 .item-text-button { grid-area: name; }
 .item-meta { grid-area: meta; display: grid; gap: 2px; min-width: 0; align-content: center; }
+.item-offer { grid-area: offer; justify-self: start; max-width: 100%; }
+.item-offer .offer-tag { max-width: 100%; white-space: normal; }
 .item-controls {
   grid-area: controls;
   display: flex;
@@ -1721,6 +1729,10 @@ a.settings-link { text-decoration: none; color: inherit; }
   gap: var(--space-2);
 }
 .bekijk-lijstje-head h2 { margin: 0; }
+.bekijk-lijstje-tools { display: flex; align-items: center; gap: var(--space-2); }
+.leave-shop { display: grid; gap: var(--space-3); }
+.leave-shop h2 { margin: 0; }
+.leave-shop .sheet-note { margin: 0; }
 .bekijk-lijstje-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

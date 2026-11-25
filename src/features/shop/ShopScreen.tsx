@@ -39,6 +39,7 @@ export function ShopScreen() {
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const [listOpen, setListOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const [missionShown, setMissionShown] = useState<string | null>(null);
@@ -620,13 +621,26 @@ export function ShopScreen() {
         <div className="bekijk-lijstje" data-testid="bekijk-lijstje-sheet">
           <div className="bekijk-lijstje-head">
             <h2>Nog te vinden</h2>
-            <button
-              type="button"
-              className="round-button round-s round-quiet"
-              data-testid="bekijk-edit-list"
-              aria-label="Lijst aanpassen"
-              onClick={() => navigate("/controleren")}
-            >
+            <div className="bekijk-lijstje-tools">
+              <button
+                type="button"
+                className="round-button round-s round-quiet"
+                data-testid="stop-adventure"
+                aria-label="Stop met speuren"
+                onClick={() => setLeaveOpen(true)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 11.2 12 4l8 7.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M7 10.2V20h10v-9.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="round-button round-s round-quiet"
+                data-testid="bekijk-edit-list"
+                aria-label="Lijst aanpassen"
+                onClick={() => navigate("/controleren")}
+              >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" strokeWidth="2" />
                 <path
@@ -638,6 +652,7 @@ export function ShopScreen() {
                 />
               </svg>
             </button>
+            </div>
           </div>
           <p className="sheet-note">Tik op wat je ziet in de winkel.</p>
           <ul className="bekijk-lijstje-grid" aria-label="Nog te vinden">
@@ -673,6 +688,19 @@ export function ShopScreen() {
           </ul>
           <PressButton variant="secondary" wide onClick={() => setListOpen(false)}>
             Verder speuren
+          </PressButton>
+        </div>
+      </Sheet>
+
+      <Sheet open={leaveOpen} onClose={() => setLeaveOpen(false)} label="Stop met speuren">
+        <div className="leave-shop" data-testid="leave-shop">
+          <h2>Stoppen met speuren?</h2>
+          <p className="sheet-note">Het lijstje blijft bewaard. Je kunt later verder.</p>
+          <PressButton variant="go" wide data-testid="leave-stay" onClick={() => setLeaveOpen(false)}>
+            Verder speuren
+          </PressButton>
+          <PressButton variant="quiet" wide data-testid="leave-home" onClick={() => navigate("/")}>
+            Naar huis
           </PressButton>
         </div>
       </Sheet>

@@ -302,7 +302,7 @@ function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
   return (
     <motion.li
       layout="position"
-      className={["item-row", pressing ? "is-pressing" : "", hasDetail ? "has-detail" : ""].filter(Boolean).join(" ")}
+      className={["item-row", pressing ? "is-pressing" : "", hasDetail ? "has-detail" : "", showOffer ? "has-offer" : ""].filter(Boolean).join(" ")}
       data-testid="item-row"
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -322,22 +322,22 @@ function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
         <button type="button" className="item-text-button" aria-label={`Bewerk ${heading.title}`} data-testid="edit-item-text" onClick={onEdit}>
           <strong>{heading.title}</strong>
         </button>
-        {hasDetail && (
+        {heading.subtitle && (
           <div className="item-meta">
-            {heading.subtitle && <small className="item-detail">{heading.subtitle}</small>}
-            {showOffer && offer && retailer && (
-              <button
-                type="button"
-                className="offer-tag-button"
-                data-no-long-press
-                aria-label={`${offerLabel(offer.shown, retailer)}: details`}
-                data-testid="offer-button"
-                onClick={() => onOffer(offer)}
-              >
-                <OfferTag shown={offer.shown} retailer={retailer} />
-              </button>
-            )}
+            <small className="item-detail">{heading.subtitle}</small>
           </div>
+        )}
+        {showOffer && offer && retailer && (
+          <button
+            type="button"
+            className="offer-tag-button item-offer"
+            data-no-long-press
+            aria-label={`${offerLabel(offer.shown, retailer)}: details`}
+            data-testid="offer-button"
+            onClick={() => onOffer(offer)}
+          >
+            <OfferTag shown={offer.shown} retailer={retailer} />
+          </button>
         )}
       </div>
       <div className="item-controls">
