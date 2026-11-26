@@ -2,6 +2,7 @@ import type { VoiceEvent, VoicePhrase } from "../../domain/voiceScripts";
 import { getSpeechElement, unlockAudio } from "../../feedback/sound";
 import { trackEvent } from "../analytics";
 import { peekVoiceBlob, readVoiceBlob } from "./cache";
+import { applySpeechPlayback } from "./playbackRate";
 import { voiceScheduler } from "./scheduler";
 
 export type PlayPriority = "high" | "normal" | "low";
@@ -239,6 +240,9 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
         done("failed", "element");
       };
       audio.src = url;
+      // Safari can reset the rate when src changes or playback starts. Pitch lock stays on.
+      applySpeechPlayback(audio);
+      audio.onplay = () => applySpeechPlayback(audio);
       void audio.play().catch(() => {
         trackEvent({ name: "voice_playback_failed", data: { reason: "play" } });
         trackEvent({ name: "voice_autoplay_reject", data: { reason: "play" } });

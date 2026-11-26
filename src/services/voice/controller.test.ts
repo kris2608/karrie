@@ -36,13 +36,21 @@ vi.mock("./scheduler", () => ({
 function mockAudio() {
   const el = {
     src: "",
+    playbackRate: 1,
+    preservesPitch: false,
+    webkitPreservesPitch: false,
     onended: null as null | (() => void),
     onerror: null as null | (() => void),
-    play: vi.fn().mockResolvedValue(undefined),
+    onplay: null as null | (() => void),
+    play: vi.fn(),
     pause: vi.fn(),
     load: vi.fn(),
     removeAttribute: vi.fn(),
   };
+  el.play.mockImplementation(() => {
+    el.onplay?.();
+    return Promise.resolve();
+  });
   getSpeechElement.mockReturnValue(el);
   return el;
 }
@@ -200,6 +208,9 @@ describe("voiceController ownership FSM", () => {
       ms: 1,
     });
     await vi.waitFor(() => expect(el.play).toHaveBeenCalled());
+    expect(el.playbackRate).toBe(1.2);
+    expect(el.preservesPitch).toBe(true);
+    expect(el.webkitPreservesPitch).toBe(true);
     el.onended?.();
     expect((await pending).status).toBe("completed");
 
