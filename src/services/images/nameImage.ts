@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import { CATEGORIES } from "../../domain/categories";
 import { parseNameImageLookupKey, parsePrivateLabelLookupKey } from "../../domain/imageIdentity";
 import { imageRetailerName, isImageSourceRetailer } from "../../domain/retailers";
@@ -152,7 +153,7 @@ export function createNameImageClient(deps: NameImageClientDeps) {
 export type NameImageClient = ReturnType<typeof createNameImageClient>;
 
 export const nameImageClient = createNameImageClient({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => typeof navigator === "undefined" || navigator.onLine,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
 });

@@ -285,9 +285,9 @@ describe("product routes", () => {
   });
 
   it("has no illustration route while the flag is off", async () => {
-    const { call } = await start();
+    const { call } = await start({}, { adminToken: "test-admin" });
     expect((await call("/api/products/illustration", { name: "walnoten" })).status).toBe(404);
-    const health = await (await call("/api/health")).json();
+    const health = await (await call("/api/admin/health", undefined, { Authorization: "Bearer test-admin" })).json();
     expect(health.products.illustrations).toEqual({ enabled: false });
   });
 

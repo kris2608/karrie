@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import type { ImageIdentity } from "../../domain/imageIdentity";
 import { cleanFacts, type ProductFacts } from "../../domain/productFacts";
 
@@ -103,7 +104,7 @@ export function createImageClient(deps: ImageClientDeps) {
 export type ImageClient = ReturnType<typeof createImageClient>;
 
 export const images = createImageClient({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => navigator.onLine,
   storage: typeof localStorage === "undefined" ? null : localStorage,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",

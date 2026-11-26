@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import type { MatchConfidence, MatchType, Offer, OfferAnswer, OfferProduct, OfferRow } from "../../domain/offers";
 import { isRetailer, type RetailerId } from "../../domain/retailers";
 
@@ -106,7 +107,7 @@ export function createOfferClient(deps: OfferClientDeps) {
 export type OfferClient = ReturnType<typeof createOfferClient>;
 
 export const offersClient = createOfferClient({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => navigator.onLine,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
   now: Date.now,

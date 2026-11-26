@@ -287,6 +287,7 @@ describe("POST /api/offers/match", () => {
       configured: true,
       model: "gpt-5.4-mini",
       limits: limits(3),
+      adminToken: "test-admin",
       recognize: async () => ({ ok: false, code: "unavailable" }) as never,
       offers: { lookup: { find: find as never, stats: () => ({ hits: 0, misses: 0, entries: 0 }) }, limits: limits(perIpPerHour) },
       log: (entry) => logs.push(entry),
@@ -316,7 +317,7 @@ describe("POST /api/offers/match", () => {
     expect(answer).toMatchObject({ status: "ok", match: { matchType: "likely", offer: { productName: "Arla Biologisch halfvolle melk" } } });
     expect(Date.parse(answer.fetchedAt)).not.toBeNaN();
     expect(seen).toEqual([{ product: body.product, retailer: "albert_heijn" }]);
-    const health = await (await fetch(`${base}/api/health`)).json();
+    const health = await (await fetch(`${base}/api/admin/health`, { headers: { Authorization: "Bearer test-admin" } })).json();
     expect(health.offers.outcomes).toEqual({ "albert_heijn-likely": 1 });
     expect(JSON.stringify(logs)).not.toContain("Melk");
   });

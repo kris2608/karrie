@@ -171,6 +171,7 @@ describe("POST/GET /api/lists/share", () => {
       allowedOrigins: ["https://www.karrie.eu"],
       requireOrigin: true,
       configured: true,
+      adminToken: "test-admin",
       model: "gpt-5.4-mini",
       limits: createLimits({
         perIpPerHour: 3,
@@ -233,7 +234,7 @@ describe("POST/GET /api/lists/share", () => {
     expect(fetched.status).toBe(200);
     expect(await fetched.json()).toMatchObject({ status: "ok", list: { name: "Week", items: [{ name: "Melk" }] } });
 
-    const health = await fetch(`${base}/api/health`);
+    const health = await fetch(`${base}/api/admin/health`, { headers: { Authorization: "Bearer test-admin" } });
     const healthBody = await health.json();
     expect(healthBody.sharedLists).toMatchObject({ enabled: true, outcomes: { created: 1, hits: 1 } });
   });
@@ -274,6 +275,7 @@ describe("POST/GET /api/lists/share", () => {
       allowedOrigins: ["https://www.karrie.eu"],
       requireOrigin: true,
       configured: false,
+      adminToken: "test-admin",
       model: "gpt-5.4-mini",
       limits: createLimits(idle),
       recognize: async () => ({ ok: false, code: "unavailable" }) as never,
@@ -287,7 +289,7 @@ describe("POST/GET /api/lists/share", () => {
     server = createServer((req, res) => void handler(req, res));
     await new Promise<void>((resolve) => server!.listen(0, resolve));
     const { port } = server.address() as AddressInfo;
-    const health = await fetch(`http://127.0.0.1:${port}/api/health`);
+    const health = await fetch(`http://127.0.0.1:${port}/api/admin/health`, { headers: { Authorization: "Bearer test-admin" } });
     const body = await health.json();
     expect(body.sharedLists).toMatchObject({ enabled: false });
     expect(disabledSharedListStore().enabled).toBe(false);

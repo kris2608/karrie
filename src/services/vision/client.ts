@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import {
   isRecognizedProduct,
   isVisualCandidate,
@@ -154,7 +155,7 @@ export function createVisionClient(deps: VisionDeps) {
 }
 
 export const vision = createVisionClient({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => navigator.onLine,
   storage: typeof localStorage === "undefined" ? null : localStorage,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { apiFetch } from "../../services/apiSession";
 import { resolveAssessment } from "../../domain/discovery";
 import { factsFor } from "../../domain/productFacts";
 import type { Adventure, AdventureItem } from "../../domain/types";
@@ -8,7 +9,7 @@ import type { Action } from "../../state/reducer";
 
 const client = createHealthierClient({
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   pageFacts: (item) => factsFor(item, references.entry),
 });
 

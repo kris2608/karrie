@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import type { SharedListV1 } from "../../domain/shareList";
 
 export type ShareCreateResult =
@@ -80,5 +81,5 @@ export function createShareListClient(deps: Deps) {
 
 export const shareListClient = createShareListClient({
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
 });

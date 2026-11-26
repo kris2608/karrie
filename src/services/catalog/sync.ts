@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import { extendCatalog, type SharedCatalogProduct } from "../../data/catalog";
 import { readKv, writeKv } from "../../storage/db";
 
@@ -95,7 +96,7 @@ export function createCatalogSync(deps: CatalogSyncDeps) {
 }
 
 export const catalogSync = createCatalogSync({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => typeof navigator === "undefined" || navigator.onLine !== false,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
   now: Date.now,

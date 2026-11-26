@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import { CATEGORIES } from "../../domain/categories";
 import type { CategoryId } from "../../domain/types";
 import type { CustomEnrichment } from "../../state/reducer";
@@ -129,7 +130,7 @@ export function createCustomProductClient(deps: CustomProductDeps) {
 }
 
 export const customProducts = createCustomProductClient({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => typeof navigator === "undefined" || navigator.onLine,
   storage: typeof localStorage === "undefined" ? null : localStorage,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",

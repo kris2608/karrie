@@ -1,4 +1,5 @@
 import { cacheKeyParts, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE, VOICE_DELIVERY_VERSION, VOICE_TEMPLATE_VERSION } from "../../domain/voiceScripts";
+import { apiFetch } from "../apiSession";
 
 /** Fallback until GET /api/voice/config resolves — must match server personality defaults. */
 const FALLBACK = {
@@ -43,7 +44,7 @@ export async function ensureVoiceCacheConfig(origin = import.meta.env.VITE_API_O
   if (configPromise) return configPromise;
   configPromise = (async () => {
     try {
-      const response = await fetch(`${origin}/api/voice/config`);
+      const response = await apiFetch(`${origin}/api/voice/config`);
       if (!response.ok) return config;
       const body = (await response.json()) as Partial<VoiceCacheConfig> & { status?: string };
       if (body.status && body.status !== "ok") return config;
