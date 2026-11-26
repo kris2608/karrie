@@ -72,6 +72,13 @@ vi.mock("./sharedPackHydrate", () => ({
 
 vi.mock("../feedback/sound", () => ({
   setSoundEnabled: () => undefined,
+  getSpeechElement: () => ({
+    onended: null,
+    onerror: null,
+    pause() {},
+    removeAttribute() {},
+    load() {},
+  }),
 }));
 
 describe("AdventureProvider persist gate", () => {

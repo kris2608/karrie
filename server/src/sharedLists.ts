@@ -43,6 +43,8 @@ export type SharedListCreateResult =
   | { ok: false; code: "empty" | "invalid" | "too-many" | "unavailable" };
 
 export type SharedListStore = {
+  /** False for the stub used when Postgres is not configured. Health must not call that stub enabled. */
+  enabled: boolean;
   create: (raw: unknown) => Promise<SharedListCreateResult>;
   get: (id: string) => Promise<{ ok: true; list: SharedListPayload } | { ok: false; code: "missing" | "expired" | "invalid" | "unavailable" }>;
   purgeExpired: () => Promise<number>;
@@ -183,6 +185,7 @@ export function createSharedListStore(pool: PoolLike, now: () => number = Date.n
   }
 
   return {
+    enabled: true,
     async create(raw) {
       const sanitized = sanitizeSharedListResult(raw);
       if (!sanitized.ok) return { ok: false, code: sanitized.code };
@@ -255,6 +258,7 @@ export function createSharedListStore(pool: PoolLike, now: () => number = Date.n
 export function disabledSharedListStore(): SharedListStore {
   const totals: SharedListStats = { created: 0, hits: 0, expired: 0, missing: 0, purged: 0 };
   return {
+    enabled: false,
     async create() {
       return { ok: false, code: "unavailable" };
     },

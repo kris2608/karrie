@@ -3,8 +3,8 @@ import { spokenNameInSentence, spokenProductName } from "./spokenProductName";
 
 describe("spokenProductName", () => {
   it("uses the catalog name for known product ids", () => {
-    expect(spokenProductName({ productId: "banaan", name: "Jumbo Bananen 5 stuks" })).toBe("Banaan");
-    expect(spokenProductName({ productId: "melk", name: "AH Halfvolle melk 1 liter", brand: "AH" })).toBe("Melk");
+    expect(spokenProductName({ productId: "banaan", name: "Jumbo Bananen 5 stuks" })).toBe("banaan");
+    expect(spokenProductName({ productId: "melk", name: "AH Halfvolle melk 1 liter", brand: "AH" })).toBe("melk");
   });
 
   it("strips brand and pack size from scanned titles", () => {
@@ -15,7 +15,7 @@ describe("spokenProductName", () => {
         brand: "Calvé",
         packageSize: "650 g",
       }),
-    ).toBe("Pindakaas");
+    ).toBe("pindakaas");
   });
 
   it("keeps meaningful distinctions like chocolate milk", () => {

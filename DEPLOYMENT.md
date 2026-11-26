@@ -6,7 +6,7 @@ Render geeft het vaste HTTPS-adres. Dat adres is ook het veilige origin dat de c
 
 ## 1. Lokaal controleren
 
-Node 20 of nieuwer. In de projectmap:
+Node 24 (minder dan 25). `@zxing/library` 0.23 weigert oudere Node, en Render ondersteunt Node 24. `render.yaml` zet `NODE_VERSION` op `24.22.1` (de huidige Node 24-default van Render, met bovengrens zodat een losse `engines`-range niet naar een nieuwere major springt). In de projectmap:
 
 ```bash
 npm ci
@@ -63,7 +63,7 @@ Maak een **Static Site** met dezelfde waarden:
 - Publish directory: `dist`
 - Rewrite: source `/*`, destination `/index.html`, action **Rewrite**
 
-Zet `NODE_VERSION` op `22` als de build om een Node-versie vraagt.
+Zet `NODE_VERSION` op `24.22.1` als de build om een Node-versie vraagt. `package.json` en `server/package.json` eisen `>=24 <25`.
 
 ## Op een telefoon zetten
 
@@ -137,7 +137,7 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 
 **Opbouw**
 
-- `server/` is een kleine Node-server (`karrie-api`) met de routes `POST /api/products/recognize-photo`, `POST /api/products/barcode` en `POST /api/images/discover`. `GET /api/health` geeft status en tellers, zonder geheimen.
+- `server/` is een kleine Node-server (`karrie-api`) met de routes `POST /api/products/recognize-photo`, `POST /api/products/barcode` en `POST /api/images/discover`. `GET /api/health` geeft status en tellers, zonder geheimen. Onder `sharedLists` staat `enabled`: `false` zolang er geen Postgres is (de server gebruikt dan een stub en delen antwoordt `503`), en `true` zodra `CANDIDATES_DATABASE_URL` een echte store opent.
 - Herkennen roept de OpenAI Responses API aan met model `gpt-5.4-mini`, een strikt JSON-schema (`server/src/schema.ts`) en `store: false`. Geen web search, geen beeldgeneratie.
 - De OpenAI-sleutel staat alleen in de omgeving van de server. De app kent hem niet; `VITE_API_ORIGIN` is alleen het openbare adres van de server.
 - Lokaal: zet de sleutel in `server/.env` (kopie van `server/.env.example`, staat in `.gitignore`). Start `npm run build --prefix server` en `npm start --prefix server` (poort 8787). `npm run dev` en `npm run preview` sturen `/api` daarheen door.
@@ -150,6 +150,7 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `OPENAI_VISION_MODEL` | `gpt-5.4-mini` | Model voor herkennen |
 | `OPENAI_IMAGE_DETAIL` | `auto` | `low`, `high` of `auto` |
 | `OPENAI_REASONING_EFFORT` | `low` | `none`, `low`, `medium`, `high` |
+| `OPENAI_MAX_OUTPUT_TOKENS` | `1800` | Maximum uitvoertokens voor foto herkennen. De code gebruikt 1800 als de variabele ontbreekt; `server/.env.example` zet dezelfde waarde. |
 | `ALLOWED_ORIGINS` | `https://karrie.eu,https://www.karrie.eu,https://karrieapp.onrender.com` | Komma-lijst van toegestane app-adressen |
 | `LIMIT_PER_IP_HOUR` / `LIMIT_PER_IP_DAY` | 20 / 60 | Per IP-adres |
 | `LIMIT_DAILY_REQUESTS` | 300 | Alle gebruikers samen, per UTC-dag |
@@ -348,7 +349,7 @@ Staat een gewoon product niet in de catalogus (walnoten, komijn, rozijnen), dan 
 - **Bewaren.** Er zijn drie standen; `/api/health` toont onder `products.candidates.storage` welke er echt draait:
   - **Geheugen** (standaard, zo staat het nu op Render): weg na een herstart of slaapstand.
   - **Bestand** met `CANDIDATES_FILE=/var/data/candidates.json` (atomair geschreven). Op het gratis Render-plan is er geen blijvende schijf; daarvoor zijn een betaalde instance (Starter, $7 per maand) en een Persistent Disk ($0,25 per GB per maand) nodig.
-  - **Postgres** met `CANDIDATES_DATABASE_URL` (heeft voorrang op het bestand). De server draait bij het starten de migraties in `server/migrations/` (`001_candidates.sql`, `002_catalog.sql`) via `schema_migrations`, leest alle kandidaten voor hij luistert en schrijft daarna alleen gewijzigde rijen. Is de database niet bereikbaar, dan draait hij in het geheugen en toont `/api/health` `storage: "memory"` met `loadError`. Een mislukte schrijfactie wordt bij de volgende wijziging opnieuw geprobeerd.
+  - **Postgres** met `CANDIDATES_DATABASE_URL` (heeft voorrang op het bestand). De server draait bij het starten de migraties in `server/migrations/` via `schema_migrations`: `001_candidates.sql`, `002_catalog.sql`, `003_pack_evidence.sql`, `004_private_label.sql`, `005_pack_retailer.sql`, `006_shared_lists.sql`, `007_healthier_assessments.sql`, `008_strip_brand_from_product_names.sql`, `009_voice_cache.sql`. Daarna leest hij alle kandidaten voor hij luistert en schrijft alleen gewijzigde rijen. Is de database niet bereikbaar, dan draait hij in het geheugen en toont `/api/health` `storage: "memory"` met `loadError`. Zonder database is `sharedLists.enabled` `false`. Een mislukte schrijfactie wordt bij de volgende wijziging opnieuw geprobeerd.
 - **Postgres kiezen** (er is **niets aangemaakt**; dat is jouw keuze):
   - **Neon**, gratis plan: geen einddatum, ongeveer 0,5 GB opslag, genoeg voor vele duizenden kandidaten. Maak op neon.tech een project in regio Frankfurt, kopieer de connection string (met `?sslmode=require`) en zet die op `karrie-api` als `CANDIDATES_DATABASE_URL` (geheim; staat al in `render.yaml` met `sync: false`).
   - **Render Postgres**: het gratis plan verloopt na 30 dagen (daarna worden de gegevens verwijderd); betaalde plannen kosten per maand, kijk voor de actuele prijs op render.com/pricing. Gebruik dan de *Internal Database URL*.
