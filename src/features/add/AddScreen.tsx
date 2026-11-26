@@ -628,7 +628,7 @@ export function AddScreen() {
         </div>
         {needsIntro(state) && !settings.cameraHintSeen && !settings.addHintSeen && (
           <p className="add-hint" data-testid="camera-hint">
-            Maak een foto of scan een barcode om een product toe te voegen.
+            Scan een product om toe te voegen.
           </p>
         )}
         <div className={tabsOverflow ? "tabs-wrap is-overflowing" : "tabs-wrap"}>
