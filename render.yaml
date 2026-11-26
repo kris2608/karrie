@@ -170,7 +170,15 @@ services:
         value: "300"
       - key: OFFERS_LIMIT_PER_IP_DAY
         value: "1500"
-      # Short Dutch shopping voice clips (Realtime). Set VOICE=off to disable.
+      # Short Dutch shopping voice. Default is Edge neural Maarten. Set VOICE_PROVIDER=openai to use Realtime instead.
+      - key: VOICE_PROVIDER
+        value: edge
+      - key: EDGE_VOICE
+        value: nl-NL-MaartenNeural
+      - key: EDGE_VOICE_RATE
+        value: "+8%"
+      - key: EDGE_VOICE_PITCH
+        value: "+16Hz"
       - key: OPENAI_VOICE_MODEL
         value: gpt-realtime-2.1
       - key: OPENAI_VOICE

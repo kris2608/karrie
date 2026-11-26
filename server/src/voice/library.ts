@@ -12,6 +12,7 @@ import {
   VOICE_INSTRUCTION_VERSION,
   VOICE_TEMPLATE_VERSION,
 } from "./personality.js";
+import { DEFAULT_EDGE_VOICE, EDGE_VOICE_MODEL } from "./edgeProvider.js";
 
 export type LibraryManifestEntry = {
   event: string;
@@ -48,9 +49,10 @@ export function expectedLibraryIdentity(): {
   deliveryVersion: string;
   templateVersion: string;
 } {
+  const edge = (process.env.VOICE_PROVIDER || "edge").trim().toLowerCase() !== "openai";
   return {
-    model: process.env.OPENAI_VOICE_MODEL || DEFAULT_VOICE_MODEL,
-    voice: process.env.OPENAI_VOICE || DEFAULT_VOICE_NAME,
+    model: edge ? EDGE_VOICE_MODEL : process.env.OPENAI_VOICE_MODEL || DEFAULT_VOICE_MODEL,
+    voice: edge ? process.env.EDGE_VOICE || DEFAULT_EDGE_VOICE : process.env.OPENAI_VOICE || DEFAULT_VOICE_NAME,
     instructionVersion: VOICE_INSTRUCTION_VERSION,
     deliveryVersion: VOICE_DELIVERY_VERSION,
     templateVersion: VOICE_TEMPLATE_VERSION,
@@ -110,7 +112,7 @@ export function loadVoiceLibrary(root = process.env.VOICE_LIBRARY_DIR || DEFAULT
       }
       const value: VoiceCacheEntry = {
         audio,
-        contentType: "audio/wav",
+        contentType: entry.file.endsWith(".mp3") ? "audio/mpeg" : "audio/wav",
         model: manifest.model,
         voice: manifest.voice,
       };

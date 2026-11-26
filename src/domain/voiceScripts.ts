@@ -6,11 +6,12 @@ const voiceCatalogEntryTexts = new Set(allVoiceCatalogInstructions());
 export const VOICE_LANGUAGE = "nl-NL";
 /** Bump when personality instructions or template wording change so caches refresh. */
 export const VOICE_INSTRUCTION_VERSION = "v6";
-export const VOICE_DELIVERY_VERSION = "v6";
+/** Delivery v7: Maarten MP3, speed in the voice, playback at 1×. Prompt stays v6. */
+export const VOICE_DELIVERY_VERSION = "v7";
 export const VOICE_TEMPLATE_VERSION = "v6";
-export const DEFAULT_VOICE_MODEL = "gpt-realtime-2.1";
-export const DEFAULT_VOICE_NAME = "coral";
-export const VOICE_CACHE_NAMESPACE = "karrie-voice-v6";
+export const DEFAULT_VOICE_MODEL = "edge-tts";
+export const DEFAULT_VOICE_NAME = "nl-NL-MaartenNeural";
+export const VOICE_CACHE_NAMESPACE = "karrie-voice-v7-maarten";
 
 export const VOICE_PERSONALITY =
   "Je bent Karrie, een blij kinderstemmetje voor een kind van een jaar of drie. Je spreekt Nederlands zoals in Nederland, zonder buitenlands accent. Je klinkt vrolijk, speels en enthousiast. Zeg alleen de zin die je krijgt, niets ervoor of erna.";

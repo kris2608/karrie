@@ -208,9 +208,7 @@ describe("voiceController ownership FSM", () => {
       ms: 1,
     });
     await vi.waitFor(() => expect(el.play).toHaveBeenCalled());
-    expect(el.playbackRate).toBe(1.2);
-    expect(el.preservesPitch).toBe(true);
-    expect(el.webkitPreservesPitch).toBe(true);
+    expect(el.playbackRate).toBe(1);
     el.onended?.();
     expect((await pending).status).toBe("completed");
 

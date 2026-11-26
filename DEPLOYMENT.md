@@ -166,7 +166,7 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `PRICE_VOICE_INPUT_PER_MTOK` / `PRICE_VOICE_CACHED_INPUT_PER_MTOK` / `PRICE_VOICE_OUTPUT_PER_MTOK` | 4 / 0,4 / 24 | Teksttokenprijzen van `gpt-realtime-2.1` |
 | `PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK` | 64 | Audiouitvoerprijs van `gpt-realtime-2.1` |
 
-Stemclips worden via Realtime (WebSocket one-shot) gegenereerd en gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal onder namespace `karrie-voice-v6`. Permanente catalogusclips staan alleen in `server/voice-library/` (genereer met `npm run voice:generate` — niet bij elke deploy; de site-build kopieert ze). Alleen allowlisted zinnetjes of product-instructies worden gesproken — geen vrije tekst-TTS, geen Speech API-fallback.
+Stemclips komen standaard van de Microsoft Edge-stem `nl-NL-MaartenNeural` (24 kHz mono MP3, 96 kbps, tempo in de stem, afspelen op 1×). Zet `VOICE_PROVIDER=openai` om terug te gaan naar Realtime. Edge kost niets en telt niet mee in het OpenAI-dagbudget. De app bewaart gehoorde clips lokaal onder namespace `karrie-voice-v7-maarten`. Permanente catalogusclips staan alleen in `server/voice-library/` (genereer met `npm run voice:generate`). Alleen allowlisted zinnetjes of product-instructies worden gesproken.
 
 Krijgt de server van Render een ander adres dan `https://karrie-api.onrender.com`? Zet dat adres dan in `VITE_API_ORIGIN` van `karrieapp` en bouw de site opnieuw.
 
