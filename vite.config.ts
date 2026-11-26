@@ -87,8 +87,10 @@ export default defineConfig({
     voiceLibrary(),
     umami(),
     VitePWA({
-      registerType: "autoUpdate",
-      injectRegister: "auto",
+      // Prompt keeps the new worker waiting until the app calls skipWaiting
+      // at a safe moment. clientsClaim then takes the open page so it can reload.
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: {
         name: "Karrie",
@@ -109,6 +111,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: false,
+        clientsClaim: true,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [...MARKETING_NAV_FALLBACK_DENYLIST],
         // Precache the tiny manifest only when a library was generated. WAV clips stay runtime-cached.
