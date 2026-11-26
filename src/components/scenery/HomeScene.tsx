@@ -1,9 +1,11 @@
 export function HomeScene() {
   return (
     <svg className="scene scene-home" viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-      <circle cx="318" cy="118" r="70" fill="#fff1bf" opacity="0.7" />
-      <circle cx="318" cy="118" r="46" fill="#ffe28a" />
-      <g fill="#fff" opacity="0.92">
+      <g className="scene-sun">
+        <circle cx="318" cy="118" r="70" fill="#fff1bf" opacity="0.7" />
+        <circle cx="318" cy="118" r="46" fill="#ffe28a" />
+      </g>
+      <g className="scene-clouds" fill="#fff" opacity="0.92">
         <path d="M34 168c0-14 12-24 26-22 6-12 26-14 34-2 14-2 24 8 22 20 0 6-4 10-10 10H44c-6 0-10-2-10-6z" />
         <path d="M250 236c0-10 9-18 19-16 5-9 19-10 25-1 10-1 17 6 16 14 0 4-3 7-7 7h-46c-4 0-7-1-7-4z" />
       </g>

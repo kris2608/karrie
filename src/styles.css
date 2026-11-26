@@ -328,45 +328,61 @@ h1, h2, p { margin: 0; }
   font-weight: 900;
 }
 .home-first { gap: var(--space-3); padding-top: calc(var(--safe-top) + var(--space-4)); }
-.home-first .home-mascot { width: min(150px, 40vw); }
+.home-first .home-mascot { width: min(124px, 33vw); }
+.home-first .wordmark h1 {
+  padding: 3px 24px 8px;
+  font-size: clamp(2.15rem, 10vw, 2.95rem);
+  text-shadow: 0 2px 0 var(--teal-shade);
+  box-shadow: 0 4px 0 var(--teal-shade), var(--shadow-float), var(--shadow-inset);
+}
+.home-first .scene-sun,
+.home-first .scene-clouds { transform: translateY(-84px); }
 .home-first-copy { gap: var(--space-2); }
 .home-value {
+  display: grid;
+  gap: 2px;
   margin: 0;
-  font-size: 1.05rem;
+  font-size: clamp(0.92rem, 3.7vw, 1.02rem);
   font-weight: 900;
-  line-height: 1.35;
+  line-height: 1.25;
   color: var(--ink);
 }
+.home-value span { display: block; white-space: nowrap; }
 .home-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
   margin: 0;
-  padding: var(--space-3) var(--space-2);
+  padding: 0;
   list-style: none;
-  border-radius: var(--radius-m);
-  background: var(--card);
-  box-shadow: var(--shadow-card);
 }
 .home-steps li {
   display: grid;
+  grid-template-rows: 56px auto;
   justify-items: center;
   align-content: start;
-  gap: 4px;
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1.2;
-  color: var(--ink);
+  gap: 6px;
+  min-width: 0;
 }
 .home-step-art {
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: rgba(255, 253, 249, 0.72);
+  box-shadow: var(--outline-soft);
 }
-.home-step-art > :first-child { width: 100%; height: 100%; }
-.home-step-karrie { width: 64px; }
-.home-how { min-height: 36px; padding-top: 0; padding-bottom: 0; }
+.home-step-art > :first-child { width: 40px; height: 40px; }
+.home-step-label {
+  max-width: 8em;
+  min-height: 2.4em;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.home-how { min-height: 44px; }
 .home-trust {
   margin: 0;
   color: var(--ink-soft);
@@ -374,9 +390,11 @@ h1, h2, p { margin: 0; }
   font-weight: 800;
 }
 @media (max-height: 700px) {
-  .home-first .home-mascot { width: min(112px, 32vw); }
-  .home-first .home-step-art,
-  .home-first .home-step-karrie { width: 52px; height: 52px; }
+  .home-first .home-mascot { width: min(96px, 28vw); }
+  .home-first .wordmark h1 { padding: 2px 18px 6px; font-size: clamp(1.85rem, 9vw, 2.4rem); }
+  .home-first .home-steps li { grid-template-rows: 48px auto; }
+  .home-first .home-step-art { width: 48px; height: 48px; }
+  .home-first .home-step-art > :first-child { width: 34px; height: 34px; }
 }
 .install-card {
   display: grid;

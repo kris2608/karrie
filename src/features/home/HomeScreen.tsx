@@ -1,10 +1,10 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ItemArt } from "../../components/ItemArt";
 import { Karrie } from "../../components/mascot/Karrie";
 import { HomeScene } from "../../components/scenery/HomeScene";
 import { StickerBadge } from "../../components/StickerBadge";
+import { StarIcon } from "../../components/ui/StarIcon";
 import { DiscoverySwitch } from "../../components/ui/DiscoverySwitch";
 import { PressButton } from "../../components/ui/PressButton";
 import { Sheet } from "../../components/ui/Sheet";
@@ -174,26 +174,27 @@ export function HomeScreen() {
           transition={{ ...softSpring, delay: 0.55 }}
         >
           <p className="home-value" data-testid="home-value">
-            Een boodschappenlijstje voor jou. Een speurtocht voor je kind.
+            <span>Een boodschappenlijstje voor jou.</span>
+            <span>Een speurtocht voor je kind.</span>
           </p>
           <ol className="home-steps">
             <li>
               <span className="home-step-art" aria-hidden="true">
-                <ItemArt item={{ icon: "banaan", name: "Banaan" }} />
+                <ListStepArt />
               </span>
-              Maak een lijstje
+              <span className="home-step-label">Maak samen een lijstje</span>
             </li>
             <li>
               <span className="home-step-art" aria-hidden="true">
-                <Karrie mood="searching" className="home-step-karrie" />
+                <SearchStepArt />
               </span>
-              Speur in de winkel
+              <span className="home-step-label">Speur in de winkel</span>
             </li>
             <li>
               <span className="home-step-art" aria-hidden="true">
-                <StickerBadge id="appel" />
+                <StarIcon />
               </span>
-              Verdien stickers
+              <span className="home-step-label">Verdien sterren en stickers</span>
             </li>
           </ol>
           <PressButton variant="primary" size="l" wide data-testid="new-adventure" ref={newRef} onClick={() => startAdventure("first")}>
@@ -415,5 +416,29 @@ export function HomeScreen() {
 
       <ListsSheet open={listsOpen} onClose={() => setListsOpen(false)} />
     </main>
+  );
+}
+
+function ListStepArt() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="6" y="4" width="52" height="56" rx="14" fill="#fffdf9" stroke="#0c8c84" strokeWidth="3" />
+      <path d="M16 22.5l3.2 3.2 6.2-6.6" fill="none" stroke="#16bfb2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M32 22h16" stroke="#ffd23f" strokeWidth="3.5" strokeLinecap="round" />
+      <path d="M16 34.5l3.2 3.2 6.2-6.6" fill="none" stroke="#16bfb2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M32 34h16" stroke="#ffd23f" strokeWidth="3.5" strokeLinecap="round" />
+      <path d="M16 46.5l3.2 3.2 6.2-6.6" fill="none" stroke="#16bfb2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M32 46h12" stroke="#ffd23f" strokeWidth="3.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SearchStepArt() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="27" cy="27" r="17" fill="#d4f4f0" stroke="#0c8c84" strokeWidth="4" />
+      <path d="M20 22c2-4 7-6 11-4" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity="0.85" />
+      <path d="M39.5 39.5L55 55" stroke="#ff8a1f" strokeWidth="7" strokeLinecap="round" />
+    </svg>
   );
 }
