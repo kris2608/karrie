@@ -108,7 +108,7 @@ export function HowKarrieWorks({ headingRef, onStart }: HowKarrieWorksProps) {
       {onStart && (
         <div className="howto-actions">
           <PressButton variant="primary" size="l" wide data-testid="intro-start" onClick={onStart}>
-            Kies een paar plaatjes
+            Start je eerste speurtocht
           </PressButton>
         </div>
       )}
