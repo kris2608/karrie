@@ -25,7 +25,7 @@ import { createOffSearch } from "./offSearch.js";
 import { createStoreImageLookup } from "./storeImage.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
 import { createMemoryVoiceCache, createPgVoiceCache } from "./voice/cache.js";
-import { VOICE_CACHE_NAMESPACE, VOICE_TEMPLATE_VERSION } from "./voice/personality.js";
+import { DEFAULT_VOICE_MODEL, DEFAULT_VOICE_NAME, VOICE_CACHE_NAMESPACE, VOICE_TEMPLATE_VERSION } from "./voice/personality.js";
 import { createRealtimeSpeechProvider } from "./voice/provider.js";
 import { createSpeakService } from "./voice/speak.js";
 import { createPgUsageStore } from "./usageStore.js";
@@ -237,9 +237,9 @@ const voiceLimits = createLimits({
   perIpPerDay: number("VOICE_LIMIT_PER_IP_DAY", 120),
   dailyRequests: number("VOICE_LIMIT_DAILY_REQUESTS", 2000),
   dailyBudgetUsd: number("VOICE_DAILY_BUDGET_USD", 1),
-  inputUsdPerMTok: number("PRICE_VOICE_INPUT_PER_MTOK", 0.6),
-  cachedInputUsdPerMTok: number("PRICE_VOICE_CACHED_INPUT_PER_MTOK", 0.06),
-  outputUsdPerMTok: number("PRICE_VOICE_OUTPUT_PER_MTOK", 2.4),
+  inputUsdPerMTok: number("PRICE_VOICE_INPUT_PER_MTOK", 4),
+  cachedInputUsdPerMTok: number("PRICE_VOICE_CACHED_INPUT_PER_MTOK", 0.4),
+  outputUsdPerMTok: number("PRICE_VOICE_OUTPUT_PER_MTOK", 24),
 });
 
 /** Stable when APP_TOKEN_SECRET is set; otherwise tokens and per-install windows reset on each boot. */
@@ -322,14 +322,14 @@ const handler = createHandler({
     : undefined,
   voice: (() => {
     if (env.VOICE === "off") return undefined;
-    const audioOutputUsdPerMTok = number("PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK", 12);
+    const audioOutputUsdPerMTok = number("PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK", 64);
     let provider = null;
     if (apiKey) {
       try {
         provider = createRealtimeSpeechProvider({
           apiKey,
-          model: env.OPENAI_VOICE_MODEL || "gpt-realtime-2.1-mini",
-          voice: env.OPENAI_VOICE || "marin",
+          model: env.OPENAI_VOICE_MODEL || DEFAULT_VOICE_MODEL,
+          voice: env.OPENAI_VOICE || DEFAULT_VOICE_NAME,
           timeoutMs: number("OPENAI_VOICE_TIMEOUT_MS", 12_000),
           maxConcurrent: number("VOICE_MAX_CONCURRENT", 2),
         });

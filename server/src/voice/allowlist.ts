@@ -5,7 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const STATIC = new Set([
-  // Welcome
+  // Welcome / round start
+  "Hoi! Zullen we samen boodschappen gaan zoeken? Daar gaan we!",
   "Hoi! Zullen we samen boodschappen doen?",
   "Ben je klaar voor ons boodschappenavontuur?",
   "Kom, we gaan op zoek naar de boodschappen!",
@@ -17,6 +18,7 @@ const STATIC = new Set([
   "Kijk eens aan!",
   "Ja, die hebben we!",
   "Goed gedaan!",
+  "Die is het!",
   "Dat is hem!",
   "Helemaal goed!",
   // Incorrect
@@ -29,6 +31,10 @@ const STATIC = new Set([
   "Nog een paar boodschappen!",
   "Nog eentje te gaan!",
   // Complete / sticker
+  "Hoera! Alle boodschappen zijn gevonden! Wat heb jij dat goed gedaan!",
+  "Tadaa! We hebben alles gevonden! Hoera, wat goed van jou!",
+  "Gelukt! Alle boodschappen zijn in het mandje! Dat hebben we samen gedaan!",
+  "Jaaa! De speurtocht is klaar! Wat heb jij goed geholpen!",
   "Gelukt! Alle boodschappen zijn gevonden.",
   "Wat heb jij goed geholpen vandaag!",
   "Ons boodschappenavontuur zit erop!",
@@ -63,7 +69,7 @@ function loadCatalogInstructions(): Set<string> {
 
 const CATALOG = loadCatalogInstructions();
 
-/** Product patterns — v5 canonical + legacy so old clients do not 422. */
+/** Product patterns — canonical + legacy so old clients do not 422. */
 const DYNAMIC_PATTERNS = [
   /^Kun jij (.+) vinden\?$/,
   /^Nu gaan we (.+) zoeken!$/,

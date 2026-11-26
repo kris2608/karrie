@@ -1,5 +1,6 @@
 import { productById } from "../data/catalog";
 import { productHeading } from "./productHeading";
+import { ruleForSpokenNoun } from "./productSpeechGrammar";
 
 /** Trailing pack size / count that should not be spoken to a toddler. */
 const PACK_SIZE =
@@ -30,6 +31,13 @@ const MASS_NOUNS = new Set([
   "pindakaas",
   "hagelslag",
   "stroop",
+  "mais",
+  "maïs",
+  "ijs",
+  "frisdrank",
+  "siroop",
+  "havermout",
+  "muesli",
 ]);
 
 /** Known Dutch articles for common preschool shopping nouns (lemma / spoken form). */
@@ -70,6 +78,22 @@ const ARTICLES: Record<string, "de" | "het"> = {
   koekje: "het",
   koekjes: "de",
   winkelwagen: "de",
+  croissant: "de",
+  ui: "de",
+  uien: "de",
+  mais: "de",
+  "maïs": "de",
+  frisdrank: "de",
+  drinkpakje: "het",
+  ijs: "het",
+  gehakt: "het",
+  stokbrood: "het",
+  sinaasappelsap: "het",
+  toiletpapier: "het",
+  keukenpapier: "het",
+  afwasmiddel: "het",
+  wasmiddel: "het",
+  schoonmaakmiddel: "het",
 };
 
 const NUMBER_WORDS: Record<number, string> = {
@@ -91,6 +115,8 @@ const PLURALS: Record<string, string> = {
   ei: "eieren",
   koekje: "koekjes",
   druif: "druiven",
+  ui: "uien",
+  augurk: "augurken",
 };
 
 function pluralForm(spoken: string): string {
@@ -159,10 +185,12 @@ export function spokenProductMeta(item: {
   const spoken = spokenNameInSentence(raw);
   const key = spoken.toLowerCase();
   const quantity = Math.max(1, Math.min(24, item.quantity ?? 1));
-  const mass = MASS_NOUNS.has(key) || MASS_NOUNS.has(key.replace(/s$/, ""));
-  const looksPlural = /en$|els$|ers$|s$/i.test(spoken) && !mass;
+  const named = ruleForSpokenNoun(key);
+  const mass = named?.number === "mass" || MASS_NOUNS.has(key) || MASS_NOUNS.has(key.replace(/s$/, ""));
+  const namedPlural = named?.number === "plural" && named.noun === key;
+  const looksPlural = namedPlural || (/en$|els$|ers$|s$/i.test(spoken) && !mass && named?.number !== "singular");
   const number: SpokenProductMeta["number"] = mass ? "mass" : looksPlural || quantity > 1 ? "plural" : "singular";
-  const article = ARTICLES[key] ?? ARTICLES[key.replace(/en$/, "")] ?? ARTICLES[key.replace(/s$/, "")];
+  const article = named?.article ?? ARTICLES[key] ?? ARTICLES[key.replace(/en$/, "")] ?? ARTICLES[key.replace(/s$/, "")];
 
   return { name: raw, spoken, article, number, quantity };
 }

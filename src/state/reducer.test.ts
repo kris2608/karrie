@@ -66,6 +66,12 @@ it("bewaart stembegeleiding apart van geluidseffecten", () => {
   });
   expect(hydrated.settings.voiceEnabled).toBe(true);
   expect(hydrated.settings.voiceOptInSeen).toBe(true);
+  const muted = reducer(on, { type: "set-voice", enabled: false });
+  expect(muted.settings.voiceEnabled).toBe(false);
+  expect(muted.settings.voiceOptInSeen).toBe(true);
+  const restored = reducer(initialState, { type: "hydrate", data: { settings: muted.settings } });
+  expect(restored.settings.voiceEnabled).toBe(false);
+  expect(restored.settings.voiceOptInSeen).toBe(true);
 });
 
 it("bewaart een nieuw lijstje voor later zonder het avontuur te starten", () => {

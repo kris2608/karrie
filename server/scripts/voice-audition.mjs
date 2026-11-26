@@ -1,7 +1,7 @@
 /**
- * Dev-only Realtime voice audition (personality v5). Writes WAV under server/tmp/voice-audition/.
+ * Dev-only Realtime voice audition. Writes WAV under server/tmp/voice-audition/.
  * Usage: npm run voice:audition
- * Keep marin as baseline until samples are listened to. Never uses the Speech API.
+ * Shipped voice is gpt-realtime-2.1 + coral. Never uses the Speech API.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -20,10 +20,10 @@ if (process.env.OPENAI_API_KEY === undefined) {
 }
 
 const API_KEY = process.env.OPENAI_API_KEY;
-const MODEL = process.env.OPENAI_VOICE_MODEL || "gpt-realtime-2.1-mini";
+const MODEL = process.env.OPENAI_VOICE_MODEL || "gpt-realtime-2.1";
 const VOICES = ["marin", "coral", "cedar"];
 
-const PERSONALITY = `Je bent Karrie, een vrolijk en nieuwsgierig winkelvriendje voor jonge kinderen. Je praat in natuurlijk Nederlands, met een warme stem en een glimlach. Je klinkt spontaan en vertrouwd. Spreek rustig, duidelijk en speels, alsof je samen met een kind boodschappen doet. Behoud steeds dezelfde herkenbare stem. Spreek uitsluitend de opgegeven tekst uit.`;
+const PERSONALITY = `Je bent Karrie, een blij kinderstemmetje voor een kind van een jaar of drie. Je spreekt Nederlands zoals in Nederland, zonder buitenlands accent. Je klinkt vrolijk, speels en enthousiast. Zeg alleen de zin die je krijgt, niets ervoor of erna.`;
 
 const BASELINE = "Zelfde Karrie-stem en toonhoogte. Geen andere spreker.";
 
@@ -205,7 +205,7 @@ async function main() {
 </head>
 <body>
   <h1>Karrie Realtime audition v5 (${MODEL})</h1>
-  <p>Stable single-speaker personality. Compare marin / coral / cedar. Default remains marin unless a voice clearly wins for Dutch consistency.</p>
+  <p>Compare marin / coral / cedar against the shipped coral voice. This page does not change the default.</p>
   ${index
     .map(
       (row) => `<div class="row"><span class="voice">${row.voice}</span><span>${row.text}</span><audio controls src="./${row.file}"></audio></div>`,
@@ -217,7 +217,7 @@ async function main() {
   await writeFile(join(OUT, "index.html"), html);
   await writeFile(join(OUT, "summary.json"), JSON.stringify({ model: MODEL, personality: "v5", voices: VOICES, clips: index }, null, 2));
   console.log(`\nWrote ${index.length} clips + index to ${OUT}`);
-  console.log("Default remains marin (locked) unless you change OPENAI_VOICE after listening.");
+  console.log("Shipped default is coral on gpt-realtime-2.1. This audition does not change it.");
 }
 
 main().catch((error) => {

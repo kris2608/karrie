@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:server": "npm test --prefix server",
+    "voice:generate": "npm run voice:generate --prefix server",
     "icons": "vite-node scripts/generate-icons.ts"
   },
   "dependencies": {

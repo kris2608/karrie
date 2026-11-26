@@ -76,6 +76,32 @@ describe("loadPersisted", () => {
     expect(mayPersist("save_failed")).toBe(true);
   });
 
+  it("persists a muted voice and loads it back", async () => {
+    const store = new Map<string, unknown>();
+    openDB.mockResolvedValue({
+      get: (_storeName: string, key: string) => Promise.resolve(store.get(key)),
+      transaction: () => ({
+        store: {
+          put: (value: unknown, key: string) => {
+            store.set(key, value);
+            return Promise.resolve();
+          },
+        },
+        done: Promise.resolve(),
+      }),
+      objectStoreNames: { contains: () => true },
+    });
+    const { emptyPersisted, loadPersisted, savePersisted } = await import("./db");
+    const data = emptyPersisted();
+    data.settings = { ...data.settings, voiceEnabled: false, voiceOptInSeen: true };
+    await savePersisted(data);
+    const loaded = await loadPersisted();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.data.settings.voiceEnabled).toBe(false);
+    expect(loaded.data.settings.voiceOptInSeen).toBe(true);
+  });
+
   it("does not write empty data when load failed (save gate)", async () => {
     openDB.mockRejectedValue(new Error("blocked"));
     const { loadPersisted, mayPersist, savePersisted } = await import("./db");
