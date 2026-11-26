@@ -38,6 +38,11 @@ services:
       - path: /index.html
         name: Cache-Control
         value: no-cache
+      # The installed app opens `/`, which rewrites to index.html. Header
+      # rules match the request path, so the shell needs its own no-cache.
+      - path: /
+        name: Cache-Control
+        value: no-cache
       - path: /ontdek.html
         name: Cache-Control
         value: no-cache

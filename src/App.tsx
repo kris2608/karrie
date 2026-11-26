@@ -8,6 +8,7 @@ import { HomeScreen } from "./features/home/HomeScreen";
 import { ReviewScreen } from "./features/review/ReviewScreen";
 import { SharedListBoot } from "./features/share/SharedListBoot";
 import { ShopScreen } from "./features/shop/ShopScreen";
+import { PwaUpdate } from "./pwa/PwaUpdate";
 import { AdventureProvider } from "./state/AdventureContext";
 
 function ScrollReset() {
@@ -24,6 +25,7 @@ export function App() {
       <MotionConfig reducedMotion="user">
         <AdventureProvider>
           <ScrollReset />
+          <PwaUpdate />
           <SharedListBoot />
           <div className="app">
             <Routes>
