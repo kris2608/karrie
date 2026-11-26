@@ -199,6 +199,16 @@ export function AddScreen() {
   /** Keeps the sheet filled while it fades out. */
   const [shown, setShown] = useState<{ name: string; token: number } | null>(null);
   const tabsRef = useRef<HTMLElement>(null);
+  const [tabsOverflow, setTabsOverflow] = useState(false);
+  useEffect(() => {
+    const strip = tabsRef.current;
+    if (!strip) return;
+    const check = () => setTabsOverflow(strip.scrollWidth > strip.clientWidth + 8);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, []);
   const sectionRefs = useRef<Partial<Record<CategoryId, HTMLElement | null>>>({});
   const jumping = useRef<(() => void) | null>(null);
   const pendingJump = useRef<CategoryId | null>(null);
@@ -609,6 +619,7 @@ export function AddScreen() {
             Maak een foto of scan een barcode om een product toe te voegen.
           </p>
         )}
+        <div className={tabsOverflow ? "tabs-wrap is-overflowing" : "tabs-wrap"}>
         <nav className="tabs" ref={tabsRef} aria-label="Categorieën">
           {CATEGORIES.map((tab) => {
             const current = !needle && active === tab.id;
@@ -627,6 +638,7 @@ export function AddScreen() {
             );
           })}
         </nav>
+        </div>
         {needsIntro(state) && !settings.addHintSeen && (
           <p className="add-hint" data-testid="tap-hint">
             Tik op een product om het aan je lijstje toe te voegen.

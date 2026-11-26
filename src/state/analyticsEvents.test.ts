@@ -136,6 +136,17 @@ describe("analytics events", () => {
     expect(run(initialState, manual).events[1].event).toEqual({ name: "product_added", data: { method: "manual", category: "household" } });
   });
 
+  it("marks a practice round on adventure_started and leaves a built list unmarked", () => {
+    const practice = run(initialState, { type: "start-practice" });
+    expect(practice.state.adventure?.practice).toBe(true);
+    expect(practice.state.adventure?.phase).toBe("shopping");
+    expect(practice.state.adventure?.items).toHaveLength(3);
+    expect(practice.state.saved).toEqual([]);
+    expect(practice.events).toEqual([
+      { event: { name: "adventure_started", data: { item_count: 3, mode: "practice" } }, once: practice.state.adventure!.id },
+    ]);
+  });
+
   it("starts an adventure once; going back to it is not another start", () => {
     const listed = play([{ type: "add-product", product: first }, { type: "add-product", product: second }]).state;
     const start = run(listed, { type: "start-shopping" });

@@ -10,6 +10,7 @@ const ADVENTURE_ACK_CAP = 100;
 export type AdventureAckTarget = {
   id: string;
   items: ReadonlyArray<{ mission?: { status?: string } }>;
+  practice?: boolean;
 };
 
 export type AnalyticsMilestones = {
@@ -301,7 +302,7 @@ export function ensureAdventureStarted(adventure: AdventureAckTarget): boolean {
   if (current.startedAdventureIds.includes(id)) return true;
   const campaign = attributionEventData();
   const accepted = trackEvent(
-    { name: "adventure_started", data: { item_count: adventure.items.length, ...campaign } },
+    { name: "adventure_started", data: { item_count: adventure.items.length, ...(adventure.practice ? { mode: "practice" as const } : {}), ...campaign } },
     id,
   );
   if (!delivered("adventure_started", id, accepted)) return false;

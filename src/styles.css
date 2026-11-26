@@ -328,8 +328,7 @@ h1, h2, p { margin: 0; }
   font-weight: 900;
 }
 .home-first { gap: var(--space-4); }
-.home-first .scene-shop,
-.home-first .scene-trail { transform: translateY(180px); }
+.home-first .scene-trail { transform: translateY(80px); }
 .home-first-copy { gap: var(--space-2); }
 .home-value {
   display: grid;
@@ -380,6 +379,12 @@ h1, h2, p { margin: 0; }
   margin: 0;
   color: var(--ink-soft);
   font-size: 0.85rem;
+  font-weight: 800;
+}
+.home-practice-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
   font-weight: 800;
 }
 @media (max-height: 700px) {
@@ -742,16 +747,32 @@ h1, h2, p { margin: 0; }
 }
 .sheet-handle {
   display: grid;
-  justify-items: center;
-  align-content: center;
-  min-height: 36px;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  min-height: 44px;
   margin: 0 calc((var(--safe-right) + var(--space-5)) * -1) 0 calc((var(--safe-left) + var(--space-5)) * -1);
-  padding: var(--space-3) var(--space-5) var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-1);
   cursor: grab;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
 }
+.sheet-grip { grid-column: 2; justify-self: center; }
+.sheet-close {
+  grid-column: 3;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+}
+.sheet-close svg { width: 22px; height: 22px; }
 .sheet-handle:active { cursor: grabbing; }
 .sheet-grip {
   width: 44px;
@@ -939,6 +960,8 @@ a.settings-link { text-decoration: none; color: inherit; }
 .howto-good { display: grid; gap: var(--space-1); padding: 0 var(--space-1); color: var(--ink-soft); font-size: 0.92rem; }
 .howto-good h3 { font-size: 0.98rem; color: var(--ink-soft); }
 .howto-good ul { display: grid; gap: 2px; margin: 0; padding-left: 1.2em; }
+.howto-body { display: grid; gap: var(--space-4); min-width: 0; }
+.howto:has(.howto-actions) .howto-body { padding-bottom: calc(128px + var(--safe-bottom)); }
 .howto-actions {
   position: sticky;
   z-index: 1;
@@ -1002,7 +1025,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   box-shadow: var(--shadow-card);
   cursor: pointer;
 }
-.switch-label { display: grid; }
+.switch-label { display: grid; min-width: 0; flex: 1; }
 .setting-block {
   display: grid;
   gap: var(--space-3);
@@ -1012,7 +1035,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   box-shadow: var(--shadow-card);
 }
 .switch-label strong { font-weight: 900; }
-.switch-label small { color: var(--ink-soft); font-size: var(--text-label); }
+.switch-label small { color: var(--ink-soft); font-size: var(--text-label); white-space: normal; overflow-wrap: anywhere; }
 .switch-track {
   position: relative;
   flex: none;
@@ -1124,11 +1147,27 @@ a.settings-link { text-decoration: none; color: inherit; }
   color: var(--ink);
   font-size: 1.05rem;
 }
+.tabs-wrap {
+  position: relative;
+  margin: var(--space-3) calc(var(--space-4) * -1) 0;
+}
+.tabs-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: var(--space-2);
+  width: 36px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--paper));
+}
+.tabs-wrap.is-overflowing::after { opacity: 1; }
 .tabs {
   display: flex;
   gap: 6px;
-  margin: var(--space-3) calc(var(--space-4) * -1) 0;
-  padding: var(--space-1) var(--space-4) var(--space-2);
+  margin: 0;
+  padding: var(--space-1) 28px var(--space-2) var(--space-4);
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
@@ -1661,8 +1700,8 @@ a.settings-link { text-decoration: none; color: inherit; }
   background: #fff;
 }
 .stepper button {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-s);
@@ -1731,7 +1770,7 @@ a.settings-link { text-decoration: none; color: inherit; }
 .share-import-more { color: var(--ink-soft); font-weight: 800; padding-left: calc(40px + var(--space-3)); }
 .share-import-actions { display: grid; gap: var(--space-3); }
 .share-import-actions.sheet-actions { display: grid; }
-.row-actions .round-s { width: 36px; height: 36px; box-shadow: var(--outline-soft); }
+.row-actions .round-s { width: 44px; height: 44px; box-shadow: var(--outline-soft); }
 
 /* Shop game */
 

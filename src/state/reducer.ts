@@ -42,6 +42,7 @@ import { productById, products } from "../data/catalog";
 import {
   createAdventure,
   createItem,
+  createPracticeAdventure,
   createSampleAdventure,
   itemFromSaved,
   packFromVision,
@@ -151,6 +152,7 @@ export type Action =
   | { type: "play-activate" }
   | { type: "new-draft" }
   | { type: "start-sample" }
+  | { type: "start-practice" }
   | { type: "add-product"; product: Product }
   | { type: "add-lines"; lines: { product: Product; quantity: number }[] }
   | { type: "set-quantity"; itemId: string; quantity: number }
@@ -254,7 +256,7 @@ export const DEFAULT_LIST_NAME = "Boodschappenlijst";
 
 /** The name a parent gave the list, or nothing for the built-in names. */
 export function listName(list: Pick<SavedList, "name">): string | undefined {
-  return list.name && list.name !== DEFAULT_LIST_NAME && list.name !== "Voorbeeldlijst" ? list.name : undefined;
+  return list.name && list.name !== DEFAULT_LIST_NAME && list.name !== "Voorbeeldlijst" && list.name !== "Oefenrondje" ? list.name : undefined;
 }
 
 function blankDraft(order: CategoryId[], retailer?: RetailerId): Adventure {
@@ -268,9 +270,10 @@ function withRetailer(adventure: Adventure, retailer: RetailerId | undefined): A
 
 /** Lists from before the home adventure have neither field; anything malformed is dropped. */
 function withHomeProgress(adventure: Adventure): Adventure {
-  const { discovered, cheered, ...rest } = adventure;
+  const { discovered, cheered, practice, ...rest } = adventure;
   return {
     ...rest,
+    ...(practice === true ? { practice: true } : {}),
     ...(Array.isArray(discovered) && { discovered: discovered.filter((id) => typeof id === "string") }),
     ...(Array.isArray(cheered) && { cheered: cheered.filter((value) => typeof value === "number") }),
   };
@@ -292,6 +295,7 @@ function withHistory(state: AppState, adventure: Adventure) {
 
 function upsertSaved(saved: SavedList[], adventure: Adventure, favorite?: boolean): SavedList[] {
   if (!adventure.items.length || (adventure.forgotten && favorite === undefined)) return saved;
+  if (adventure.practice && !favorite) return saved;
   const existing = saved.find((list) => list.id === adventure.id);
   const entry: SavedList = {
     id: adventure.id,
@@ -724,6 +728,15 @@ export function reducer(state: AppState, action: Action): AppState {
     case "start-sample": {
       const saved = state.adventure?.items.length ? upsertSaved(state.saved, state.adventure) : state.saved;
       return { ...state, saved, adventure: withRetailer(createSampleAdventure(state.categoryOrder), state.settings.retailer) };
+    }
+    case "start-practice": {
+      const current = state.adventure;
+      const saved = current?.items.length ? upsertSaved(state.saved, current) : state.saved;
+      const draft = createPracticeAdventure(state.categoryOrder);
+      const withBonuses = assignBonuses(draft.items, state.settings.smartDiscovery, state.declined, draft.id);
+      const items = sortByCategory(withBonuses, state.categoryOrder);
+      const adventure = withRetailer({ ...draft, items, practice: true, history: [] }, state.settings.retailer);
+      return { ...state, saved, adventure };
     }
     case "add-product": {
       const adventure = ensureDraft(state);

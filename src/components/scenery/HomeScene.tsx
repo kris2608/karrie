@@ -11,7 +11,7 @@ export function HomeScene() {
       </g>
       <path d="M-20 600C40 560 120 552 196 572S330 600 410 560V844H-20Z" fill="#d4f4f0" />
       <g className="scene-shop">
-        <g transform="translate(280 520)">
+        <g transform="translate(168 710)">
           <rect x="0" y="22" width="74" height="54" rx="8" fill="#fffdf9" />
           <path d="M-6 24h86l-8-20H2z" fill="#ff6b5e" />
           <path d="M10 4l-4 20M26 4v20M42 4v20M58 4l4 20" stroke="#fffdf9" strokeWidth="6" />

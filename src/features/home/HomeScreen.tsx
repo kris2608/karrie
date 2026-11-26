@@ -24,6 +24,7 @@ import { trackEvent } from "../../services/analytics";
 import { trackFirstHomeViewed } from "../../services/analyticsMilestones";
 import { attributionEventData } from "../../services/campaignAttribution";
 import { InstallCard } from "../install/InstallCard";
+import { VoiceOptInSheet } from "../shop/VoiceOptInSheet";
 import { ListsSheet } from "../lists/ListsSheet";
 import { AboutKarrie } from "./AboutKarrie";
 import { HowKarrieWorks } from "./HowKarrieWorks";
@@ -60,6 +61,7 @@ export function HomeScreen() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const rowRefs = useRef<Partial<Record<ParentView, HTMLButtonElement | null>>>({});
   const [introOpen, setIntroOpen] = useState(false);
+  const [practiceAsk, setPracticeAsk] = useState(false);
   const introHeadingRef = useRef<HTMLHeadingElement>(null);
   const newRef = useRef<HTMLButtonElement>(null);
   const undo = useNotice();
@@ -96,6 +98,19 @@ export function HomeScreen() {
     trackEvent({ name: "new_adventure_clicked", data: { entry, ...campaign } });
     dispatch({ type: "new-draft" });
     navigate("/toevoegen");
+  }
+
+  function launchPractice() {
+    dispatch({ type: "start-practice" });
+    navigate("/winkel");
+  }
+
+  function startPractice() {
+    if (!settings.voiceOptInSeen) {
+      setPracticeAsk(true);
+      return;
+    }
+    launchPractice();
   }
 
   function openHowTo() {
@@ -197,8 +212,12 @@ export function HomeScreen() {
               <span className="home-step-label">Verdien sterren en stickers</span>
             </li>
           </ol>
+          <p className="home-practice-note">Thuis oefenen mag ook.</p>
           <PressButton variant="primary" size="l" wide data-testid="new-adventure" ref={newRef} onClick={() => startAdventure("first")}>
-            Maak je eerste lijstje
+            Kies een paar plaatjes
+          </PressButton>
+          <PressButton variant="secondary" size="l" wide data-testid="practice-round" onClick={startPractice}>
+            Oefenrondje
           </PressButton>
           <button type="button" className="text-button home-how" data-testid="open-howto" onClick={openHowTo}>
             Hoe werkt Karrie?
@@ -226,6 +245,9 @@ export function HomeScreen() {
             onClick={() => startAdventure("return")}
           >
             Nieuw avontuur
+          </PressButton>
+          <PressButton variant="secondary" wide data-testid="practice-round" onClick={startPractice}>
+            Oefenrondje
           </PressButton>
           {draft && !shopping && (
             <PressButton variant="secondary" wide data-testid="resume-adventure" onClick={resumeAdventure}>
@@ -284,6 +306,15 @@ export function HomeScreen() {
       </AnimatePresence>
 
       <Toast notice={undo.notice} onDismiss={undo.dismiss} />
+
+      <VoiceOptInSheet
+        open={practiceAsk}
+        onAnswer={(enabled) => {
+          dispatch({ type: "set-voice", enabled });
+          setPracticeAsk(false);
+          launchPractice();
+        }}
+      />
 
       <Sheet open={introOpen} onClose={dismissIntro} label="Hoe werkt Karrie?">
         <HowKarrieWorks
