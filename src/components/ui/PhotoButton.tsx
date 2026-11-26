@@ -16,19 +16,32 @@ export function CameraIcon() {
   );
 }
 
+export function BarcodeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="camera-icon">
+      <path d="M4.5 5.5v13" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M8 5.5v13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M11 5.5v13" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M14.4 5.5v13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M17.2 5.5v13" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M20 5.5v13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function PhotoButton({ onClick }: { onClick: () => void }) {
   return (
     <motion.button
       type="button"
       className="scan-button photo-button"
-      aria-label="Foto of streepjescode"
+      aria-label="Scan barcode"
       data-testid="photo-button"
       whileTap={press.whileTap}
       transition={press.transition}
       onClick={onClick}
     >
-      <CameraIcon />
-      <span className="scan-label">Scan of foto</span>
+      <BarcodeIcon />
+      <span className="scan-label">Scan barcode</span>
     </motion.button>
   );
 }
