@@ -28,6 +28,7 @@ export function PhotoButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
     >
       <CameraIcon />
+      <span className="scan-label">Scan of foto</span>
     </motion.button>
   );
 }

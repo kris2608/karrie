@@ -191,6 +191,7 @@ export function AddScreen() {
     markAppUsed();
   }, []);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [active, setActive] = useState<CategoryId>(CATEGORIES[0].id);
   const reduced = useReducedMotion() ?? false;
   const headRef = useRef<HTMLDivElement>(null);
@@ -590,8 +591,14 @@ export function AddScreen() {
             </button>
           }
         />
-        <div className="search-row">
-          <label className="search">
+        <div className={searchOpen || query ? "search-row is-searching" : "search-row"}>
+          <label
+            className="search"
+            onClick={() => {
+              setSearchOpen(true);
+              searchRef.current?.focus();
+            }}
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.4" />
               <path d="M15.5 15.5L20 20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
@@ -601,10 +608,15 @@ export function AddScreen() {
               ref={searchRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onFocus={() => setSearchOpen(true)}
+              onBlur={() => {
+                if (!query) setSearchOpen(false);
+              }}
               placeholder="Zoek brood, melk…"
               enterKeyHint="search"
               autoComplete="off"
               type="search"
+              aria-label="Zoek een product"
             />
           </label>
           <PhotoButton
@@ -699,9 +711,13 @@ export function AddScreen() {
       {custom && <p className="add-hint">Staat het er niet bij? Voeg het toe, ook een merk zoals Chocomel. Karrie zoekt er meteen een foto of plaatje bij.</p>}
 
       <div className="dock dock-fixed">
-        <PressButton variant="quiet" data-testid="paste" onClick={() => setPasteOpen(true)}>
-          Lijst plakken
-        </PressButton>
+        <button type="button" className="round-button dock-paste" data-testid="paste" aria-label="Lijst plakken" onClick={() => setPasteOpen(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5.5h8M9 4h6a1 1 0 0 1 1 1v2H8V5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            <rect x="6" y="7" width="12" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path d="M9 11h6M9 14.5h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
         <PressButton variant="primary" data-testid="to-list" disabled={count === 0} onClick={() => navigate("/controleren")}>
           <svg viewBox="0 0 24 24" aria-hidden="true" className="dock-icon">
             <rect x="5" y="3.5" width="14" height="17" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" />

@@ -163,17 +163,7 @@ export function ReviewScreen() {
 
   return (
     <main className="screen screen-review">
-      <TopBar
-        title={named ?? "Klopt het lijstje?"}
-        to="/toevoegen"
-        action={
-          <Link to="/toevoegen" className="round-button" aria-label="Producten toevoegen">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 6v12M6 12h12" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-            </svg>
-          </Link>
-        }
-      />
+      <TopBar title={named ?? "Klopt het lijstje?"} to="/toevoegen" />
       {adventure.phase === "draft" && saved.length === 0 && stickers.length === 0 && completedAdventures.length === 0 && hasOpen && (
         <p className="review-context" data-testid="review-context">
           Klaar om te zoeken? Thuis oefenen mag ook.
@@ -331,11 +321,10 @@ function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
   const heading = productHeading({ name: item.name, brand: item.brand, packageSize: item.packageSize });
   const mission = settings.smartDiscovery && missionOn(item, declined);
   const showOffer = Boolean(offer && retailer);
-  const hasDetail = Boolean(heading.subtitle);
   return (
     <motion.li
       layout="position"
-      className={["item-row", pressing ? "is-pressing" : "", hasDetail ? "has-detail" : ""].filter(Boolean).join(" ")}
+      className={["item-row", pressing ? "is-pressing" : ""].filter(Boolean).join(" ")}
       data-testid="item-row"
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -351,29 +340,23 @@ function ItemRow({ item, offer, onEdit, onRemove, onOffer }: ItemRowProps) {
           </span>
         )}
       </button>
-      <div className="item-main">
-        <div className="item-name-line">
-          <button type="button" className="item-text-button" aria-label={`Bewerk ${heading.title}`} data-testid="edit-item-text" onClick={onEdit}>
-            <strong>{heading.title}</strong>
+      <div className="item-copy">
+        <button type="button" className="item-text-button" aria-label={`Bewerk ${heading.title}`} data-testid="edit-item-text" onClick={onEdit}>
+          <strong>{heading.title}</strong>
+          {heading.subtitle && <small className="item-detail">{heading.subtitle}</small>}
+        </button>
+        {showOffer && offer && retailer && (
+          <button
+            type="button"
+            className="offer-tag-button item-offer"
+            data-no-long-press
+            aria-label={`${offer.shown === "maybe" ? "Mogelijk in de aanbieding" : offerLabel(offer.shown, retailer)}: details`}
+            title={offer.shown === "maybe" ? "Mogelijk in de aanbieding" : offerLabel(offer.shown, retailer)}
+            data-testid="offer-button"
+            onClick={() => onOffer(offer)}
+          >
+            <OfferTag shown={offer.shown} retailer={retailer} />
           </button>
-          {showOffer && offer && retailer && (
-            <button
-              type="button"
-              className="offer-tag-button item-offer"
-              data-no-long-press
-              aria-label={`${offer.shown === "maybe" ? "Mogelijk in de aanbieding" : offerLabel(offer.shown, retailer)}: details`}
-              title={offer.shown === "maybe" ? "Mogelijk in de aanbieding" : offerLabel(offer.shown, retailer)}
-              data-testid="offer-button"
-              onClick={() => onOffer(offer)}
-            >
-              <OfferTag shown={offer.shown} retailer={retailer} />
-            </button>
-          )}
-        </div>
-        {heading.subtitle && (
-          <div className="item-meta">
-            <small className="item-detail">{heading.subtitle}</small>
-          </div>
         )}
       </div>
       <div className="item-controls">

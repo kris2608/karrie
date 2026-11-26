@@ -214,9 +214,9 @@ export function HomeScreen() {
           </ol>
           <p className="home-practice-note">Thuis oefenen mag ook.</p>
           <PressButton variant="primary" size="l" wide data-testid="new-adventure" ref={newRef} onClick={() => startAdventure("first")}>
-            Kies een paar plaatjes
+            Start je eerste speurtocht
           </PressButton>
-          <PressButton variant="secondary" size="l" wide data-testid="practice-round" onClick={startPractice}>
+          <PressButton variant="quiet" size="m" wide className="home-practice" data-testid="practice-round" onClick={startPractice}>
             Oefenrondje
           </PressButton>
           <button type="button" className="text-button home-how" data-testid="open-howto" onClick={openHowTo}>
@@ -245,9 +245,6 @@ export function HomeScreen() {
             onClick={() => startAdventure("return")}
           >
             Nieuw avontuur
-          </PressButton>
-          <PressButton variant="secondary" wide data-testid="practice-round" onClick={startPractice}>
-            Oefenrondje
           </PressButton>
           {draft && !shopping && (
             <PressButton variant="secondary" wide data-testid="resume-adventure" onClick={resumeAdventure}>
