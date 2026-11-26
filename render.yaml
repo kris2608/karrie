@@ -9,6 +9,13 @@ services:
       - type: redirect
         source: /s/*
         destination: https://karrie-api.onrender.com/l/*
+      # Instagram bio. Exact paths, before the SPA rewrite. The app keeps the query in the address bar.
+      - type: redirect
+        source: /ig
+        destination: "/?utm_source=instagram&utm_medium=social&utm_campaign=bio"
+      - type: redirect
+        source: /ig/
+        destination: "/?utm_source=instagram&utm_medium=social&utm_campaign=bio"
       # Public marketing pages (static HTML) before the SPA catch-all.
       - type: rewrite
         source: /ontdek

@@ -108,6 +108,7 @@ Example links (canonical host):
 - `https://www.karrie.eu/ontdek?utm_source=chatgpt&utm_medium=paid&utm_campaign=launch_nl`
 - `https://www.karrie.eu/ontdek?utm_source=instagram&utm_medium=paid&utm_campaign=launch_nl`
 - `https://www.karrie.eu/ontdek?utm_source=creator&utm_medium=referral&utm_campaign=launch_nl`
+- `https://www.karrie.eu/ig` and `https://www.karrie.eu/ig/` redirect to `/?utm_source=instagram&utm_medium=social&utm_campaign=bio` and send `landing_view` with `page=ig`
 
 ## Delivery notes
 
