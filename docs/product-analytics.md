@@ -15,11 +15,14 @@ Anonymous funnels **cannot** reliably link activity across devices or browser pr
 
 Compare counts (same date range) for:
 
-1. `new_adventure_clicked`
-2. `shopping_list_created`
-3. `adventure_started`
-4. `adventure_first_item_found` (property `item_count`)
-5. `adventure_completed` (properties `item_count`, `completed_missions`)
+1. `first_home_viewed` (once per profile, first-time home only)
+2. `new_adventure_clicked` (`entry`: `first` | `return`, plus allowlisted UTMs when present)
+3. `shopping_list_created` / `first_list_created`
+4. `shopping_list_reviewed` (once per adventure; no list contents)
+5. `shopping_list_saved` / `first_list_saved` (explicit save only)
+6. `adventure_started`
+7. `adventure_first_item_found` (property `item_count`)
+8. `adventure_completed` (properties `item_count`, `completed_missions`)
 
 Also available: `first_adventure_started`, `first_adventure_completed` (lifetime milestones per browser profile).
 

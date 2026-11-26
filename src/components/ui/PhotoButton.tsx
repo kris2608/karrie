@@ -21,7 +21,7 @@ export function PhotoButton({ onClick }: { onClick: () => void }) {
     <motion.button
       type="button"
       className="scan-button photo-button"
-      aria-label="Foto maken"
+      aria-label="Foto of streepjescode"
       data-testid="photo-button"
       whileTap={press.whileTap}
       transition={press.transition}

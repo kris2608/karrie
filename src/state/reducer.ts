@@ -65,6 +65,12 @@ export type Settings = {
   retailer?: RetailerId;
   /** "Hoe werkt Karrie?" was shown once before a first adventure; absent in data from before it existed. */
   introSeen?: boolean;
+  /** The visitor added a product; the tap hint stays gone even if the list is cleared. */
+  addHintSeen?: boolean;
+  /** The camera was opened, or a product was added. */
+  cameraHintSeen?: boolean;
+  /** A product was collected in the scavenger hunt. */
+  shopHintSeen?: boolean;
 };
 
 /** What the server made of a typed-in product; never a brand, barcode or nutrition. */
@@ -128,6 +134,7 @@ export type Action =
   /** The parent's default for new lists; the current list keeps its own supermarket. */
   | { type: "set-default-retailer"; retailer: RetailerId | null }
   | { type: "intro-seen" }
+  | { type: "hint-seen"; hint: "add" | "camera" | "shop" }
   | { type: "set-image-choice"; itemId: string; choice: ImageChoice | undefined }
   | { type: "confirm-pack-size"; itemId: string; packageSize: string }
   | { type: "add-mine"; key: string }
@@ -627,6 +634,11 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "intro-seen":
       return state.settings.introSeen ? state : { ...state, settings: { ...state.settings, introSeen: true } };
+    case "hint-seen": {
+      const key = action.hint === "add" ? "addHintSeen" : action.hint === "camera" ? "cameraHintSeen" : "shopHintSeen";
+      if (state.settings[key]) return state;
+      return { ...state, settings: { ...state.settings, [key]: true } };
+    }
     case "confirm-pack-size":
       return updateItem(state, action.itemId, (item) => {
         const { packConflict: _cleared, ...rest } = item;

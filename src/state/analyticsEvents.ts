@@ -128,6 +128,9 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
       event: { name: "shopping_list_saved", data: { action: wasFavorite ? "updated" : "new" } },
       once: `save:${action.type}:${next.id}:${next.updatedAt}:${wasFavorite ? "u" : "n"}`,
     });
+    if (!getMilestones().firstListSavedTracked) {
+      events.push({ event: { name: "first_list_saved" }, once: `first-save:${next.id}` });
+    }
   }
 
   if (action.type === "open-saved") {
@@ -145,6 +148,7 @@ export function commitMilestoneEvents(events: Tracked[], sent: boolean[]): void 
   events.forEach((entry, index) => {
     if (!sent[index]) return;
     if (entry.event.name === "first_list_created") markMilestoneSent("firstListTracked");
+    if (entry.event.name === "first_list_saved") markMilestoneSent("firstListSavedTracked");
     if (entry.event.name === "first_adventure_started") markMilestoneSent("firstAdventureStartedTracked");
     if (entry.event.name === "first_adventure_completed") markMilestoneSent("firstAdventureCompletedTracked");
     if (entry.event.name === "adventure_started" && entry.once) ackAdventureStarted(entry.once);

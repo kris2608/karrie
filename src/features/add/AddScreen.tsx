@@ -35,6 +35,7 @@ import { badgeSpring, spring } from "../../motion/variants";
 import { catalogSync } from "../../services/catalog/sync";
 import { recognizeList } from "../../state/reducer";
 import { collectRefreshEans, runRefreshEanPacks } from "../../state/refreshEanPacks";
+import { needsIntro } from "../../domain/intro";
 import { useAdventure } from "../../state/AdventureContext";
 
 type DraftLine = {
@@ -183,7 +184,8 @@ function matches(product: Product, needle: string) {
 }
 
 export function AddScreen() {
-  const { adventure, mine, settings, dispatch } = useAdventure();
+  const state = useAdventure();
+  const { adventure, mine, settings, dispatch } = state;
   const navigate = useNavigate();
   useEffect(() => {
     markAppUsed();
@@ -230,6 +232,12 @@ export function AddScreen() {
   const offerOn = (item: AdventureItem | undefined) => (item && draft?.retailer && views.get(item.id)?.shown === "deal" ? draft.retailer : undefined);
 
   const count = adventure && adventure.phase !== "done" ? adventure.items.length : 0;
+  useEffect(() => {
+    if (count > 0 && (!settings.addHintSeen || !settings.cameraHintSeen)) {
+      if (!settings.addHintSeen) dispatch({ type: "hint-seen", hint: "add" });
+      if (!settings.cameraHintSeen) dispatch({ type: "hint-seen", hint: "camera" });
+    }
+  }, [count, settings.addHintSeen, settings.cameraHintSeen, dispatch]);
   const mineKeys = useMemo(() => new Set(mine.map(mineKey)), [mine]);
   /** A remembered product counts on its own tile, not on the catalog tile of the same type. */
   const tileOf = (item: AdventureItem) => (mineKeys.has(mineKey(item)) ? mineKey(item) : item.productId);
@@ -568,7 +576,7 @@ export function AddScreen() {
               onClick={() => setPickingStore(true)}
             >
               <TagIcon />
-              <span>{retailer ? RETAILERS.find((entry) => entry.id === retailer)?.short : "Winkel"}</span>
+              <span>{retailer ? RETAILERS.find((entry) => entry.id === retailer)?.short : "Supermarkt"}</span>
             </button>
           }
         />
@@ -589,8 +597,18 @@ export function AddScreen() {
               type="search"
             />
           </label>
-          <PhotoButton onClick={() => photo.current?.open()} />
+          <PhotoButton
+            onClick={() => {
+              dispatch({ type: "hint-seen", hint: "camera" });
+              photo.current?.open();
+            }}
+          />
         </div>
+        {needsIntro(state) && !settings.cameraHintSeen && !settings.addHintSeen && (
+          <p className="add-hint" data-testid="camera-hint">
+            Maak een foto of scan een barcode om een product toe te voegen.
+          </p>
+        )}
         <nav className="tabs" ref={tabsRef} aria-label="Categorieën">
           {CATEGORIES.map((tab) => {
             const current = !needle && active === tab.id;
@@ -609,6 +627,11 @@ export function AddScreen() {
             );
           })}
         </nav>
+        {needsIntro(state) && !settings.addHintSeen && (
+          <p className="add-hint" data-testid="tap-hint">
+            Tik op een product om het aan je lijstje toe te voegen.
+          </p>
+        )}
       </div>
 
       {/* Temporarily hidden: {!needle && <DiscoverBanner count={discovered} onStart={() => photo.current?.discover()} />} */}
@@ -672,7 +695,7 @@ export function AddScreen() {
             <rect x="5" y="3.5" width="14" height="17" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" />
             <path d="M9 9h6M9 13h6M9 17h3" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
           </svg>
-          Lijstje
+          Bekijk lijstje
           {count > 0 && (
             <motion.span key={count} className="dock-count" initial={{ scale: 1.6 }} animate={{ scale: 1 }} transition={spring}>
               {count}
@@ -687,11 +710,12 @@ export function AddScreen() {
 
       <Sheet open={pasteOpen} onClose={() => setPasteOpen(false)} label="Lijst plakken">
         <h2>Plak je lijst</h2>
+        <p className="sheet-note">Plak hier je boodschappenlijstje. Karrie herkent de producten automatisch.</p>
         <textarea
           className="paste-field"
           value={pasteText}
           onChange={(event) => setPasteText(event.target.value)}
-          placeholder="Plak hier je lijst…"
+          placeholder="Plak hier je boodschappenlijstje…"
           rows={5}
         />
         <p className="sheet-note paste-example">Bijvoorbeeld: melk · 2x brood · - 3 appels</p>
@@ -733,7 +757,8 @@ export function AddScreen() {
 
       <Sheet open={pickingStore} onClose={() => setPickingStore(false)} label="Supermarkt kiezen">
         <h2>Bij welke supermarkt?</h2>
-        <p className="sheet-note">Dan laat Karrie zien wat er op je lijstje in de aanbieding is.</p>
+        <p className="sheet-note">Kies je supermarkt en ontdek welke producten op je lijstje in de aanbieding zijn.</p>
+        <p className="sheet-note">Je kunt Karrie ook zonder supermarkt gebruiken.</p>
         <RetailerPicker
           value={retailer}
           onChange={(next) => {

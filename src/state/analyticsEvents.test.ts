@@ -59,9 +59,12 @@ function seedMilestones(patch: Partial<AnalyticsMilestones> = {}) {
     initialized: true,
     firstOpenTracked: true,
     firstListTracked: true,
+    firstListSavedTracked: true,
+    firstHomeTracked: true,
     firstAdventureStartedTracked: true,
     firstAdventureCompletedTracked: true,
     startedAdventureIds: [],
+    reviewedAdventureIds: [],
     completedAdventureIds: [],
     ...patch,
   };
@@ -168,6 +171,16 @@ describe("analytics events", () => {
       { event: { name: "adventure_first_item_found", data: { item_count: 2 } }, once: `first-found:${shopping.adventure!.id}` },
     ]);
     expect(run(firstFind.state, { type: "found" }).events.map((entry) => entry.event.name)).not.toContain("adventure_first_item_found");
+  });
+
+  it("emits first_list_saved once beside an explicit save, without the list name", () => {
+    seedMilestones({ firstListSavedTracked: false });
+    const listed = play([{ type: "add-product", product: first }]).state;
+    const saved = run(listed, { type: "save-favorite", name: "Zaterdag" });
+    expect(names(saved.events)).toEqual(["shopping_list_saved", "first_list_saved"]);
+    const sent = JSON.stringify(saved.events.map((entry) => entry.event));
+    expect(sent).not.toContain("Zaterdag");
+    expect(sent).not.toContain(first.name);
   });
 
   it("counts saving and reopening a list without product secrets", () => {

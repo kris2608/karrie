@@ -8,12 +8,14 @@ import {
   emptyMilestones,
   ensureAdventureCompleted,
   ensureAdventureStarted,
+  ensureListReviewed,
   getMilestones,
   inferPriorUse,
   localDay,
   migrateMilestones,
   resetMilestonesMemory,
   returnBucket,
+  trackFirstHomeViewed,
 } from "./analyticsMilestones";
 
 const store = new Map<string, unknown>();
@@ -97,6 +99,59 @@ describe("analytics milestones", () => {
     const milestones = await bootstrapAnalytics(base(), "2026-11-09");
     expect(milestones.firstOpenTracked).toBe(false);
     expect(localDay().length).toBe(10);
+  });
+});
+
+describe("first-home and review milestones", () => {
+  const track = vi.fn();
+  beforeEach(() => {
+    store.clear();
+    resetTracking();
+    resetMilestonesMemory();
+    track.mockReset();
+    vi.stubGlobal("window", { umami: { track } });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetMilestonesMemory();
+    store.clear();
+  });
+
+  it("records the first home once", async () => {
+    await bootstrapAnalytics(base(), "2026-11-09");
+    track.mockClear();
+    trackFirstHomeViewed();
+    trackFirstHomeViewed();
+    expect(track.mock.calls.map(([name]) => name)).toEqual(["first_home_viewed"]);
+    expect(getMilestones().firstHomeTracked).toBe(true);
+  });
+
+  it("records a reviewed list once per adventure and without contents", async () => {
+    await bootstrapAnalytics(base(), "2026-11-09");
+    track.mockClear();
+    ensureListReviewed("adv-1");
+    ensureListReviewed("adv-1");
+    expect(track.mock.calls).toEqual([["shopping_list_reviewed"]]);
+    expect(getMilestones().reviewedAdventureIds).toEqual(["adv-1"]);
+  });
+
+  it("does not call an existing favorite the first save", async () => {
+    const stored = {
+      ...emptyMilestones(),
+      initialized: true,
+      firstOpenTracked: true,
+      firstListTracked: true,
+      firstAdventureStartedTracked: true,
+      firstAdventureCompletedTracked: true,
+    };
+    delete stored.firstListSavedTracked;
+    store.set("analyticsMilestones", stored);
+    await bootstrapAnalytics(
+      base({ saved: [{ id: "1", name: "Zaterdag", items: [], favorite: true, updatedAt: 1 }] }),
+      "2026-11-09",
+    );
+    expect(getMilestones().firstListSavedTracked).toBe(true);
+    expect(track.mock.calls.map(([name]) => name)).not.toContain("first_list_saved");
   });
 });
 

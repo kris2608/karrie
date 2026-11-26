@@ -18,6 +18,7 @@ import { listName } from "../../state/reducer";
 import { summaryText } from "../../domain/offers";
 import { analyticsRetailer } from "../../domain/retailers";
 import { trackEvent } from "../../services/analytics";
+import { ensureListReviewed } from "../../services/analyticsMilestones";
 import { offerQueries, offers, useOfferViews, type OfferView } from "../../storage/offers";
 import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { Attribution, OfferTag, offerLabel, TagIcon } from "../offers/OfferTag";
@@ -36,7 +37,7 @@ import { useHealthierPreflight } from "./useHealthierPreflight";
 const NO_ITEMS: AdventureItem[] = [];
 
 export function ReviewScreen() {
-  const { adventure, saved, settings, dispatch } = useAdventure();
+  const { adventure, saved, stickers = [], completedAdventures = [], settings, dispatch } = useAdventure();
   const navigate = useNavigate();
   const location = useLocation();
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
@@ -54,6 +55,11 @@ export function ReviewScreen() {
   useEffect(() => {
     markAppUsed();
   }, []);
+
+  useEffect(() => {
+    if (!adventure || adventure.items.length === 0) return;
+    ensureListReviewed(adventure.id);
+  }, [adventure]);
 
   useEffect(() => {
     if ((location.state as { editItem?: string } | null)?.editItem) navigate(".", { replace: true, state: null });
@@ -157,6 +163,11 @@ export function ReviewScreen() {
           </Link>
         }
       />
+      {adventure.phase === "draft" && saved.length === 0 && stickers.length === 0 && completedAdventures.length === 0 && hasOpen && (
+        <p className="review-context" data-testid="review-context">
+          Nog thuis? Bewaar jullie lijstje. In de supermarkt? Start de speurtocht!
+        </p>
+      )}
       {adventure.store && (
         <p className="list-name" data-testid="list-store">
           {adventure.store}
@@ -169,6 +180,7 @@ export function ReviewScreen() {
             {hasOpen && (
               <button type="button" className="share-icon-button" data-testid="share-list-review" aria-label="Deel lijstje" onClick={() => setSharing(true)}>
                 <ShareIcon />
+                <span>Delen</span>
               </button>
             )}
           </div>
@@ -185,6 +197,7 @@ export function ReviewScreen() {
         <div className="offer-bar-row review-share-only">
           <button type="button" className="share-icon-button" data-testid="share-list-review" aria-label="Deel lijstje" onClick={() => setSharing(true)}>
             <ShareIcon />
+            <span>Delen</span>
           </button>
         </div>
       )}
@@ -230,11 +243,11 @@ export function ReviewScreen() {
       <div className="dock dock-fixed dock-review">
         {adventure.phase === "draft" && (
           <PressButton variant="quiet" size="l" data-testid="save-later" disabled={!hasOpen} onClick={() => setSaving(true)}>
-            Bewaar
+            Bewaar lijstje
           </PressButton>
         )}
         <PressButton variant="primary" size="l" data-testid="start" disabled={!hasOpen} onClick={start}>
-          {adventure.phase === "shopping" ? "Verder winkelen" : "Start avontuur"}
+          {adventure.phase === "shopping" ? "Verder speuren" : "Start speurtocht"}
         </PressButton>
       </div>
 

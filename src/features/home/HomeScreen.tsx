@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ItemArt } from "../../components/ItemArt";
 import { Karrie } from "../../components/mascot/Karrie";
 import { HomeScene } from "../../components/scenery/HomeScene";
 import { StickerBadge } from "../../components/StickerBadge";
@@ -20,6 +21,7 @@ import { needsIntro } from "../../domain/intro";
 import { feedbackUrl } from "../../domain/feedback";
 import { shareKarrie } from "../../domain/share";
 import { trackEvent } from "../../services/analytics";
+import { trackFirstHomeViewed } from "../../services/analyticsMilestones";
 import { attributionEventData } from "../../services/campaignAttribution";
 import { InstallCard } from "../install/InstallCard";
 import { ListsSheet } from "../lists/ListsSheet";
@@ -83,31 +85,26 @@ export function HomeScreen() {
     if (introOpen) introHeadingRef.current?.focus();
   }, [introOpen]);
 
-  function startAdventure() {
+  const firstHome = needsIntro(state);
+
+  useEffect(() => {
+    if (firstHome) trackFirstHomeViewed();
+  }, [firstHome]);
+
+  function startAdventure(entry: "first" | "return") {
+    const campaign = attributionEventData();
+    trackEvent({ name: "new_adventure_clicked", data: { entry, ...campaign } });
     dispatch({ type: "new-draft" });
     navigate("/toevoegen");
   }
 
-  function clickNewAdventure() {
-    const campaign = attributionEventData();
-    trackEvent(campaign ? { name: "new_adventure_clicked", data: campaign } : { name: "new_adventure_clicked" });
-    if (needsIntro(state)) {
-      trackEvent({ name: "onboarding_opened" }, "onboarding-open");
-      setIntroOpen(true);
-      return;
-    }
-    startAdventure();
-  }
-
-  function finishIntro(action: "start" | "skip") {
-    trackEvent({ name: "onboarding_finished", data: { action } }, "onboarding-finished");
-    dispatch({ type: "intro-seen" });
-    startAdventure();
+  function openHowTo() {
+    trackEvent({ name: "onboarding_opened" }, "onboarding-open");
+    setIntroOpen(true);
   }
 
   function dismissIntro() {
     trackEvent({ name: "onboarding_finished", data: { action: "dismiss" } }, "onboarding-finished");
-    dispatch({ type: "intro-seen" });
     setIntroOpen(false);
     newRef.current?.focus();
   }
@@ -125,13 +122,23 @@ export function HomeScreen() {
   const shopping = adventure?.phase === "shopping";
   const draft = adventure?.phase === "draft" && adventure.items.length > 0;
 
+  function resumeAdventure() {
+    if (!adventure) return;
+    trackEvent(
+      { name: "adventure_resumed", data: { phase: shopping ? "shopping" : "draft" } },
+      `resume:${adventure.id}:${shopping ? "shopping" : "draft"}`,
+    );
+    navigate(shopping ? "/winkel" : "/controleren");
+  }
+
   return (
-    <main className="screen home">
+    <main className={firstHome ? "screen home home-first" : "screen home"}>
       <HomeScene />
       <button type="button" className="lists-button" data-testid="open-lists-home" aria-label="Lijstjes" onClick={() => setListsOpen(true)}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 7h14M5 12h14M5 17h10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
         </svg>
+        <span>Lijstjes</span>
       </button>
       <button type="button" className="parent-button" aria-label="Instellingen voor ouders" onClick={() => setParentOpen(true)}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -155,50 +162,78 @@ export function HomeScreen() {
           transition={{ ...softSpring, delay: 0.35 }}
         >
           <h1>Karrie</h1>
-          <p>Speur, vind en vink af!</p>
+          {!firstHome && <p>Speur, vind en vink af!</p>}
         </motion.div>
       </section>
 
-      <motion.div
-        className="home-actions"
-        initial={{ y: 24, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ ...softSpring, delay: 0.55 }}
-      >
-        <PressButton
-          variant="primary"
-          size="l"
-          wide
-          data-testid="new-adventure"
-          ref={newRef}
-          onClick={clickNewAdventure}
+      {firstHome ? (
+        <motion.div
+          className="home-actions home-first-copy"
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ ...softSpring, delay: 0.55 }}
         >
-          Nieuw avontuur
-        </PressButton>
-        {needsIntro(state) && (
-          <p className="home-teaser" data-testid="home-teaser">
-            <strong>Boodschappen doen wordt een spelletje!</strong>
-            Maak samen een lijstje. In de winkel speurt je kind naar de producten en verdient sterren en stickers.
+          <p className="home-value" data-testid="home-value">
+            Een boodschappenlijstje voor jou. Een speurtocht voor je kind.
           </p>
-        )}
-        {(shopping || draft) && adventure && (
-          <PressButton
-            variant="secondary"
-            wide
-            data-testid="resume-adventure"
-            onClick={() => {
-              trackEvent(
-                { name: "adventure_resumed", data: { phase: shopping ? "shopping" : "draft" } },
-                `resume:${adventure.id}:${shopping ? "shopping" : "draft"}`,
-              );
-              navigate(shopping ? "/winkel" : "/controleren");
-            }}
-          >
-            {shopping ? "Verder speuren" : "Verder met lijstje"}
+          <ol className="home-steps">
+            <li>
+              <span className="home-step-art" aria-hidden="true">
+                <ItemArt item={{ icon: "banaan", name: "Banaan" }} />
+              </span>
+              Maak een lijstje
+            </li>
+            <li>
+              <span className="home-step-art" aria-hidden="true">
+                <Karrie mood="searching" className="home-step-karrie" />
+              </span>
+              Speur in de winkel
+            </li>
+            <li>
+              <span className="home-step-art" aria-hidden="true">
+                <StickerBadge id="appel" />
+              </span>
+              Verdien stickers
+            </li>
+          </ol>
+          <PressButton variant="primary" size="l" wide data-testid="new-adventure" ref={newRef} onClick={() => startAdventure("first")}>
+            Maak je eerste lijstje
           </PressButton>
-        )}
-        <InstallCard />
-      </motion.div>
+          <button type="button" className="text-button home-how" data-testid="open-howto" onClick={openHowTo}>
+            Hoe werkt Karrie?
+          </button>
+          <p className="home-trust">Gratis · Geen account nodig</p>
+        </motion.div>
+      ) : (
+        <motion.div
+          className="home-actions"
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ ...softSpring, delay: 0.55 }}
+        >
+          {shopping ? (
+            <PressButton variant="primary" size="l" wide data-testid="resume-adventure" onClick={resumeAdventure}>
+              Verder speuren
+            </PressButton>
+          ) : null}
+          <PressButton
+            variant={shopping ? "secondary" : "primary"}
+            size={shopping ? "m" : "l"}
+            wide
+            data-testid="new-adventure"
+            ref={newRef}
+            onClick={() => startAdventure("return")}
+          >
+            Nieuw avontuur
+          </PressButton>
+          {draft && !shopping && (
+            <PressButton variant="secondary" wide data-testid="resume-adventure" onClick={resumeAdventure}>
+              Verder met lijstje
+            </PressButton>
+          )}
+          <InstallCard />
+        </motion.div>
+      )}
 
       {preview.count > 0 && (
         <motion.button
@@ -250,7 +285,18 @@ export function HomeScreen() {
       <Toast notice={undo.notice} onDismiss={undo.dismiss} />
 
       <Sheet open={introOpen} onClose={dismissIntro} label="Hoe werkt Karrie?">
-        <HowKarrieWorks headingRef={introHeadingRef} onStart={() => finishIntro("start")} onSkip={() => finishIntro("skip")} />
+        <HowKarrieWorks
+          headingRef={introHeadingRef}
+          onStart={
+            firstHome
+              ? () => {
+                  trackEvent({ name: "onboarding_finished", data: { action: "start" } }, "onboarding-finished");
+                  setIntroOpen(false);
+                  startAdventure("first");
+                }
+              : undefined
+          }
+        />
       </Sheet>
 
       <Sheet open={stickersOpen} onClose={closeStickers} label="Stickerboek">

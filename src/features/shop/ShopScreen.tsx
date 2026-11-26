@@ -35,7 +35,7 @@ const MISSION_DELAY_MS = 900;
 const INTRO_MS = 2200;
 
 export function ShopScreen() {
-  const { adventure, settings, dispatch } = useAdventure();
+  const { adventure, settings, stickers = [], completedAdventures = [], dispatch } = useAdventure();
   const navigate = useNavigate();
   const reduced = useReducedMotion() ?? false;
   const [listOpen, setListOpen] = useState(false);
@@ -101,10 +101,18 @@ export function ShopScreen() {
     playColorLabel: play?.kind === "color" ? play.colorLabel : undefined,
   });
 
+  const firstHunt = !settings.shopHintSeen && stickers.length === 0 && completedAdventures.length === 0 && foundCount(adventure?.items ?? []) === 0;
+
   useEffect(() => {
-    if (intro || settings.voiceOptInSeen) return;
+    if (settings.shopHintSeen || !adventure || adventure.phase !== "shopping") return;
+    if (foundCount(adventure.items) > 0) dispatch({ type: "hint-seen", hint: "shop" });
+  }, [adventure, settings.shopHintSeen, dispatch]);
+
+  useEffect(() => {
+    if (intro || settings.voiceOptInSeen || voicePromptOpen) return;
+    if (firstHunt || sequence.locked) return;
     setVoicePromptOpen(true);
-  }, [intro, settings.voiceOptInSeen]);
+  }, [intro, settings.voiceOptInSeen, voicePromptOpen, firstHunt, sequence.locked]);
   const guessDistractor =
     showGuess && current && play?.distractorItemId
       ? adventure?.items.find((entry) => entry.id === play.distractorItemId)
@@ -322,9 +330,11 @@ export function ShopScreen() {
                         ? "color"
                         : dragPlay
                           ? "drag"
-                          : "search"
+                          : firstHunt
+                            ? "coach"
+                            : "search"
               }
-              className="speech"
+              className={firstHunt && current && !showMission && !searching && !colorPlay && !dragPlay ? "speech is-hint" : "speech"}
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
@@ -340,7 +350,9 @@ export function ShopScreen() {
                       ? `Zoek iets ${play?.colorLabel ?? "kleurigs"}!`
                       : dragPlay
                         ? "Sleep naar Karrie!"
-                        : "Zoek dit product!"}
+                        : firstHunt
+                          ? "Kun jij dit vinden? Tik op Gevonden als het in jullie mandje ligt!"
+                          : "Zoek dit product!"}
             </motion.p>
           )}
         </AnimatePresence>

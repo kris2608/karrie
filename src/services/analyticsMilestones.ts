@@ -17,10 +17,14 @@ export type AnalyticsMilestones = {
   initialized: boolean;
   firstOpenTracked: boolean;
   firstListTracked: boolean;
+  firstListSavedTracked: boolean;
+  firstHomeTracked: boolean;
   firstAdventureStartedTracked: boolean;
   firstAdventureCompletedTracked: boolean;
   /** Adventure ids whose `adventure_started` was accepted (or catch-up succeeded). */
   startedAdventureIds: string[];
+  /** Adventure ids whose review screen was reported. */
+  reviewedAdventureIds: string[];
   /** Adventure ids whose `adventure_completed` was accepted (or catch-up succeeded). */
   completedAdventureIds: string[];
   lastOpenDay?: string;
@@ -32,9 +36,12 @@ export const emptyMilestones = (): AnalyticsMilestones => ({
   initialized: false,
   firstOpenTracked: false,
   firstListTracked: false,
+  firstListSavedTracked: false,
+  firstHomeTracked: false,
   firstAdventureStartedTracked: false,
   firstAdventureCompletedTracked: false,
   startedAdventureIds: [],
+  reviewedAdventureIds: [],
   completedAdventureIds: [],
 });
 
@@ -101,10 +108,13 @@ export function migrateMilestones(data: Persisted, today: string = localDay()): 
     initialized: true,
     firstOpenTracked: true,
     firstListTracked: listed,
+    firstListSavedTracked: data.saved.some((list) => list.favorite),
+    firstHomeTracked: false,
     firstAdventureStartedTracked: Boolean(started),
     firstAdventureCompletedTracked: completed,
     // Leave empty so screen catch-up can still send adventure_started / adventure_completed once.
     startedAdventureIds: [],
+    reviewedAdventureIds: [],
     completedAdventureIds: [],
     lastOpenDay: today,
   };
@@ -119,9 +129,12 @@ function clean(raw: unknown): AnalyticsMilestones | null {
     initialized: value.initialized,
     firstOpenTracked: value.firstOpenTracked === true,
     firstListTracked: value.firstListTracked === true,
+    firstListSavedTracked: value.firstListSavedTracked === true,
+    firstHomeTracked: value.firstHomeTracked === true,
     firstAdventureStartedTracked: value.firstAdventureStartedTracked === true,
     firstAdventureCompletedTracked: value.firstAdventureCompletedTracked === true,
     startedAdventureIds: idList(value.startedAdventureIds),
+    reviewedAdventureIds: idList(value.reviewedAdventureIds),
     completedAdventureIds: idList(value.completedAdventureIds),
     ...(typeof value.lastOpenDay === "string" && { lastOpenDay: value.lastOpenDay }),
     ...(typeof value.lastReturnTrackedDay === "string" && { lastReturnTrackedDay: value.lastReturnTrackedDay }),
@@ -179,13 +192,40 @@ function catchUpFirsts(data: Persisted, milestones: AnalyticsMilestones): Analyt
  * After hydrate: migrate existing installs without backfilling Umami, emit first-open or return once.
  * Guarded so React StrictMode does not double-fire in one page load.
  */
+function hasOwn(raw: unknown, key: string): boolean {
+  return Boolean(raw && typeof raw === "object" && key in raw);
+}
+
+/** Once per profile, when the first-time home is actually shown. */
+export function trackFirstHomeViewed(): void {
+  const current = getMilestones();
+  if (!current.initialized || current.firstHomeTracked) return;
+  if (!trackEvent({ name: "first_home_viewed" })) return;
+  setMilestones({ ...current, firstHomeTracked: true });
+}
+
+/** Once per adventure, when the review screen shows a list. No list contents. */
+export function ensureListReviewed(id: string): void {
+  const current = getMilestones();
+  if (!current.initialized || current.reviewedAdventureIds.includes(id)) return;
+  const once = `review:${id}`;
+  const accepted = trackEvent({ name: "shopping_list_reviewed" }, once);
+  if (!accepted && !hasTracked("shopping_list_reviewed", once)) return;
+  const latest = getMilestones();
+  setMilestones({ ...latest, reviewedAdventureIds: pushId(latest.reviewedAdventureIds, id) });
+}
+
 export async function bootstrapAnalytics(data: Persisted, today: string = localDay()): Promise<AnalyticsMilestones> {
   if (bootstrapped && memory) return memory;
   bootstrapped = true;
 
-  let milestones = clean(await readKv(KEY)) ?? emptyMilestones();
+  const raw = await readKv(KEY);
+  let milestones = clean(raw) ?? emptyMilestones();
   const wasUninitialized = !milestones.initialized;
   if (wasUninitialized) milestones = migrateMilestones(data, today);
+  else if (!hasOwn(raw, "firstListSavedTracked") && data.saved.some((list) => list.favorite)) {
+    milestones = { ...milestones, firstListSavedTracked: true };
+  }
 
   if (!milestones.firstOpenTracked) {
     if (trackEvent({ name: "app_first_open" })) {
@@ -209,7 +249,9 @@ export async function bootstrapAnalytics(data: Persisted, today: string = localD
 }
 
 /** Persist a lifetime first-* flag after that event was successfully sent to Umami. */
-export function markMilestoneSent(flag: "firstListTracked" | "firstAdventureStartedTracked" | "firstAdventureCompletedTracked"): void {
+export function markMilestoneSent(
+  flag: "firstListTracked" | "firstListSavedTracked" | "firstAdventureStartedTracked" | "firstAdventureCompletedTracked",
+): void {
   const current = getMilestones();
   if (!current.initialized || current[flag]) return;
   setMilestones({ ...current, [flag]: true });

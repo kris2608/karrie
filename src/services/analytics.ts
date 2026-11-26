@@ -47,7 +47,13 @@ export type AnalyticsEvent =
   | { name: "bonus_play_completed"; data: { kind: "guess" | "color" | "drag" } }
   | { name: "offer_opened"; data: { retailer: "jumbo" | "ah" | "lidl"; match_type: "exact" | "likely" } }
   | { name: "app_first_open" }
-  | { name: "new_adventure_clicked"; data?: { utm_source?: string; utm_medium?: string; utm_campaign?: string } }
+  | { name: "first_home_viewed" }
+  | { name: "shopping_list_reviewed" }
+  | { name: "first_list_saved" }
+  | {
+      name: "new_adventure_clicked";
+      data?: { entry?: "first" | "return"; utm_source?: string; utm_medium?: string; utm_campaign?: string };
+    }
   | {
       name: "landing_view";
       data: { page: string; utm_source?: string; utm_medium?: string; utm_campaign?: string };

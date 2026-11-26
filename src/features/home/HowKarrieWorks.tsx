@@ -15,21 +15,20 @@ const LIST_ART = [
 
 type HowKarrieWorksProps = {
   headingRef: Ref<HTMLHeadingElement>;
-  /** Given only before a first adventure: shows "Aan de slag!" and "Overslaan". */
+  /** First-time home only: an explicit button that starts a list. Closing the sheet does not. */
   onStart?: () => void;
-  onSkip?: () => void;
 };
 
-export function HowKarrieWorks({ headingRef, onStart, onSkip }: HowKarrieWorksProps) {
+export function HowKarrieWorks({ headingRef, onStart }: HowKarrieWorksProps) {
   return (
     <article className="howto" data-testid="how-karrie-works">
       <header className="howto-intro">
         <Karrie mood="idle" className="howto-mascot" />
         <div>
           <h2 ref={headingRef} tabIndex={-1}>
-            Hoe werkt Karrie? 🛒
+            Hoe werkt Karrie?
           </h2>
-          <p>Met Karrie wordt boodschappen doen een avontuur voor kleine speurneuzen! Maak samen een lijstje, zoek de producten in de winkel en verdien sterren.</p>
+          <p>Een boodschappenlijstje voor jou. Een speurtocht voor je kind.</p>
         </div>
       </header>
 
@@ -37,8 +36,7 @@ export function HowKarrieWorks({ headingRef, onStart, onSkip }: HowKarrieWorksPr
         <h3>
           <span aria-hidden="true">📝</span> 1. Maak samen een lijstje
         </h3>
-        <p>Kies wat jullie nodig hebben. Tik op producten, zoek op naam of gebruik de camera om een verpakking te herkennen. Ook een streepjescode scannen kan!</p>
-        <p className="howto-small">Je kind mag meekiezen en producten herkennen; de camera bedien je samen.</p>
+        <p>Kies, zoek, fotografeer of scan de boodschappen die jullie nodig hebben.</p>
         <div className="howto-art" aria-hidden="true">
           {LIST_ART.map((item) => (
             <span key={item.icon} className="howto-tile">
@@ -53,9 +51,33 @@ export function HowKarrieWorks({ headingRef, onStart, onSkip }: HowKarrieWorksPr
 
       <section className="howto-step">
         <h3>
-          <span aria-hidden="true">🏷️</span> 2. Kies je supermarkt
+          <span aria-hidden="true">🔍</span> 2. Ga op speurtocht
         </h3>
-        <p>Kies waar jullie boodschappen gaan doen. Karrie laat bij producten op jullie lijstje zien of er een passende aanbieding is.</p>
+        <p>Karrie laat één voor één zien welke boodschappen je kind mag zoeken.</p>
+        <div className="howto-art" aria-hidden="true">
+          <span className="howto-found">Gevonden!</span>
+        </div>
+      </section>
+
+      <section className="howto-step">
+        <h3>
+          <span aria-hidden="true">⭐</span> 3. Verdien sterren en stickers
+        </h3>
+        <p>Elk gevonden product levert een ster op. Verzamel stickers met jullie avonturen!</p>
+        <div className="howto-art" aria-hidden="true">
+          <StarIcon className="howto-star" />
+          <span className="sticker-slot">
+            <StickerBadge id="appel" />
+          </span>
+          <span className="sticker-slot">
+            <StickerBadge id="kar" />
+          </span>
+        </div>
+      </section>
+
+      <section className="howto-good">
+        <h3>Supermarkt en aanbiedingen</h3>
+        <p>Kies je supermarkt en ontdek welke producten op je lijstje in de aanbieding zijn. Je kunt Karrie ook zonder supermarkt gebruiken.</p>
         <div className="howto-art howto-stores">
           <span className="sr-only">Je kiest uit {RETAILERS.map((retailer) => retailer.name).join(", ").replace(/, ([^,]*)$/, " of $1")}.</span>
           {RETAILERS.map((retailer) => (
@@ -69,58 +91,22 @@ export function HowKarrieWorks({ headingRef, onStart, onSkip }: HowKarrieWorksPr
           </span>
         </div>
         <p className="howto-small">Niet ieder product heeft een aanbieding. Controleer de prijs en voorwaarden altijd even in de winkel.</p>
-        <p className="howto-small">
-          Kiezen hoeft niet. Je kunt de supermarkt wijzigen bij Toevoegen, Controleren of in de instellingen. Aanbiedingen zie je op het lijstje en
-          tijdens de speurtocht, als klein label bij het product.
-        </p>
         <Attribution />
-      </section>
-
-      <section className="howto-step">
-        <h3>
-          <span aria-hidden="true">🔍</span> 3. Ga samen op speurtocht
-        </h3>
-        <p>In de winkel laat Karrie zien wat jullie zoeken. Gevonden? Tik op 'Gevonden!' en het product gaat in Karrie's mandje.</p>
-        <div className="howto-art" aria-hidden="true">
-          <span className="howto-found">Gevonden!</span>
-        </div>
-        <p className="howto-small">Soms heeft Karrie een extra speurmissie! Die is altijd vrijblijvend: met 'Nu niet' gaan jullie gewoon verder.</p>
-        <p className="howto-small">Een bonusmissie stelt soms een vergelijkbaar product voor. Kijk samen op het etiket; jullie kiezen zelf.</p>
-      </section>
-
-      <section className="howto-step">
-        <h3>
-          <span aria-hidden="true">⭐</span> 4. Verzamel sterren en stickers
-        </h3>
-        <p>Voor ieder gevonden product verdient je kind een ster. Is alles gevonden? Dan vieren jullie het avontuur en kunnen jullie stickers verzamelen!</p>
-        <div className="howto-art" aria-hidden="true">
-          <StarIcon className="howto-star" />
-          <span className="sticker-slot">
-            <StickerBadge id="appel" />
-          </span>
-          <span className="sticker-slot">
-            <StickerBadge id="kar" />
-          </span>
-        </div>
-        <p className="howto-small">Bewaar een lijstje en gebruik het later opnieuw.</p>
       </section>
 
       <section className="howto-good">
         <h3>Goed om te weten</h3>
         <ul>
           <li>Je kunt je lijstjes bewaren en opnieuw gebruiken.</li>
-          <li>Een account is niet nodig.</li>
-          <li>Extra missies zijn altijd vrijblijvend.</li>
+          <li>Karrie is gratis en een account is niet nodig.</li>
+          <li>Extra missies zijn altijd vrijblijvend. Met ‘Nu niet’ gaan jullie gewoon verder.</li>
         </ul>
       </section>
 
       {onStart && (
         <div className="howto-actions">
           <PressButton variant="primary" size="l" wide data-testid="intro-start" onClick={onStart}>
-            Aan de slag!
-          </PressButton>
-          <PressButton variant="quiet" size="s" wide data-testid="intro-skip" onClick={onSkip ?? onStart}>
-            Overslaan
+            Maak je eerste lijstje
           </PressButton>
         </div>
       )}
