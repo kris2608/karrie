@@ -236,6 +236,8 @@ export type Adventure = {
   cheered?: number[];
   /** The parent wiped this list's saved copy, so it is only saved again on an explicit Bewaren. */
   forgotten?: boolean;
+  /** Started from Oefenrondje: three pictures, no list to build. */
+  practice?: boolean;
 };
 
 export type SavedItem = PackInfo & {

@@ -99,7 +99,7 @@ Pageviews still strip query strings (`data-exclude-search`). Campaign attributio
 1. `landing_view` — marketing page open (`page`, optional `utm_source` / `utm_medium` / `utm_campaign`)
 2. `landing_cta_clicked` — CTA on a marketing page (`page`, `placement`, optional UTMs)
 3. `new_adventure_clicked` — may include the same UTM fields when captured earlier in the tab session
-4. `adventure_started` — may include the same UTM fields
+4. `adventure_started` — may include the same UTM fields. An Oefenrondje also sends `mode: practice`. A list the parent built does not send `mode`.
 
 Only `utm_source`, `utm_medium` and `utm_campaign` are stored (sessionStorage, max ~7 days) and never arbitrary query params, list tokens or shopping contents.
 

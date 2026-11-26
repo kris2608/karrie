@@ -30,6 +30,7 @@ import { PhotoFlow, type PhotoFlowHandle } from "../photo/PhotoFlow";
 import { ShareIcon } from "../../components/ui/ShareIcon";
 import { roundWarmupPhrases } from "../shop/useShopVoice";
 import { ShareListSheet } from "../share/ShareListSheet";
+import { VoiceOptInSheet } from "../shop/VoiceOptInSheet";
 import { ItemSheet } from "./ItemSheet";
 import { SaveListSheet } from "./SaveListSheet";
 import { useHealthierPreflight } from "./useHealthierPreflight";
@@ -43,6 +44,7 @@ export function ReviewScreen() {
   const [editId, setEditId] = useState<string | null>(() => (location.state as { editItem?: string } | null)?.editItem ?? null);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [voiceAsk, setVoiceAsk] = useState(false);
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const photo = useRef<PhotoFlowHandle>(null);
   const { notice, show, dismiss } = useNotice();
@@ -109,10 +111,19 @@ export function ReviewScreen() {
 
   function start() {
     if (!adventure) return;
+    if (!settings.voiceOptInSeen) {
+      setVoiceAsk(true);
+      return;
+    }
+    beginHunt();
+  }
+
+  function beginHunt(voiceEnabled = settings.voiceEnabled) {
+    if (!adventure) return;
     const fresh = adventure.phase !== "shopping";
     // User gesture unlocks Web Audio / HTMLAudio for voice guidance on iOS.
     unlockAudio();
-    if (settings.voiceEnabled) {
+    if (voiceEnabled) {
       voiceController.setEnabled(true);
       // Warm first product clips during navigation / intro so speech is ready on arrival.
       // Current + next product only — max 1 background generate via scheduler.
@@ -165,7 +176,7 @@ export function ReviewScreen() {
       />
       {adventure.phase === "draft" && saved.length === 0 && stickers.length === 0 && completedAdventures.length === 0 && hasOpen && (
         <p className="review-context" data-testid="review-context">
-          Nog thuis? Bewaar jullie lijstje. In de supermarkt? Start de speurtocht!
+          Klaar om te zoeken? Thuis oefenen mag ook.
         </p>
       )}
       {adventure.store && (
@@ -284,6 +295,14 @@ export function ReviewScreen() {
         onSaveAsNew={saveAsNew}
       />
       <ShareListSheet open={sharing} source={adventure} onClose={() => setSharing(false)} />
+      <VoiceOptInSheet
+        open={voiceAsk}
+        onAnswer={(enabled) => {
+          dispatch({ type: "set-voice", enabled });
+          setVoiceAsk(false);
+          beginHunt(enabled);
+        }}
+      />
       <PhotoFlow ref={photo} items={adventure.items} onDone={show} />
       <Toast notice={notice} onDismiss={dismiss} />
     </main>

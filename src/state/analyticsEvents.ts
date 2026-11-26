@@ -63,10 +63,11 @@ export function analyticsEvents(action: Action, before: AppState, after: AppStat
     for (const item of added) events.push({ event: { name: "product_added", data: { method, category: item.category } } });
   }
 
-  if (action.type === "start-shopping" && previous?.phase !== "shopping" && next.phase === "shopping") {
+  if ((action.type === "start-shopping" || action.type === "start-practice") && previous?.phase !== "shopping" && next.phase === "shopping") {
     const campaign = attributionEventData();
+    const practice = action.type === "start-practice" || next.practice === true;
     events.push({
-      event: { name: "adventure_started", data: { item_count: next.items.length, ...campaign } },
+      event: { name: "adventure_started", data: { item_count: next.items.length, ...(practice ? { mode: "practice" as const } : {}), ...campaign } },
       once: next.id,
     });
     if (!getMilestones().firstAdventureStartedTracked) {

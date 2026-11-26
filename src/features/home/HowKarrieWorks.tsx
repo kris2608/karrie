@@ -22,6 +22,7 @@ type HowKarrieWorksProps = {
 export function HowKarrieWorks({ headingRef, onStart }: HowKarrieWorksProps) {
   return (
     <article className="howto" data-testid="how-karrie-works">
+      <div className="howto-body">
       <header className="howto-intro">
         <Karrie mood="idle" className="howto-mascot" />
         <div>
@@ -103,10 +104,11 @@ export function HowKarrieWorks({ headingRef, onStart }: HowKarrieWorksProps) {
         </ul>
       </section>
 
+      </div>
       {onStart && (
         <div className="howto-actions">
           <PressButton variant="primary" size="l" wide data-testid="intro-start" onClick={onStart}>
-            Maak je eerste lijstje
+            Kies een paar plaatjes
           </PressButton>
         </div>
       )}

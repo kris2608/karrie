@@ -37,7 +37,7 @@ export type AnalyticsEvent =
   | { name: "photo_recognition_outcome"; data: { outcome: PhotoRecognitionOutcome; candidate_count: number; latency_bucket: LatencyBucket } }
   | { name: "recognition_chooser"; data: { action: RecognitionChooserAction; candidate_count: number } }
   | { name: "barcode_lookup_result"; data: { source: BarcodeLookupSource; outcome: BarcodeLookupOutcome } }
-  | { name: "adventure_started"; data: { item_count: number; utm_source?: string; utm_medium?: string; utm_campaign?: string } }
+  | { name: "adventure_started"; data: { item_count: number; mode?: "practice"; utm_source?: string; utm_medium?: string; utm_campaign?: string } }
   | { name: "adventure_first_item_found"; data: { item_count: number } }
   | { name: "adventure_resumed"; data: { phase: "draft" | "shopping" } }
   | { name: "adventure_completed"; data: { item_count: number; completed_missions: number } }

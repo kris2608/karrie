@@ -19,6 +19,9 @@ import type {
 import { productById } from "./catalog";
 
 export const SAMPLE_IDS = ["appel", "banaan", "brood", "melk"] as const;
+/** Three pictures a toddler already knows. The practice round starts the hunt with these. */
+export const PRACTICE_IDS = ["banaan", "brood", "melk"] as const;
+export const PRACTICE_LIST_NAME = "Oefenrondje";
 
 const PACK_KEYS = [
   "ean",
@@ -187,4 +190,13 @@ export function sampleProducts(): Product[] {
 
 export function createSampleAdventure(order: CategoryId[] = DEFAULT_CATEGORY_ORDER): Adventure {
   return createAdventure("Voorbeeldlijst", sampleProducts(), order, "shopping");
+}
+
+export function createPracticeAdventure(order: CategoryId[] = DEFAULT_CATEGORY_ORDER): Adventure {
+  const products = PRACTICE_IDS.map((id) => {
+    const product = productById(id);
+    if (!product) throw new Error(`Oefenproduct ontbreekt: ${id}`);
+    return product;
+  });
+  return { ...createAdventure(PRACTICE_LIST_NAME, products, order, "shopping"), practice: true };
 }

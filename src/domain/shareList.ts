@@ -120,7 +120,7 @@ export function toSharedList(source: ShareListSource): ToSharedListResult {
     status: "ok",
     list: {
       version: SHARE_LIST_VERSION,
-      ...(name && name !== "Boodschappenlijst" && name !== "Voorbeeldlijst" && { name }),
+      ...(name && name !== "Boodschappenlijst" && name !== "Voorbeeldlijst" && name !== "Oefenrondje" && { name }),
       ...(retailer && { retailer }),
       items,
     },

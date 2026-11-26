@@ -74,6 +74,18 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
           >
             <div className="sheet-handle" onPointerDown={startDismissDrag}>
               <span className="sheet-grip" aria-hidden="true" />
+              <button
+                type="button"
+                className="sheet-close"
+                aria-label="Sluiten"
+                data-testid="sheet-close"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={onClose}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
             <div className="sheet-body" onPointerDown={startBodyDrag} onFocusCapture={keepFieldVisible}>
               {children}

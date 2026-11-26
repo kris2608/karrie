@@ -46,7 +46,6 @@ export function ShopScreen() {
   const [offerOpen, setOfferOpen] = useState<OpenOffer | null>(null);
   const [missionShown, setMissionShown] = useState<string | null>(null);
   const [playMood, setPlayMood] = useState<Mood | null>(null);
-  const [voicePromptOpen, setVoicePromptOpen] = useState(false);
   const location = useLocation();
   /** Shown once when a list collected at home goes shopping; a tap or a moment later it is gone. */
   const [intro, setIntro] = useState(() => Boolean((location.state as { intro?: boolean } | null)?.intro));
@@ -110,11 +109,6 @@ export function ShopScreen() {
     if (foundCount(adventure.items) > 0) dispatch({ type: "hint-seen", hint: "shop" });
   }, [adventure, settings.shopHintSeen, dispatch]);
 
-  useEffect(() => {
-    if (intro || settings.voiceOptInSeen || voicePromptOpen) return;
-    if (firstHunt || sequence.locked) return;
-    setVoicePromptOpen(true);
-  }, [intro, settings.voiceOptInSeen, voicePromptOpen, firstHunt, sequence.locked]);
   const guessDistractor =
     showGuess && current && play?.distractorItemId
       ? adventure?.items.find((entry) => entry.id === play.distractorItemId)
@@ -235,13 +229,6 @@ export function ShopScreen() {
       persist: (on) => dispatch({ type: "set-voice", enabled: on }),
       onMuted: () => trackEvent({ name: "voice_muted" }),
     });
-  }
-
-  function answerVoicePrompt(enabled: boolean) {
-    unlockAudio();
-    voice.prepareOptIn(enabled);
-    dispatch({ type: "set-voice", enabled });
-    setVoicePromptOpen(false);
   }
 
   function dropOnBasket(_: unknown, info: { point: { x: number; y: number } }) {
@@ -609,22 +596,6 @@ export function ShopScreen() {
       </AnimatePresence>
 
       <OfferSheet open={offerOpen} onClose={() => setOfferOpen(null)} />
-
-      <Sheet open={voicePromptOpen && !intro} onClose={() => answerVoicePrompt(false)} label="Stem van Karrie">
-        <div className="voice-opt-in" data-testid="voice-opt-in">
-          <Karrie mood="greeting" className="voice-opt-in-karrie" />
-          <h2>Wil je dat Karrie met je praat?</h2>
-          <p>Karrie kan hardop zeggen welk product je zoekt. De stem is gemaakt met AI.</p>
-          <div className="voice-opt-in-actions">
-            <PressButton variant="go" wide data-testid="voice-opt-in-yes" onClick={() => answerVoicePrompt(true)}>
-              Ja, graag
-            </PressButton>
-            <PressButton variant="quiet" wide data-testid="voice-opt-in-no" onClick={() => answerVoicePrompt(false)}>
-              Nee, liever niet
-            </PressButton>
-          </div>
-        </div>
-      </Sheet>
 
       <Sheet open={checkOpen && Boolean(searching)} onClose={() => setCheckOpen(false)} label="Bonusmissie controleren">
         {searching && (
