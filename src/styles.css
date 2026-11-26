@@ -1698,13 +1698,6 @@ a.settings-link { text-decoration: none; color: inherit; }
   color: color-mix(in srgb, var(--ink) 55%, transparent);
 }
 .product-title-speaker svg { width: 100%; height: 100%; }
-.setting-note {
-  margin: -0.35rem 0 0.5rem;
-  padding: 0 0.15rem;
-  color: color-mix(in srgb, var(--ink) 62%, transparent);
-  font-size: 0.85rem;
-  line-height: 1.35;
-}
 .voice-opt-in {
   display: grid;
   gap: var(--space-3);
