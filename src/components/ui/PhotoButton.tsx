@@ -34,14 +34,14 @@ export function PhotoButton({ onClick }: { onClick: () => void }) {
     <motion.button
       type="button"
       className="scan-button photo-button"
-      aria-label="Scan barcode"
+      aria-label="Scan product"
       data-testid="photo-button"
       whileTap={press.whileTap}
       transition={press.transition}
       onClick={onClick}
     >
       <BarcodeIcon />
-      <span className="scan-label">Scan barcode</span>
+      <span className="scan-label">Scan product</span>
     </motion.button>
   );
 }
