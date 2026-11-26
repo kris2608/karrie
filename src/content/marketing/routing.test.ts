@@ -14,6 +14,9 @@ describe("marketing routing", () => {
       "/sitemap.xml",
       "/sitemap",
       "/api/health",
+      "/ig",
+      "/ig/",
+      "/ig?x=1",
     ];
     for (const path of paths) {
       expect(
@@ -23,6 +26,8 @@ describe("marketing routing", () => {
     }
     expect(MARKETING_NAV_FALLBACK_DENYLIST.some((pattern) => pattern.test("/"))).toBe(false);
     expect(MARKETING_NAV_FALLBACK_DENYLIST.some((pattern) => pattern.test("/toevoegen"))).toBe(false);
+    expect(MARKETING_NAV_FALLBACK_DENYLIST.some((pattern) => pattern.test("/ignored"))).toBe(false);
+    expect(MARKETING_NAV_FALLBACK_DENYLIST.some((pattern) => pattern.test("/ig/extra"))).toBe(false);
   });
 
   it("lists Render rewrites for clean marketing URLs", () => {

@@ -8,6 +8,8 @@ export const MARKETING_NAV_FALLBACK_DENYLIST = [
   /^\/boodschappenlijstje-met-plaatjes(?:\.html)?\/?$/,
   /^\/robots\.txt$/,
   /^\/sitemap(?:\.xml)?\/?$/,
+  // Instagram bio link. Let the network answer so Render's redirect can run.
+  /^\/ig\/?(?:\?|$)/,
 ] as const;
 
 /** Clean public URLs rewritten to static HTML on Render (before SPA catch-all). */
