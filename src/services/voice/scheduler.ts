@@ -19,7 +19,8 @@ type Job = {
 };
 
 const MAX_BACKGROUND = 1;
-const MAX_QUEUE = 3;
+/** Start line, celebration, and the next two product lines. */
+const MAX_QUEUE = 4;
 const BACKGROUND_DEADLINE_MS = 12_000;
 const INTERACTIVE_DEADLINE_MS = 12_000;
 
@@ -209,7 +210,7 @@ export function createVoiceScheduler() {
   }
 
   function schedule(phrases: Array<VoicePhrase & { productId?: string }>) {
-    for (const phrase of phrases.slice(0, 3)) {
+    for (const phrase of phrases.slice(0, MAX_QUEUE)) {
       void enqueueBackground(phrase);
     }
   }

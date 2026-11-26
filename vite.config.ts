@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { cpSync, createReadStream, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv, type Plugin } from "vite";
@@ -21,6 +21,39 @@ const UMAMI_DOMAINS = "karrie.eu,www.karrie.eu,karrieapp.onrender.com";
  * Must stay a single-line IIFE assignable to window before the tracker script loads.
  */
 const UMAMI_BEFORE_SEND = `window.karrieUmamiBeforeSend=function(t,p){if(!p||typeof p!=="object")return!1;if(typeof p.url==="string"){try{var u=new URL(p.url,location.origin);if(/^\\/(?:l|s)\\/[A-Za-z0-9_-]{16,64}\\/?$/.test(u.pathname))p.url=u.pathname.charAt(1)==="s"?"/s":"/l"}catch(e){p.url=p.url.replace(/\\/(?:l|s)\\/[A-Za-z0-9_-]{16,64}\\/?/g,function(m){return m.charAt(1)==="s"?"/s":"/l"})}}return p};`;
+
+/** One voice library: `server/voice-library`. The static app serves a build-time copy. */
+function voiceLibrary(): Plugin {
+  const src = path.resolve(rootDir, "server/voice-library");
+  let outDir = path.resolve(rootDir, "dist");
+  return {
+    name: "karrie-voice-library",
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    configureServer(server) {
+      server.middlewares.use("/voice-library", (req, res, next) => {
+        const raw = decodeURIComponent((req.url ?? "/").split("?")[0] ?? "/");
+        const rel = raw.replace(/^\/+/, "");
+        if (!rel || rel.includes("..")) {
+          next();
+          return;
+        }
+        const file = path.resolve(src, rel);
+        if (!file.startsWith(src) || !existsSync(file)) {
+          next();
+          return;
+        }
+        res.setHeader("Content-Type", file.endsWith(".json") ? "application/json; charset=utf-8" : "audio/wav");
+        createReadStream(file).pipe(res);
+      });
+    },
+    writeBundle() {
+      if (!existsSync(path.join(src, "manifest.json"))) return;
+      cpSync(src, path.join(outDir, "voice-library"), { recursive: true });
+    },
+  };
+}
 
 /** Adds the Umami Cloud tracker to production builds only, when both public values are set. */
 function umami(): Plugin {
@@ -51,6 +84,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    voiceLibrary(),
     umami(),
     VitePWA({
       registerType: "autoUpdate",
@@ -77,15 +111,18 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [...MARKETING_NAV_FALLBACK_DENYLIST],
-        // Precache tiny voice manifest only — full WAV library (~8.5MB) uses runtime cache below.
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2,webp,mp3,opus}", "voice-library/manifest.json"],
+        // Precache the tiny manifest only when a library was generated. WAV clips stay runtime-cached.
+        globPatterns: [
+          "**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2,webp,mp3,opus}",
+          ...(existsSync(path.join(rootDir, "server/voice-library/manifest.json")) ? ["voice-library/manifest.json"] : []),
+        ],
         globIgnores: ["og-image.png", "voice-library/**/*.wav"],
         runtimeCaching: [
           {
             urlPattern: /\/voice-library\/.*\.(?:wav|json)$/,
             handler: "CacheFirst",
             options: {
-              cacheName: "karrie-voice-library",
+              cacheName: "karrie-voice-library-v6",
               cacheableResponse: { statuses: [0, 200] },
               expiration: { maxEntries: 120, maxAgeSeconds: 365 * 24 * 60 * 60, purgeOnQuotaError: true },
             },

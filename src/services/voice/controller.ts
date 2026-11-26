@@ -12,6 +12,11 @@ export type PlayOptions = {
   /** Wait before speaking so SFX can finish. */
   delayMs?: number;
   priority?: PlayPriority;
+  /**
+   * Keep playing across the shop → complete navigation.
+   * Mute still stops it. A later shopping line does not.
+   */
+  handoff?: boolean;
 };
 
 export type PlayOutcome = {
@@ -28,6 +33,7 @@ type ActivePlay = {
   playId: number;
   generation: number;
   priority: PlayPriority;
+  handoff: boolean;
   abort: AbortController;
   settle: (outcome: PlayOutcome) => void;
   settled: boolean;
@@ -113,6 +119,17 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
     state = "idle";
   }
 
+  /** Shop unmount. A celebration handed off to the complete screen keeps playing. */
+  function releaseShopping() {
+    voiceScheduler.cancelBackground();
+    queue = null;
+    if (active?.handoff) {
+      generation += 1;
+      return;
+    }
+    cancel();
+  }
+
   function setEnabled(value: boolean) {
     enabled = value;
     if (!value) cancel();
@@ -140,6 +157,7 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
       playId,
       generation: gen,
       priority,
+      handoff: options.handoff === true,
       abort,
       settle,
       settled: false,
@@ -147,21 +165,23 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
     active = play;
     state = "loading";
 
-    if (!enabled || gen !== generation) {
+    const dropped = () => !enabled || abort.signal.aborted || active?.playId !== playId || (!play.handoff && gen !== generation);
+
+    if (dropped()) {
       finishOwner(playId, { status: "cancelled", playId });
       return;
     }
 
     if (options.delayMs && options.delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, options.delayMs));
-      if (!enabled || gen !== generation || abort.signal.aborted || active?.playId !== playId) {
+      if (dropped()) {
         finishOwner(playId, { status: "cancelled", playId });
         return;
       }
     }
 
     const fetched = await voiceScheduler.fetchInteractive(phrase, abort.signal);
-    if (!enabled || gen !== generation || abort.signal.aborted || active?.playId !== playId) {
+    if (dropped()) {
       finishOwner(playId, { status: "cancelled", playId, fetchMs: fetched.ms });
       return;
     }
@@ -186,7 +206,7 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
     const blob = fetched.blob;
     const fetchMs = fetched.ms;
     const source = fetched.source;
-    if (play.abort.signal.aborted || play.generation !== generation || !enabled || active?.playId !== playId) {
+    if (dropped()) {
       finishOwner(playId, { status: "cancelled", playId, fetchMs, source });
       return;
     }
@@ -253,6 +273,7 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
       generation: gen,
       delayMs: options?.delayMs,
       priority,
+      handoff: options?.handoff,
     };
 
     return new Promise<PlayOutcome>((settle) => {
@@ -301,6 +322,7 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
     setEnabled,
     isEnabled,
     cancel,
+    releaseShopping,
     bump,
     currentToken,
     play,

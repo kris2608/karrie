@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createVoiceController } from "./controller";
-import { positivePhrase, productPhrase, welcomePhrase } from "../../domain/voiceScripts";
+import { celebrationPhrase, positivePhrase, productPhrase, welcomePhrase } from "../../domain/voiceScripts";
 
 const trackEvent = vi.fn();
 const unlockAudio = vi.fn();
@@ -172,5 +172,49 @@ describe("voiceController ownership FSM", () => {
     const controller = createVoiceController();
     controller.prefetch([positivePhrase("x")]);
     expect(schedule).toHaveBeenCalled();
+  });
+
+  it("keeps a handoff celebration across the shop screen change and mute still stops it", async () => {
+    let resolveFetch: (value: unknown) => void = () => undefined;
+    fetchInteractive.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const el = mockAudio();
+    const controller = createVoiceController();
+    controller.setEnabled(true);
+    const generation = controller.bump();
+    const pending = controller.play(celebrationPhrase("round"), {
+      generation,
+      priority: "high",
+      delayMs: 0,
+      handoff: true,
+    });
+    controller.releaseShopping();
+    resolveFetch({
+      ok: true,
+      blob: new Blob([new Uint8Array([1, 2, 3])], { type: "audio/wav" }),
+      source: "memory",
+      ms: 1,
+    });
+    await vi.waitFor(() => expect(el.play).toHaveBeenCalled());
+    el.onended?.();
+    expect((await pending).status).toBe("completed");
+
+    fetchInteractive.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    controller.setEnabled(true);
+    const nextGen = controller.bump();
+    const muted = controller.play(celebrationPhrase("round"), { generation: nextGen, priority: "high", handoff: true });
+    controller.setEnabled(false);
+    resolveFetch({ ok: true, blob: new Blob([new Uint8Array([1])]), source: "memory", ms: 1 });
+    expect((await muted).status).toBe("cancelled");
+    expect(el.pause).toHaveBeenCalled();
   });
 });

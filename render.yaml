@@ -172,9 +172,9 @@ services:
         value: "1500"
       # Short Dutch shopping voice clips (Realtime). Set VOICE=off to disable.
       - key: OPENAI_VOICE_MODEL
-        value: gpt-realtime-2.1-mini
+        value: gpt-realtime-2.1
       - key: OPENAI_VOICE
-        value: marin
+        value: coral
       - key: VOICE_LIMIT_PER_IP_HOUR
         value: "40"
       - key: VOICE_LIMIT_PER_IP_DAY
@@ -183,11 +183,12 @@ services:
         value: "2000"
       - key: VOICE_DAILY_BUDGET_USD
         value: "1"
+      # gpt-realtime-2.1 text + audio token prices (USD per 1M). Audio output is billed separately.
       - key: PRICE_VOICE_INPUT_PER_MTOK
-        value: "0.6"
+        value: "4"
       - key: PRICE_VOICE_CACHED_INPUT_PER_MTOK
-        value: "0.06"
+        value: "0.4"
       - key: PRICE_VOICE_OUTPUT_PER_MTOK
-        value: "2.4"
+        value: "24"
       - key: PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK
-        value: "12"
+        value: "64"

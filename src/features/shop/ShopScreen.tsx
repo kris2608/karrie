@@ -24,6 +24,8 @@ import { OfferSheet, type OpenOffer } from "../offers/OfferSheet";
 import { OfferTag, offerLabel } from "../offers/OfferTag";
 import { unlockAudio } from "../../feedback/sound";
 import { trackEvent } from "../../services/analytics";
+import { voiceController } from "../../services/voice/controller";
+import { commitVoiceEnabled } from "./voiceMute";
 import { GuessProductCard } from "./GuessProductCard";
 import { MissionCard, ParentCheck } from "./MissionCard";
 import { useShopVoice } from "./useShopVoice";
@@ -213,8 +215,9 @@ export function ShopScreen() {
     if (play && (play.kind === "color" || play.kind === "drag") && play.status !== "done" && play.status !== "skipped") {
       finishPlay(play.kind);
     }
-    voice.onFoundSuccess();
-    sequence.collect(current, openItems.length === 1);
+    const isLast = openItems.length === 1;
+    voice.onFoundSuccess(isLast);
+    sequence.collect(current, isLast);
   }
 
   function celebrateGuess() {
@@ -225,10 +228,13 @@ export function ShopScreen() {
   }
 
   function toggleVoice() {
-    unlockAudio();
     const next = !settings.voiceEnabled;
-    if (!next) trackEvent({ name: "voice_muted" });
-    dispatch({ type: "set-voice", enabled: next });
+    commitVoiceEnabled(next, {
+      setEnabled: (on) => voiceController.setEnabled(on),
+      unlock: unlockAudio,
+      persist: (on) => dispatch({ type: "set-voice", enabled: on }),
+      onMuted: () => trackEvent({ name: "voice_muted" }),
+    });
   }
 
   function answerVoicePrompt(enabled: boolean) {
@@ -259,8 +265,9 @@ export function ShopScreen() {
     keep.current = choice;
     const flying: AdventureItem =
       choice === "alternative" && missionTarget ? { ...searching, icon: missionTarget.id, imageKind: "generic", photoId: undefined, imageUrl: undefined } : searching;
-    voice.onFoundSuccess();
-    sequence.collect(flying, openItems.length === 1, SCORING.discoveryBonus);
+    const isLast = openItems.length === 1;
+    voice.onFoundSuccess(isLast);
+    sequence.collect(flying, isLast, SCORING.discoveryBonus);
   }
 
   return (
@@ -289,7 +296,7 @@ export function ShopScreen() {
           className={`shop-voice-chip${settings.voiceEnabled ? " is-on" : ""}`}
           data-testid="shop-voice-toggle"
           aria-pressed={settings.voiceEnabled}
-          aria-label={settings.voiceEnabled ? "Stem van Karrie aan" : "Stem van Karrie uit"}
+          aria-label={settings.voiceEnabled ? "Zet de stem van Karrie uit" : "Zet de stem van Karrie aan"}
           onClick={toggleVoice}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -305,6 +312,7 @@ export function ShopScreen() {
               </>
             )}
           </svg>
+          <span className="shop-voice-chip-label">{settings.voiceEnabled ? "Aan" : "Uit"}</span>
         </button>
         <span className="star-pill" ref={starRef} aria-label={`${stars} sterren`} data-testid="star-count">
           <motion.span key={stars} className="star-pill-icon" initial={{ scale: stars ? 1.5 : 1, rotate: stars ? -20 : 0 }} animate={{ scale: 1, rotate: 0 }} transition={spring}>

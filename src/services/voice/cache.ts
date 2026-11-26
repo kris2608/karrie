@@ -1,15 +1,24 @@
-import { cacheKeyParts, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE, VOICE_DELIVERY_VERSION, VOICE_TEMPLATE_VERSION } from "../../domain/voiceScripts";
+import {
+  cacheKeyParts,
+  DEFAULT_VOICE_MODEL,
+  DEFAULT_VOICE_NAME,
+  VOICE_CACHE_NAMESPACE,
+  VOICE_INSTRUCTION_VERSION,
+  VOICE_LANGUAGE,
+  VOICE_DELIVERY_VERSION,
+  VOICE_TEMPLATE_VERSION,
+} from "../../domain/voiceScripts";
 import { apiFetch } from "../apiSession";
 
 /** Fallback until GET /api/voice/config resolves — must match server personality defaults. */
 const FALLBACK = {
-  model: "gpt-realtime-2.1-mini",
-  voice: "marin",
+  model: DEFAULT_VOICE_MODEL,
+  voice: DEFAULT_VOICE_NAME,
   language: VOICE_LANGUAGE,
   instructionVersion: VOICE_INSTRUCTION_VERSION,
   deliveryVersion: VOICE_DELIVERY_VERSION,
   templateVersion: VOICE_TEMPLATE_VERSION,
-  cacheNamespace: "karrie-voice-v5",
+  cacheNamespace: VOICE_CACHE_NAMESPACE,
 };
 
 export type VoiceCacheConfig = typeof FALLBACK;

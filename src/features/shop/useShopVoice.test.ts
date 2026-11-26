@@ -26,7 +26,8 @@ describe("shopping phrase stability", () => {
     }));
     expect(shoppingPrefetchPhrases("adv-1", items as never)).toHaveLength(2);
     const staticPhrases = staticFeedbackPhrases();
-    expect(staticPhrases.every((phrase) => phrase.event === "mission" || phrase.event === "complete")).toBe(true);
+    expect(staticPhrases.some((phrase) => phrase.event === "welcome")).toBe(true);
+    expect(staticPhrases.some((phrase) => phrase.event === "complete" && phrase.text.startsWith("Hoera!"))).toBe(true);
     expect(staticPhrases.every((phrase) => isAllowedSpeechText(phrase.text))).toBe(true);
   });
 

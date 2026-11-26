@@ -1,23 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { applyVoiceCacheConfig, getVoiceCacheConfig, localCacheKey } from "./cache";
+import { getVoiceCacheConfig, localCacheKey } from "./cache";
 
 describe("voice cache config", () => {
-  it("builds keys from server config and bumps namespace to v5", () => {
-    applyVoiceCacheConfig({
-      model: "gpt-realtime-2.1-mini",
-      voice: "marin",
-      instructionVersion: "v5",
-      deliveryVersion: "v5",
-      templateVersion: "v5",
-      cacheNamespace: "karrie-voice-v5",
-    });
+  it("defaults to coral on gpt-realtime-2.1 under the v6 namespace", () => {
     const cfg = getVoiceCacheConfig();
-    expect(cfg.cacheNamespace).toBe("karrie-voice-v5");
-    expect(cfg.voice).toBe("marin");
+    expect(cfg.cacheNamespace).toBe("karrie-voice-v6");
+    expect(cfg.voice).toBe("coral");
+    expect(cfg.model).toBe("gpt-realtime-2.1");
+    expect(cfg.instructionVersion).toBe("v6");
     const key = localCacheKey("Hebbes!", "positive");
-    expect(key).toContain("marin");
-    expect(key).toContain("gpt-realtime-2.1-mini");
-    expect(key).toContain("v5");
+    expect(key).toContain("coral");
+    expect(key).toContain("gpt-realtime-2.1");
+    expect(key).toContain("v6");
+    expect(key).not.toContain("marin");
+    expect(key).not.toContain("v5");
   });
 });
 

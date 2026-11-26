@@ -5,12 +5,15 @@ const voiceCatalogEntryTexts = new Set(allVoiceCatalogInstructions());
 
 export const VOICE_LANGUAGE = "nl-NL";
 /** Bump when personality instructions or template wording change so caches refresh. */
-export const VOICE_INSTRUCTION_VERSION = "v5";
-export const VOICE_DELIVERY_VERSION = "v5";
-export const VOICE_TEMPLATE_VERSION = "v5";
+export const VOICE_INSTRUCTION_VERSION = "v6";
+export const VOICE_DELIVERY_VERSION = "v6";
+export const VOICE_TEMPLATE_VERSION = "v6";
+export const DEFAULT_VOICE_MODEL = "gpt-realtime-2.1";
+export const DEFAULT_VOICE_NAME = "coral";
+export const VOICE_CACHE_NAMESPACE = "karrie-voice-v6";
 
 export const VOICE_PERSONALITY =
-  "Je bent Karrie, een vrolijk en nieuwsgierig winkelvriendje voor jonge kinderen. Je praat in natuurlijk Nederlands, met een warme stem en een glimlach. Je klinkt spontaan en vertrouwd. Spreek rustig, duidelijk en speels, alsof je samen met een kind boodschappen doet. Behoud steeds dezelfde herkenbare stem. Spreek uitsluitend de opgegeven tekst uit.";
+  "Je bent Karrie, een blij kinderstemmetje voor een kind van een jaar of drie. Je spreekt Nederlands zoals in Nederland, zonder buitenlands accent. Je klinkt vrolijk, speels en enthousiast. Zeg alleen de zin die je krijgt, niets ervoor of erna.";
 
 export type VoiceEvent =
   | "welcome"
@@ -32,6 +35,9 @@ export type VoicePhrase = {
   productId?: string;
 };
 
+/** Spoken once when a fresh shopping round begins. */
+export const START_LINE = "Hoi! Zullen we samen boodschappen gaan zoeken? Daar gaan we!";
+
 const WELCOME = [
   "Hoi! Zullen we samen boodschappen doen?",
   "Ben je klaar voor ons boodschappenavontuur?",
@@ -46,9 +52,12 @@ const POSITIVE = [
   "Kijk eens aan!",
   "Ja, die hebben we!",
   "Goed gedaan!",
-  "Dat is hem!",
+  "Die is het!",
   "Helemaal goed!",
 ] as const;
+
+/** Kept so older clients that still ask for this line do not get a 422. */
+const LEGACY_STATIC = ["Dat is hem!"] as const;
 
 const INCORRECT = [
   "Oeps, die zoeken we nog niet.",
@@ -63,11 +72,14 @@ const ENCOURAGEMENT = [
   "Nog eentje te gaan!",
 ] as const;
 
+/** The round-ending line. Longer and more festive than a single praise. */
+export const CELEBRATION_LINE = "Hoera! Alle boodschappen zijn gevonden! Wat heb jij dat goed gedaan!";
+
 const COMPLETE = [
-  "Gelukt! Alle boodschappen zijn gevonden.",
-  "Wat heb jij goed geholpen vandaag!",
-  "Ons boodschappenavontuur zit erop!",
-  "Tadaa! Dat hebben we samen mooi gedaan!",
+  CELEBRATION_LINE,
+  "Tadaa! We hebben alles gevonden! Hoera, wat goed van jou!",
+  "Gelukt! Alle boodschappen zijn in het mandje! Dat hebben we samen gedaan!",
+  "Jaaa! De speurtocht is klaar! Wat heb jij goed geholpen!",
 ] as const;
 
 const STICKER = [
@@ -101,14 +113,14 @@ const PRODUCT: readonly ProductBuilder[] = [
     const np = spokenNounPhrase(item, { withArticle: Boolean(meta.article), withQuantity: true });
     return `Kun jij ${np} vinden?`;
   },
-  (item) => `Nu gaan we ${spokenNounPhrase(item, { withQuantity: false })} zoeken!`,
+  (item) => `Nu gaan we ${spokenNounPhrase(item, { withArticle: true, withQuantity: false })} zoeken!`,
   (item) => {
     const meta = spokenProductMeta(item);
     const np = spokenNounPhrase(item, { withArticle: Boolean(meta.article), withQuantity: true });
     const plural = meta.number === "plural" || (meta.number !== "mass" && meta.quantity > 1);
     return plural ? `Waar zijn ${np}?` : `Waar is ${np}?`;
   },
-  (item) => `Zoek maar ${spokenNounPhrase(item, { withArticle: false, withQuantity: true })}!`,
+  (item) => `Zoek maar ${spokenNounPhrase(item, { withArticle: true, withQuantity: true })}!`,
 ];
 
 /** Deterministic pick that still rotates; avoids the same line twice in a row when possible. */
@@ -131,6 +143,10 @@ function fixed(event: VoiceEvent, lines: readonly string[], seed: string, avoidT
 
 export function welcomePhrase(seed: string, avoidText?: string): VoicePhrase {
   return fixed("welcome", WELCOME, seed, avoidText);
+}
+
+export function startPhrase(seed: string): VoicePhrase {
+  return { event: "welcome", phraseId: `welcome:start:${normalizeKey(seed).slice(0, 24)}`, text: START_LINE };
 }
 
 export function positivePhrase(seed: string, avoidText?: string): VoicePhrase {
@@ -167,14 +183,9 @@ export function playPhrase(seed: string, kind: "color" | "drag" | "guess", color
   return fixed("play", ["Raad het product!"] as const, seed);
 }
 
-/** Combined celebratory line for complete + sticker beat. */
+/** One bigger ending line, stable for preload and playback. */
 export function celebrationPhrase(seed: string): VoicePhrase {
-  const lines = [
-    "Tadaa! Dat hebben we samen mooi gedaan!",
-    "Gelukt! Alle boodschappen zijn gevonden.",
-    "Wat heb jij goed geholpen vandaag!",
-  ] as const;
-  return fixed("complete", lines, seed);
+  return { event: "complete", phraseId: `complete:celebration:${normalizeKey(seed).slice(0, 24)}`, text: CELEBRATION_LINE };
 }
 
 /**
@@ -200,8 +211,10 @@ export function productPhrase(item: ProductItem, _seed?: string, _avoidText?: st
 
 /** Allowed static phrase texts the server will speak without a free-form input. */
 export const ALLOWED_STATIC_TEXTS = new Set<string>([
+  START_LINE,
   ...WELCOME,
   ...POSITIVE,
+  ...LEGACY_STATIC,
   ...INCORRECT,
   ...ENCOURAGEMENT,
   ...COMPLETE,

@@ -1,10 +1,14 @@
 import { useEffect, useRef } from "react";
 import {
-  completePhrase,
-  missionPhrase,
+  celebrationPhrase,
+  positivePhrase,
   productPhrase,
+  startPhrase,
+  missionPhrase,
+  completePhrase,
   type VoicePhrase,
 } from "../../domain/voiceScripts";
+import { INITIAL_PRAISE_STATE, planFoundVoice, type PraiseState } from "../../domain/voiceRound";
 import type { AdventureItem } from "../../domain/types";
 import { activeItem } from "../../domain/shopQueue";
 import { unlockAudio } from "../../feedback/sound";
@@ -27,6 +31,8 @@ type Options = {
   /** Colour / drag / guess play prompts — disabled for auto speech in P0. */
   playKind?: "color" | "drag" | "guess" | null;
   playColorLabel?: string;
+  /** Test hook. Defaults to Math.random. */
+  random?: () => number;
 };
 
 /** Prefetch current + next only — shared with ReviewScreen start. */
@@ -39,22 +45,46 @@ export function shoppingPrefetchPhrases(adventureId: string, items: AdventureIte
   return phrases;
 }
 
-/** Mission + complete lines only (praise disabled on happy path). */
+/** Start and ending first, so they are warm before the round needs them. */
+export function roundWarmupPhrases(adventureId: string, items: AdventureItem[]): VoicePhrase[] {
+  return [startPhrase(adventureId), celebrationPhrase(adventureId), ...shoppingPrefetchPhrases(adventureId, items)];
+}
+
+/** Mission, celebration and a praise line for the opt-in warm-up. */
 export function staticFeedbackPhrases(): VoicePhrase[] {
   return [
+    startPhrase("warm:start"),
+    celebrationPhrase("warm:complete"),
     missionPhrase("warm:mission:0"),
     missionPhrase("warm:mission:1"),
-    missionPhrase("warm:mission:2"),
+    positivePhrase("warm:praise:0"),
     completePhrase("warm:complete:0"),
-    completePhrase("warm:complete:1"),
   ];
 }
 
 const PERMANENT_FAIL = new Set(["invalid", "misconfigured"]);
+const OPENING_WAIT_MS = 8_000;
+
+function waitFor(pending: Promise<unknown> | null, limitMs: number): Promise<void> {
+  if (!pending) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, limitMs);
+    pending.then(
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+    );
+  });
+}
 
 /**
- * Shopping voice P0: product instruction, mission (replaces product), complete via CompleteScreen.
- * Guess missions: no automatic speech that could spoil; replay stays product-safe.
+ * Shopping voice: start line once per fresh round, then every product instruction.
+ * Praise is occasional. The ending plays at the found instant of the last product.
  */
 export function useShopVoice(options: Options) {
   const {
@@ -67,6 +97,7 @@ export function useShopVoice(options: Options) {
     locked,
     showGuess,
     missionActive,
+    random,
   } = options;
 
   const instructionKey = useRef<string | null>(null);
@@ -75,6 +106,18 @@ export function useShopVoice(options: Options) {
   /** Exact phrase for the current step — play and replay share this. */
   const currentPhrase = useRef<VoicePhrase | null>(null);
   const wasEnabled = useRef(enabled);
+  const openingFor = useRef<string | null>(null);
+  const openingPlay = useRef<Promise<unknown> | null>(null);
+  const praiseFlight = useRef<Promise<unknown> | null>(null);
+  const praiseState = useRef<PraiseState>({ ...INITIAL_PRAISE_STATE });
+  const praiseAdventure = useRef<string | null>(null);
+
+  if (praiseAdventure.current !== (adventureId ?? null)) {
+    praiseAdventure.current = adventureId ?? null;
+    praiseState.current = { ...INITIAL_PRAISE_STATE };
+    openingFor.current = null;
+    openingPlay.current = null;
+  }
 
   useEffect(() => {
     if (!enabled) {
@@ -82,7 +125,7 @@ export function useShopVoice(options: Options) {
       return;
     }
     return () => {
-      voiceController.cancel();
+      voiceController.releaseShopping();
     };
   }, [enabled]);
 
@@ -96,11 +139,19 @@ export function useShopVoice(options: Options) {
     wasEnabled.current = enabled;
   }, [enabled]);
 
-  // Prefetch current + next only.
   useEffect(() => {
     if (!enabled || !adventureId) return;
-    voiceController.prefetch(shoppingPrefetchPhrases(adventureId, items));
-  }, [enabled, adventureId, items, currentId]);
+    voiceController.prefetch(roundWarmupPhrases(adventureId, items));
+    const fresh = !items.some((item) => item.status === "found");
+    if (!fresh || openingFor.current === adventureId) return;
+    openingFor.current = adventureId;
+    const generation = voiceController.currentToken();
+    openingPlay.current = voiceController.play(startPhrase(adventureId), {
+      generation,
+      priority: "high",
+      delayMs: 0,
+    });
+  }, [enabled, adventureId, items]);
 
   useEffect(() => {
     if (!enabled || !adventureId || intro || locked) return;
@@ -139,9 +190,15 @@ export function useShopVoice(options: Options) {
     instructionStatus.current = "requested";
     retryUsed.current = false;
 
-    const generation = voiceController.bump();
+    const opening = openingPlay.current;
+    const praise = praiseFlight.current;
 
     void (async () => {
+      await waitFor(opening, OPENING_WAIT_MS);
+      await waitFor(praise, 2_200);
+      if (instructionKey.current !== stepKey) return;
+
+      const generation = voiceController.bump();
       instructionStatus.current = "started";
       trackEvent({ name: "voice_instruction", data: { phase: "started", event: phrase.event } });
       let outcome = await voiceController.play(phrase, { generation, priority: "high", delayMs: 0 });
@@ -152,7 +209,7 @@ export function useShopVoice(options: Options) {
         retryUsed.current = true;
         trackEvent({ name: "voice_instruction", data: { phase: "retry", event: phrase.event, code: outcome.code } });
         const retryGen = voiceController.currentToken();
-        outcome = await voiceController.play(phrase, { generation: retryGen, priority: "high" });
+        outcome = await voiceController.play(phrase, { generation: retryGen, priority: "high", delayMs: 0 });
       }
 
       if (instructionKey.current !== stepKey) return;
@@ -172,10 +229,6 @@ export function useShopVoice(options: Options) {
         instructionKey.current = null;
       }
     })();
-
-    const open = items.filter((item) => item.status !== "found");
-    const upcoming = open.slice(1, 3).map((item) => productPhrase(item, `${adventureId}:${item.id}`));
-    voiceController.prefetch(upcoming);
   }, [enabled, adventureId, currentId, items, intro, locked, showGuess, missionActive]);
 
   function replay() {
@@ -188,7 +241,7 @@ export function useShopVoice(options: Options) {
       const phrase = productPhrase(current, `${adventureId}:${current.id}`);
       currentPhrase.current = phrase;
       const generation = voiceController.bump();
-      void voiceController.play(phrase, { generation, priority: "high" });
+      void voiceController.play(phrase, { generation, priority: "high", delayMs: 0 });
       return;
     }
     unlockAudio();
@@ -204,16 +257,35 @@ export function useShopVoice(options: Options) {
           : productPhrase(current, seed);
     currentPhrase.current = phrase;
     const generation = voiceController.bump();
-    void voiceController.play(phrase, { generation, priority: "high" });
+    void voiceController.play(phrase, { generation, priority: "high", delayMs: 0 });
   }
 
-  /** Praise disabled — SFX-only callers keep the hook. Stop speech immediately on found. */
-  function onFoundSuccess() {
-    voiceController.bump();
+  /**
+   * Called in the same turn as the found dispatch.
+   * Last item: celebration immediately, no praise in front of it.
+   * Other finds: praise only when planFoundVoice says so.
+   */
+  function onFoundSuccess(isLast = false) {
+    const generation = voiceController.bump();
     instructionKey.current = null;
     instructionStatus.current = null;
     retryUsed.current = false;
     currentPhrase.current = null;
+    if (!enabled) return;
+    const plan = planFoundVoice(praiseState.current, { isLast, random: (random ?? Math.random)() });
+    praiseState.current = plan.praise;
+    if (plan.line === "celebration") {
+      praiseFlight.current = null;
+      const phrase = celebrationPhrase(adventureId ?? "round");
+      void voiceController.play(phrase, { generation, priority: "high", delayMs: plan.delayMs, handoff: true });
+      return;
+    }
+    if (plan.line === "praise") {
+      const phrase = positivePhrase(`${adventureId ?? "round"}:${praiseState.current.findsSincePraise}`, voiceController.avoidText("positive"));
+      praiseFlight.current = voiceController.play(phrase, { generation, priority: "high", delayMs: plan.delayMs });
+      return;
+    }
+    praiseFlight.current = null;
   }
 
   function onGuessCorrect() {
@@ -234,7 +306,7 @@ export function useShopVoice(options: Options) {
   }
 
   function prefetchList(phrases: VoicePhrase[]) {
-    if (enabled) voiceController.prefetch(phrases.slice(0, 3));
+    if (enabled) voiceController.prefetch(phrases.slice(0, 4));
   }
 
   return {

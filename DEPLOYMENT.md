@@ -157,16 +157,16 @@ Het productvenster heeft **Toevoegen en verder scannen** (de camera komt meteen 
 | `LIMIT_PER_IP_HOUR` / `LIMIT_PER_IP_DAY` | 20 / 60 | Per IP-adres |
 | `LIMIT_DAILY_REQUESTS` | 300 | Alle gebruikers samen, per UTC-dag |
 | `DAILY_BUDGET_USD` | 1 | Server stopt met herkennen boven dit bedrag per dag |
-| `OPENAI_VOICE_MODEL` | `gpt-realtime-2.1-mini` | Realtime-model voor korte winkelaudio (geen Speech API) |
-| `OPENAI_VOICE` | `marin` | Vaste Karrie-stem op Realtime (`marin` / `coral` / `shimmer` / `cedar`) |
+| `OPENAI_VOICE_MODEL` | `gpt-realtime-2.1` | Realtime-model voor korte winkelaudio (geen Speech API). `gpt-realtime-2.1-mini` mag nog, maar is niet de standaard. |
+| `OPENAI_VOICE` | `coral` | Vaste Karrie-stem op Realtime (`coral` / `marin` / `shimmer` / `cedar`) |
 | `VOICE` | (aan) | Zet op `off` om stemroutes uit te zetten |
 | `VOICE_LIMIT_PER_IP_HOUR` / `VOICE_LIMIT_PER_IP_DAY` | 40 / 120 | Nieuwe audioclips per IP |
 | `VOICE_LIMIT_DAILY_REQUESTS` | 2000 | Alle gebruikers samen, per UTC-dag |
 | `VOICE_DAILY_BUDGET_USD` | 1 | Dagbudget voor cache-misses |
-| `PRICE_VOICE_INPUT_PER_MTOK` / `PRICE_VOICE_CACHED_INPUT_PER_MTOK` / `PRICE_VOICE_OUTPUT_PER_MTOK` | 0,6 / 0,06 / 2,4 | Realtime tekst-tokenprijzen |
-| `PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK` | 12 | Realtime audio-outputprijs |
+| `PRICE_VOICE_INPUT_PER_MTOK` / `PRICE_VOICE_CACHED_INPUT_PER_MTOK` / `PRICE_VOICE_OUTPUT_PER_MTOK` | 4 / 0,4 / 24 | Teksttokenprijzen van `gpt-realtime-2.1` |
+| `PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK` | 64 | Audiouitvoerprijs van `gpt-realtime-2.1` |
 
-Stemclips worden via Realtime (WebSocket one-shot) gegenereerd en gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal onder namespace `karrie-voice-v5`. Optionele permanente catalogusclips staan in `server/voice-library/` / `public/voice-library/` (genereer met `npm run voice:library` in `server/` — niet bij elke deploy). Alleen allowlisted zinnetjes of product-instructieshetjes worden gesproken — geen vrije tekst-TTS, geen Speech API-fallback.
+Stemclips worden via Realtime (WebSocket one-shot) gegenereerd en gedeeld gecachet (Postgres `voice_cache` als `CANDIDATES_DATABASE_URL` gezet is, anders alleen in-process geheugen). De app bewaart gehoorde clips ook lokaal onder namespace `karrie-voice-v6`. Permanente catalogusclips staan alleen in `server/voice-library/` (genereer met `npm run voice:generate` — niet bij elke deploy; de site-build kopieert ze). Alleen allowlisted zinnetjes of product-instructies worden gesproken — geen vrije tekst-TTS, geen Speech API-fallback.
 
 Krijgt de server van Render een ander adres dan `https://karrie-api.onrender.com`? Zet dat adres dan in `VITE_API_ORIGIN` van `karrieapp` en bouw de site opnieuw.
 

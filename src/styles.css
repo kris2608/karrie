@@ -1755,19 +1755,24 @@ a.settings-link { text-decoration: none; color: inherit; }
 .shop-list-chip svg { width: 22px; height: 22px; }
 .shop-voice-chip {
   flex: none;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 10px;
+  border: 2px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 999px;
+  background: #fff;
   color: var(--ink);
   cursor: pointer;
 }
 .shop-voice-chip svg { width: 22px; height: 22px; }
+.shop-voice-chip-label { font-size: 0.85rem; font-weight: 900; line-height: 1; }
 .shop-voice-chip.is-on {
-  background: color-mix(in srgb, var(--green) 22%, transparent);
+  background: color-mix(in srgb, var(--green) 22%, white);
+  border-color: transparent;
   color: var(--green-ink, #0b6b63);
 }
 .product-title-replay {

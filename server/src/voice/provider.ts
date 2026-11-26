@@ -1,12 +1,13 @@
 import WebSocket from "ws";
 import type { VoiceEvent } from "./allowlist.js";
-import { buildSpeakInstructions, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE } from "./personality.js";
+import { checkPcmClip } from "./clipQuality.js";
+import { buildSpeakInstructions, DEFAULT_VOICE_MODEL, DEFAULT_VOICE_NAME, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE } from "./personality.js";
 import { transcriptsMatch } from "./transcript.js";
 import { pcmToWav } from "./wav.js";
 
 export { VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE };
 
-const ALLOWED_MODELS = new Set(["gpt-realtime-2.1-mini"]);
+const ALLOWED_MODELS = new Set(["gpt-realtime-2.1", "gpt-realtime-2.1-mini"]);
 const DEPRECATED_MODELS = new Set(["gpt-4o-mini-tts", "tts-1", "tts-1-hd", "gpt-4o-mini-tts-2025-03-20", "gpt-4o-mini-tts-2025-12-15"]);
 const ALLOWED_VOICES = new Set(["marin", "coral", "shimmer", "cedar", "alloy", "ash", "ballad", "echo", "sage", "verse"]);
 
@@ -42,10 +43,10 @@ export type RealtimeSpeechConfig = {
 
 function assertModel(model: string): string {
   if (DEPRECATED_MODELS.has(model) || model.includes("tts-1") || model.includes("mini-tts")) {
-    throw new Error(`Unsupported deprecated voice model: ${model}. Use gpt-realtime-2.1-mini.`);
+    throw new Error(`Unsupported deprecated voice model: ${model}. Use ${DEFAULT_VOICE_MODEL}.`);
   }
   if (!ALLOWED_MODELS.has(model)) {
-    throw new Error(`Unsupported voice model: ${model}. Allowed: gpt-realtime-2.1-mini.`);
+    throw new Error(`Unsupported voice model: ${model}. Allowed: ${[...ALLOWED_MODELS].join(", ")}.`);
   }
   return model;
 }
@@ -95,8 +96,8 @@ function isSchemaOrModelError(error: unknown): boolean {
  * Never uses /v1/audio/speech. Creates response only after session.updated.
  */
 export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): SpeechProvider {
-  const model = assertModel(config.model || "gpt-realtime-2.1-mini");
-  const voice = assertVoice(config.voice || "marin");
+  const model = assertModel(config.model || DEFAULT_VOICE_MODEL);
+  const voice = assertVoice(config.voice || DEFAULT_VOICE_NAME);
   const timeoutMs = config.timeoutMs ?? 12_000;
   const gate = createGate(Math.max(1, config.maxConcurrent ?? 2));
 
@@ -278,6 +279,12 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
             return;
           }
 
+          const quality = checkPcmClip(pcm, PCM_RATE, text);
+          if (!quality.ok) {
+            fail(new Error(`Realtime audio ${quality.reason}`));
+            return;
+          }
+
           if (!transcript.trim()) {
             console.warn(
               JSON.stringify({
@@ -347,7 +354,8 @@ export function createRealtimeSpeechProvider(config: RealtimeSpeechConfig): Spee
         if (isSchemaOrModelError(first)) throw first;
         const message = first instanceof Error ? first.message : String(first);
         const retryable =
-          isTransportError(first) || /transcript missing|transcript mismatch|audio too short|invalid PCM|status:/i.test(message);
+          isTransportError(first) ||
+          /transcript missing|transcript mismatch|audio too short|audio silent|audio stretched|audio too-short|invalid PCM|status:/i.test(message);
         if (!retryable) throw first;
         try {
           return await generateOnce(text, options.event);

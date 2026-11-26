@@ -1,26 +1,28 @@
-import type { VoiceEvent } from "./allowlist.js";
-
-export const VOICE_INSTRUCTION_VERSION = "v5";
-export const VOICE_DELIVERY_VERSION = "v5";
-export const VOICE_TEMPLATE_VERSION = "v5";
+export const VOICE_INSTRUCTION_VERSION = "v6";
+export const VOICE_DELIVERY_VERSION = "v6";
+export const VOICE_TEMPLATE_VERSION = "v6";
 export const VOICE_LANGUAGE = "nl-NL";
-export const VOICE_CACHE_NAMESPACE = "karrie-voice-v5";
+export const VOICE_CACHE_NAMESPACE = "karrie-voice-v6";
+export const DEFAULT_VOICE_MODEL = "gpt-realtime-2.1";
+export const DEFAULT_VOICE_NAME = "coral";
 
 /**
- * Short Dutch single-speaker identity (v5). Keep brief: Realtime over-interprets long briefs.
+ * Short Dutch single-speaker identity (v6).
+ * Native Netherlands Dutch, cheerful and childlike. Keep it brief: Realtime over-interprets long briefs.
  */
-export const DEFAULT_VOICE_PERSONALITY = `Je bent Karrie, een vrolijk en nieuwsgierig winkelvriendje voor jonge kinderen. Je praat in natuurlijk Nederlands, met een warme stem en een glimlach. Je klinkt spontaan en vertrouwd. Spreek rustig, duidelijk en speels, alsof je samen met een kind boodschappen doet. Behoud steeds dezelfde herkenbare stem. Spreek uitsluitend de opgegeven tekst uit.`;
+export const DEFAULT_VOICE_PERSONALITY = `Je bent Karrie, een blij kinderstemmetje voor een kind van een jaar of drie. Je spreekt Nederlands zoals in Nederland, zonder buitenlands accent. Je klinkt vrolijk, speels en enthousiast. Zeg alleen de zin die je krijgt, niets ervoor of erna.`;
 
-/** Identical delivery for ordinary product instructions; tiny mood only for celebration/mission. */
-const BASELINE_DELIVERY = "Zelfde Karrie-stem en toonhoogte. Geen andere spreker.";
+const BASELINE_DELIVERY = "Zelfde vrolijke kinderstem. Nederlands uit Nederland. Geen andere spreker.";
 
-const MOOD: Partial<Record<VoiceEvent, string>> = {
-  complete: "Stemming: rustig trots.",
-  mission: "Stemming: speels aandachtig (geen fluisterstem).",
-  sticker: "Stemming: warm tevreden.",
+const MOOD: Record<string, string> = {
+  complete: "Stemming: uitgelaten blij, een feestje.",
+  welcome: "Stemming: vrolijk, daar gaan we!",
+  mission: "Stemming: speels en enthousiast.",
+  sticker: "Stemming: trots en blij.",
+  positive: "Stemming: blij verrast.",
 };
 
-export function buildSpeakInstructions(event: VoiceEvent, text: string): string {
+export function buildSpeakInstructions(event: string, text: string): string {
   const mood = MOOD[event] ?? "";
   return `${DEFAULT_VOICE_PERSONALITY}
 

@@ -8,8 +8,9 @@ const state = {
   instances: [] as Array<{ sent: string[]; readyState: number }>,
 };
 
-/** ~350ms of 16-bit mono PCM at 24 kHz — above min for short "Hebbes!". */
-const GOOD_PCM = Buffer.alloc(24_000 * 2 * 0.35, 1);
+/** ~350ms of loud 16-bit mono PCM at 24 kHz — passes silence and duration checks for "Hebbes!". */
+const GOOD_PCM = Buffer.alloc(24_000 * 2 * 0.35);
+for (let i = 0; i < GOOD_PCM.length; i += 2) GOOD_PCM.writeInt16LE(8_000, i);
 
 vi.mock("ws", () => {
   class MockWebSocket {
@@ -123,6 +124,15 @@ describe("createRealtimeSpeechProvider", () => {
     const { createRealtimeSpeechProvider, createSpeechApiProvider } = await import("./provider.js");
     expect(() => createRealtimeSpeechProvider({ apiKey: "k", model: "gpt-4o-mini-tts" })).toThrow(/deprecated|Unsupported/i);
     expect(() => createSpeechApiProvider()).toThrow(/removed/i);
+  });
+
+  it("defaults to the full realtime model and coral, and still allows mini", async () => {
+    const { createRealtimeSpeechProvider } = await import("./provider.js");
+    const provider = createRealtimeSpeechProvider({ apiKey: "k" });
+    expect(provider.model).toBe("gpt-realtime-2.1");
+    expect(provider.voice).toBe("coral");
+    expect(provider.instructionVersion).toBe("v6");
+    expect(() => createRealtimeSpeechProvider({ apiKey: "k", model: "gpt-realtime-2.1-mini", voice: "coral" })).not.toThrow();
   });
 
   it("returns WAV audio and usage without calling audio.speech", async () => {

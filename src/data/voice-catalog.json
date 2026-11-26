@@ -1,5 +1,5 @@
 {
-  "version": "v5",
+  "version": "v6",
   "language": "nl-NL",
   "products": [
     {
@@ -10,7 +10,7 @@
     {
       "productId": "banaan",
       "spokenName": "bananen",
-      "instruction": "Zoek maar bananen!"
+      "instruction": "Zoek maar de bananen!"
     },
     {
       "productId": "peer",
@@ -20,7 +20,7 @@
     {
       "productId": "sinaasappel",
       "spokenName": "sinaasappels",
-      "instruction": "Nu gaan we sinaasappels zoeken!"
+      "instruction": "Nu gaan we de sinaasappels zoeken!"
     },
     {
       "productId": "aardbei",
@@ -30,7 +30,7 @@
     {
       "productId": "druiven",
       "spokenName": "druiven",
-      "instruction": "Nu gaan we druiven zoeken!"
+      "instruction": "Nu gaan we de druiven zoeken!"
     },
     {
       "productId": "mandarijn",
@@ -60,27 +60,27 @@
     {
       "productId": "paprika",
       "spokenName": "paprika",
-      "instruction": "Kun jij paprika vinden?"
+      "instruction": "Kun jij de paprika vinden?"
     },
     {
       "productId": "wortel",
       "spokenName": "wortels",
-      "instruction": "Nu gaan we wortels zoeken!"
+      "instruction": "Nu gaan we de wortels zoeken!"
     },
     {
       "productId": "broccoli",
       "spokenName": "broccoli",
-      "instruction": "Nu gaan we broccoli zoeken!"
+      "instruction": "Nu gaan we de broccoli zoeken!"
     },
     {
       "productId": "sla",
       "spokenName": "sla",
-      "instruction": "Kun jij sla vinden?"
+      "instruction": "Kun jij de sla vinden?"
     },
     {
       "productId": "avocado",
       "spokenName": "avocado",
-      "instruction": "Zoek maar avocado!"
+      "instruction": "Zoek maar de avocado!"
     },
     {
       "productId": "aardappel",
@@ -90,57 +90,57 @@
     {
       "productId": "aardappeltjes",
       "spokenName": "aardappeltjes",
-      "instruction": "Waar zijn aardappeltjes?"
+      "instruction": "Waar zijn de aardappeltjes?"
     },
     {
       "productId": "ui",
-      "spokenName": "ui",
-      "instruction": "Kun jij ui vinden?"
+      "spokenName": "uien",
+      "instruction": "Kun jij de uien vinden?"
     },
     {
       "productId": "knoflook",
       "spokenName": "knoflook",
-      "instruction": "Nu gaan we knoflook zoeken!"
+      "instruction": "Nu gaan we de knoflook zoeken!"
     },
     {
       "productId": "champignons",
       "spokenName": "champignons",
-      "instruction": "Zoek maar champignons!"
+      "instruction": "Zoek maar de champignons!"
     },
     {
       "productId": "courgette",
       "spokenName": "courgette",
-      "instruction": "Waar is courgette?"
+      "instruction": "Waar is de courgette?"
     },
     {
       "productId": "aubergine",
       "spokenName": "aubergine",
-      "instruction": "Kun jij aubergine vinden?"
+      "instruction": "Kun jij de aubergine vinden?"
     },
     {
       "productId": "sperziebonen",
       "spokenName": "sperziebonen",
-      "instruction": "Waar zijn sperziebonen?"
+      "instruction": "Waar zijn de sperziebonen?"
     },
     {
       "productId": "prei",
       "spokenName": "prei",
-      "instruction": "Waar is prei?"
+      "instruction": "Waar is de prei?"
     },
     {
       "productId": "verse-spinazie",
       "spokenName": "verse spinazie",
-      "instruction": "Zoek maar verse spinazie!"
+      "instruction": "Zoek maar de verse spinazie!"
     },
     {
       "productId": "wokgroenten",
       "spokenName": "wokgroenten",
-      "instruction": "Zoek maar wokgroenten!"
+      "instruction": "Zoek maar de wokgroenten!"
     },
     {
       "productId": "pastagroenten",
       "spokenName": "pastagroenten",
-      "instruction": "Zoek maar pastagroenten!"
+      "instruction": "Zoek maar de pastagroenten!"
     },
     {
       "productId": "brood",
@@ -150,57 +150,57 @@
     {
       "productId": "bolletjes",
       "spokenName": "bolletjes",
-      "instruction": "Kun jij bolletjes vinden?"
+      "instruction": "Kun jij de bolletjes vinden?"
     },
     {
       "productId": "krentenbollen",
       "spokenName": "krentenbollen",
-      "instruction": "Zoek maar krentenbollen!"
+      "instruction": "Zoek maar de krentenbollen!"
     },
     {
       "productId": "croissant",
       "spokenName": "croissant",
-      "instruction": "Waar is croissant?"
+      "instruction": "Waar is de croissant?"
     },
     {
       "productId": "stokbrood",
       "spokenName": "stokbrood",
-      "instruction": "Zoek maar stokbrood!"
+      "instruction": "Zoek maar het stokbrood!"
     },
     {
       "productId": "kipfilet",
       "spokenName": "kipfilet",
-      "instruction": "Waar is kipfilet?"
+      "instruction": "Waar is de kipfilet?"
     },
     {
       "productId": "gehakt",
       "spokenName": "gehakt",
-      "instruction": "Kun jij gehakt vinden?"
+      "instruction": "Kun jij het gehakt vinden?"
     },
     {
       "productId": "zalm",
       "spokenName": "zalm",
-      "instruction": "Kun jij zalm vinden?"
+      "instruction": "Kun jij de zalm vinden?"
     },
     {
       "productId": "vegaburger",
       "spokenName": "vegaburger",
-      "instruction": "Waar is vegaburger?"
+      "instruction": "Waar is de vegaburger?"
     },
     {
       "productId": "beschuit",
       "spokenName": "beschuit",
-      "instruction": "Zoek maar beschuit!"
+      "instruction": "Zoek maar de beschuit!"
     },
     {
       "productId": "crackers",
       "spokenName": "crackers",
-      "instruction": "Kun jij crackers vinden?"
+      "instruction": "Kun jij de crackers vinden?"
     },
     {
       "productId": "havermout",
       "spokenName": "havermout",
-      "instruction": "Zoek maar havermout!"
+      "instruction": "Zoek maar de havermout!"
     },
     {
       "productId": "pindakaas",
@@ -210,12 +210,12 @@
     {
       "productId": "noten",
       "spokenName": "noten",
-      "instruction": "Kun jij noten vinden?"
+      "instruction": "Kun jij de noten vinden?"
     },
     {
       "productId": "jam",
       "spokenName": "jam",
-      "instruction": "Waar is jam?"
+      "instruction": "Waar is de jam?"
     },
     {
       "productId": "hagelslag",
@@ -225,22 +225,22 @@
     {
       "productId": "muesli",
       "spokenName": "muesli",
-      "instruction": "Zoek maar muesli!"
+      "instruction": "Zoek maar de muesli!"
     },
     {
       "productId": "honing",
       "spokenName": "honing",
-      "instruction": "Zoek maar honing!"
+      "instruction": "Zoek maar de honing!"
     },
     {
       "productId": "appelstroop",
       "spokenName": "appelstroop",
-      "instruction": "Zoek maar appelstroop!"
+      "instruction": "Zoek maar de appelstroop!"
     },
     {
       "productId": "pasta",
       "spokenName": "pasta",
-      "instruction": "Zoek maar pasta!"
+      "instruction": "Zoek maar de pasta!"
     },
     {
       "productId": "rijst",
@@ -250,22 +250,22 @@
     {
       "productId": "tomatenpuree",
       "spokenName": "tomatenpuree",
-      "instruction": "Zoek maar tomatenpuree!"
+      "instruction": "Zoek maar de tomatenpuree!"
     },
     {
       "productId": "soep",
       "spokenName": "soep",
-      "instruction": "Zoek maar soep!"
+      "instruction": "Zoek maar de soep!"
     },
     {
       "productId": "olijfolie",
       "spokenName": "olijfolie",
-      "instruction": "Nu gaan we olijfolie zoeken!"
+      "instruction": "Nu gaan we de olijfolie zoeken!"
     },
     {
       "productId": "suiker",
       "spokenName": "suiker",
-      "instruction": "Nu gaan we suiker zoeken!"
+      "instruction": "Nu gaan we de suiker zoeken!"
     },
     {
       "productId": "koekjes",
@@ -275,42 +275,42 @@
     {
       "productId": "chips",
       "spokenName": "chips",
-      "instruction": "Zoek maar chips!"
+      "instruction": "Zoek maar de chips!"
     },
     {
       "productId": "chocoladereep",
       "spokenName": "chocoladereep",
-      "instruction": "Waar is chocoladereep?"
+      "instruction": "Waar is de chocoladereep?"
     },
     {
       "productId": "ontbijtkoek",
       "spokenName": "ontbijtkoek",
-      "instruction": "Kun jij ontbijtkoek vinden?"
+      "instruction": "Kun jij de ontbijtkoek vinden?"
     },
     {
       "productId": "pastasaus",
       "spokenName": "pastasaus",
-      "instruction": "Zoek maar pastasaus!"
+      "instruction": "Zoek maar de pastasaus!"
     },
     {
       "productId": "mais",
       "spokenName": "mais",
-      "instruction": "Waar zijn mais?"
+      "instruction": "Waar is de mais?"
     },
     {
       "productId": "augurk",
-      "spokenName": "augurk",
-      "instruction": "Zoek maar augurk!"
+      "spokenName": "augurken",
+      "instruction": "Zoek maar de augurken!"
     },
     {
       "productId": "olijven",
       "spokenName": "olijven",
-      "instruction": "Nu gaan we olijven zoeken!"
+      "instruction": "Nu gaan we de olijven zoeken!"
     },
     {
       "productId": "babyvoeding",
       "spokenName": "babyvoeding",
-      "instruction": "Kun jij babyvoeding vinden?"
+      "instruction": "Kun jij de babyvoeding vinden?"
     },
     {
       "productId": "melk",
@@ -325,7 +325,7 @@
     {
       "productId": "kwark",
       "spokenName": "kwark",
-      "instruction": "Waar is kwark?"
+      "instruction": "Waar is de kwark?"
     },
     {
       "productId": "kaas",
@@ -335,22 +335,22 @@
     {
       "productId": "ham",
       "spokenName": "ham",
-      "instruction": "Kun jij ham vinden?"
+      "instruction": "Kun jij de ham vinden?"
     },
     {
       "productId": "salami",
       "spokenName": "salami",
-      "instruction": "Zoek maar salami!"
+      "instruction": "Zoek maar de salami!"
     },
     {
       "productId": "mozzarella",
       "spokenName": "mozzarella",
-      "instruction": "Zoek maar mozzarella!"
+      "instruction": "Zoek maar de mozzarella!"
     },
     {
       "productId": "feta",
       "spokenName": "feta",
-      "instruction": "Kun jij feta vinden?"
+      "instruction": "Kun jij de feta vinden?"
     },
     {
       "productId": "eieren",
@@ -365,37 +365,37 @@
     {
       "productId": "vla",
       "spokenName": "vla",
-      "instruction": "Zoek maar vla!"
+      "instruction": "Zoek maar de vla!"
     },
     {
       "productId": "karnemelk",
       "spokenName": "karnemelk",
-      "instruction": "Waar is karnemelk?"
+      "instruction": "Waar is de karnemelk?"
     },
     {
       "productId": "roomkaas",
       "spokenName": "roomkaas",
-      "instruction": "Zoek maar roomkaas!"
+      "instruction": "Zoek maar de roomkaas!"
     },
     {
       "productId": "slagroom",
       "spokenName": "slagroom",
-      "instruction": "Waar is slagroom?"
+      "instruction": "Waar is de slagroom?"
     },
     {
       "productId": "koffie",
       "spokenName": "koffie",
-      "instruction": "Kun jij koffie vinden?"
+      "instruction": "Kun jij de koffie vinden?"
     },
     {
       "productId": "thee",
       "spokenName": "thee",
-      "instruction": "Kun jij thee vinden?"
+      "instruction": "Kun jij de thee vinden?"
     },
     {
       "productId": "sinaasappelsap",
       "spokenName": "sinaasappelsap",
-      "instruction": "Nu gaan we sinaasappelsap zoeken!"
+      "instruction": "Nu gaan we het sinaasappelsap zoeken!"
     },
     {
       "productId": "water",
@@ -405,17 +405,17 @@
     {
       "productId": "drinkpakje",
       "spokenName": "drinkpakje",
-      "instruction": "Nu gaan we drinkpakje zoeken!"
+      "instruction": "Nu gaan we het drinkpakje zoeken!"
     },
     {
       "productId": "frisdrank",
       "spokenName": "frisdrank",
-      "instruction": "Waar is frisdrank?"
+      "instruction": "Waar is de frisdrank?"
     },
     {
       "productId": "siroop",
       "spokenName": "siroop",
-      "instruction": "Kun jij siroop vinden?"
+      "instruction": "Kun jij de siroop vinden?"
     },
     {
       "productId": "ijs",
@@ -425,87 +425,87 @@
     {
       "productId": "pizza",
       "spokenName": "pizza",
-      "instruction": "Kun jij pizza vinden?"
+      "instruction": "Kun jij de pizza vinden?"
     },
     {
       "productId": "vissticks",
       "spokenName": "vissticks",
-      "instruction": "Zoek maar vissticks!"
+      "instruction": "Zoek maar de vissticks!"
     },
     {
       "productId": "spinazie",
       "spokenName": "spinazie",
-      "instruction": "Zoek maar spinazie!"
+      "instruction": "Zoek maar de spinazie!"
     },
     {
       "productId": "bessen",
       "spokenName": "bessen",
-      "instruction": "Kun jij bessen vinden?"
+      "instruction": "Kun jij de bessen vinden?"
     },
     {
       "productId": "kant-en-klaar",
-      "spokenName": "kant-en-klaar",
-      "instruction": "Waar is kant-en-klaar?"
+      "spokenName": "kant-en-klaarmaaltje",
+      "instruction": "Waar is het kant-en-klaarmaaltje?"
     },
     {
       "productId": "maaltijdsalade",
       "spokenName": "maaltijdsalade",
-      "instruction": "Waar is maaltijdsalade?"
+      "instruction": "Waar is de maaltijdsalade?"
     },
     {
       "productId": "toiletpapier",
       "spokenName": "toiletpapier",
-      "instruction": "Kun jij toiletpapier vinden?"
+      "instruction": "Kun jij het toiletpapier vinden?"
     },
     {
       "productId": "keukenpapier",
       "spokenName": "keukenpapier",
-      "instruction": "Kun jij keukenpapier vinden?"
+      "instruction": "Kun jij het keukenpapier vinden?"
     },
     {
       "productId": "afwasmiddel",
       "spokenName": "afwasmiddel",
-      "instruction": "Zoek maar afwasmiddel!"
+      "instruction": "Zoek maar het afwasmiddel!"
     },
     {
       "productId": "wasmiddel",
       "spokenName": "wasmiddel",
-      "instruction": "Kun jij wasmiddel vinden?"
+      "instruction": "Kun jij het wasmiddel vinden?"
     },
     {
       "productId": "vuilniszakken",
       "spokenName": "vuilniszakken",
-      "instruction": "Waar zijn vuilniszakken?"
+      "instruction": "Waar zijn de vuilniszakken?"
     },
     {
       "productId": "schoonmaakmiddel",
       "spokenName": "schoonmaakmiddel",
-      "instruction": "Zoek maar schoonmaakmiddel!"
+      "instruction": "Zoek maar het schoonmaakmiddel!"
     },
     {
       "productId": "vaatwastabletten",
       "spokenName": "vaatwastabletten",
-      "instruction": "Kun jij vaatwastabletten vinden?"
+      "instruction": "Kun jij de vaatwastabletten vinden?"
     },
     {
       "productId": "handzeep",
       "spokenName": "handzeep",
-      "instruction": "Nu gaan we handzeep zoeken!"
+      "instruction": "Nu gaan we de handzeep zoeken!"
     },
     {
       "productId": "tandpasta",
       "spokenName": "tandpasta",
-      "instruction": "Kun jij tandpasta vinden?"
+      "instruction": "Kun jij de tandpasta vinden?"
     },
     {
       "productId": "shampoo",
       "spokenName": "shampoo",
-      "instruction": "Zoek maar shampoo!"
+      "instruction": "Zoek maar de shampoo!"
     },
     {
       "productId": "luiers",
       "spokenName": "luiers",
-      "instruction": "Waar zijn luiers?"
+      "instruction": "Waar zijn de luiers?"
     }
   ]
 }
