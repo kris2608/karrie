@@ -408,6 +408,7 @@ describe("POST /api/products/barcode", () => {
       model: "m",
       limits: createLimits({ perIpPerHour: 1, perIpPerDay: 1, dailyRequests: 1, dailyBudgetUsd: 1, inputUsdPerMTok: 1, cachedInputUsdPerMTok: 0.1, outputUsdPerMTok: 4 }),
       recognize: async () => ({ ok: false, code: "unavailable" }),
+      adminToken: "test-admin",
       barcode: { lookup, limits, searchCallUsd: 0.01 },
       log: (entry) => logs.push(entry),
     });
@@ -418,7 +419,7 @@ describe("POST /api/products/barcode", () => {
     return {
       limits,
       webCalls,
-      health: async () => (await fetch(`${base}/api/health`)).json(),
+      health: async () => (await fetch(`${base}/api/admin/health`, { headers: { Authorization: "Bearer test-admin" } })).json(),
       post: (body: unknown) =>
         fetch(`${base}/api/products/barcode`, { method: "POST", headers: { "Content-Type": "application/json", Origin: "https://karrieapp.onrender.com" }, body: JSON.stringify(body) }),
     };

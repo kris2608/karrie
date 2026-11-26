@@ -1,5 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isInstallId, newInstallId, signAppToken, verifyAppToken } from "./appToken.js";
+import { clientIp } from "./clientIp.js";
 import { z } from "zod";
 import type { BarcodeLookup, LookupResult } from "./barcode.js";
 import { APPROVAL, CREATED_FROM, type Candidate, type CandidateStore } from "./candidates.js";
@@ -11,7 +13,7 @@ import type { NameImageLookup, NameImageResult } from "./nameImage.js";
 import type { OffSearch } from "./offSearch.js";
 import { parseName, type ParsedName } from "./productName.js";
 import { ImageIdentitySchema, type ImageDiscovery } from "./images.js";
-import type { Limits } from "./limits.js";
+import type { Denial, Limits } from "./limits.js";
 import type { OfferLookup } from "./offers/index.js";
 import { PRODUCT_CATEGORIES } from "./offers/match.js";
 import { RETAILERS, type PrijsProfeet } from "./offers/prijsprofeet.js";
@@ -84,10 +86,23 @@ export type SharedListDeps = {
   publicOrigin: string;
 };
 
+export type AppAuth = {
+  /** HMAC key for short-lived app tokens. A boot secret works; a stable env secret survives restarts. */
+  secret: string;
+  /** When true, paid and quota routes reject calls that do not carry a valid app token. */
+  required: boolean;
+};
+
 export type AppDeps = {
   allowedOrigins: string[];
   requireOrigin: boolean;
   configured: boolean;
+  /** Bearer token for /api/admin/health. Falls back to the candidates admin token. */
+  adminToken?: string;
+  /** Absent in unit tests, so existing callers keep working without a session. */
+  appAuth?: AppAuth;
+  /** Per-IP cap for minting app tokens. Falls back to the main limits when omitted. */
+  sessionLimits?: Limits;
   model: string;
   limits: Limits;
   recognize: (dataUrl: string, scannedEan?: string) => Promise<RecognizeResult>;
@@ -199,18 +214,14 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 /** Hide secret share tokens in ordinary request logs. */
+export { clientIp } from "./clientIp.js";
+
 export function sanitizeLogPath(pathname: string): string {
   if (pathname.startsWith("/api/lists/share/") && pathname.length > "/api/lists/share/".length) {
     return "/api/lists/share/:id";
   }
   if (/^\/l\/[A-Za-z0-9_-]{16,64}\/?$/.test(pathname)) return "/l/:id";
   return pathname;
-}
-
-export function clientIp(req: IncomingMessage): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim();
-  return first || req.socket.remoteAddress || "unknown";
 }
 
 export function createHandler(deps: AppDeps) {
@@ -227,10 +238,12 @@ export function createHandler(deps: AppDeps) {
   const productOutcomes: Record<string, number> = {};
   const illustrationOutcomes: Record<string, number> = {};
   const count = (into: Record<string, number>, key: string) => (into[key] = (into[key] ?? 0) + 1);
+  const sessionLimits = deps.sessionLimits;
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     const id = randomUUID().slice(0, 8);
     const started = now();
+    let payer: { ip: string; installId?: string } = { ip: "unknown" };
     const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
     const allowed = origin !== undefined && deps.allowedOrigins.includes(origin);
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -253,7 +266,7 @@ export function createHandler(deps: AppDeps) {
     if (req.method === "OPTIONS") {
       if (!allowed) return send(403, { status: "error", code: "origin" });
       res.setHeader("Access-Control-Allow-Methods", "GET, POST");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
       res.setHeader("Access-Control-Max-Age", "600");
       res.writeHead(204);
       res.end();
@@ -261,7 +274,14 @@ export function createHandler(deps: AppDeps) {
     }
 
     if (url.pathname === "/api/health" && req.method === "GET") {
-      return send(200, {
+      return send(200, { status: "ok" });
+    }
+
+    if (url.pathname === "/api/admin/health" && req.method === "GET") return adminHealth();
+    if (url.pathname === "/api/session" && req.method === "POST") return issueSession();
+
+    function healthReport() {
+      return {
         status: "ok",
         configured: deps.configured,
         model: deps.model,
@@ -297,13 +317,103 @@ export function createHandler(deps: AppDeps) {
           : { enabled: false },
         healthier: deps.healthier ? { enabled: true, stats: deps.healthier.limits.stats() } : { enabled: false },
         voice: deps.voice ? { enabled: true, stats: deps.voice.limits.stats(), cache: deps.voice.stats() } : { enabled: false },
-      });
+      };
     }
 
-    if (url.pathname === "/api/voice/speak" && req.method === "POST") return speakVoice();
+    function adminSecret(): string | undefined {
+      return deps.adminToken || deps.products?.adminToken;
+    }
+
+    function presentedBearer(): string {
+      return String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+    }
+
+    function adminHealth() {
+      const token = adminSecret();
+      const given = presentedBearer();
+      if (!token || !given || !sameToken(given, token)) return send(404, { status: "error", code: "not-found" });
+      return send(200, healthReport());
+    }
+
+    /** Paid routes. Tests omit appAuth, so they stay on origin checks alone. */
+    function allowPaid(): { ip: string; installId?: string } | undefined {
+      const ip = clientIp(req);
+      if (!deps.appAuth?.required) return { ip };
+      const verified = verifyAppToken(deps.appAuth.secret, presentedBearer(), now());
+      if (!verified) {
+        send(401, { status: "error", code: "session" });
+        return undefined;
+      }
+      return { ip, installId: verified.installId };
+    }
+
+    async function reserve(limits: Limits, who: { ip: string; installId?: string }): Promise<Denial | "unavailable" | null> {
+      const denial = limits.admit(who.ip, who.installId);
+      if (denial) return denial;
+      try {
+        await limits.commit();
+        return null;
+      } catch {
+        return "unavailable";
+      }
+    }
+
+    async function remember(limits: Limits, outcome: Parameters<Limits["record"]>[0]) {
+      limits.record(outcome);
+      try {
+        await limits.commit();
+      } catch {
+        deps.log({ event: "usage-commit-failed" });
+      }
+    }
+
+    function deny(denial: Denial | "unavailable") {
+      if (denial === "unavailable") return send(503, { status: "error", code: "unavailable" });
+      return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+    }
+
+    async function issueSession() {
+      if (!deps.appAuth) return send(404, { status: "error", code: "not-found" });
+      if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
+      if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) return send(415, { status: "error", code: "unsupported-type" });
+      let raw: string;
+      try {
+        raw = await readBody(req);
+      } catch (error) {
+        if (error instanceof BodyTooLarge) return send(413, { status: "error", code: "too-large" });
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      let body: unknown;
+      try {
+        body = raw ? JSON.parse(raw) : {};
+      } catch {
+        return send(400, { status: "error", code: "bad-request" });
+      }
+      const requested = body && typeof body === "object" && typeof (body as { installId?: unknown }).installId === "string" ? (body as { installId: string }).installId : "";
+      const install = isInstallId(requested) ? requested : newInstallId();
+      const limiter = sessionLimits ?? deps.limits;
+      const ip = clientIp(req);
+      const denial = await reserve(limiter, { ip });
+      if (denial) return deny(denial);
+      const signed = signAppToken(deps.appAuth.secret, install, now());
+      await remember(limiter, { ok: true, latencyMs: now() - started });
+      return send(200, { status: "ok", token: signed.token, expiresAt: new Date(signed.expiresAt).toISOString(), installId: install });
+    }
+
+    if (url.pathname === "/api/voice/speak" && req.method === "POST") {
+      const who = allowPaid();
+      if (!who) return;
+      payer = who;
+      return speakVoice();
+    }
     if (url.pathname === "/api/voice/config" && req.method === "GET") return voiceConfig();
 
-    if (url.pathname === "/api/lists/share" && req.method === "POST") return createSharedList();
+    if (url.pathname === "/api/lists/share" && req.method === "POST") {
+      const who = allowPaid();
+      if (!who) return;
+      payer = who;
+      return createSharedList();
+    }
     if (url.pathname.startsWith("/api/lists/share/") && req.method === "GET") return readSharedList();
     if (/^\/l\/[A-Za-z0-9_-]{16,64}\/?$/.test(url.pathname) && req.method === "GET") return previewSharedList();
     if (url.pathname === CATALOG_CHANGES && req.method === "GET") return catalogChanges();
@@ -313,6 +423,9 @@ export function createHandler(deps: AppDeps) {
     if (!ROUTES.includes(url.pathname)) return send(404, { status: "error", code: "not-found" });
     if (req.method !== "POST") return send(405, { status: "error", code: "method" });
     if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
+    const who = allowPaid();
+    if (!who) return;
+    payer = who;
     if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) return send(415, { status: "error", code: "unsupported-type" });
 
     let raw: string;
@@ -344,17 +457,17 @@ export function createHandler(deps: AppDeps) {
     if (!image.ok) return send(image.status, { status: "error", code: image.code });
     if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
 
-    const ip = clientIp(req);
+    const ip = payer.ip;
     if (inFlight.has(ip)) return send(429, { status: "error", code: "in-flight" });
-    const denial = deps.limits.admit(ip);
-    if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+    const denial = await reserve(deps.limits, payer);
+    if (denial) return deny(denial);
 
     inFlight.add(ip);
     const callStarted = now();
     try {
       const result = await deps.recognize(image.dataUrl, canonicalEan((body as { scannedEan?: unknown }).scannedEan) ?? undefined);
       const openaiMs = now() - callStarted;
-      deps.limits.record({ ok: result.ok, latencyMs: openaiMs, usage: result.usage });
+      await remember(deps.limits, { ok: result.ok, latencyMs: openaiMs, usage: result.usage });
       Object.assign(entry, { model: deps.model, openaiMs, usage: result.usage, code: result.ok ? undefined : result.code });
       if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
 
@@ -397,15 +510,14 @@ export function createHandler(deps: AppDeps) {
         return send(200, { status: "ok", discovery: hit });
       }
       if (images.discovery.busy()) return send(503, { status: "error", code: "busy" });
-      const ip = clientIp(req);
-      const denial = images.limits.admit(ip);
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(images.limits, payer);
+      if (denial) return deny(denial);
 
       const callStarted = now();
       const result = await images.discovery.discover(identity, { refresh });
       const latencyMs = now() - callStarted;
       const extraUsd = result.searchCalls * images.searchCallUsd + result.providerCalls * images.providerCallUsd;
-      images.limits.record({ ok: result.ok, latencyMs, usage: result.usage, extraUsd });
+      await remember(images.limits, { ok: result.ok, latencyMs, usage: result.usage, extraUsd });
       Object.assign(entry, { provider: images.discovery.provider, openaiMs: latencyMs, usage: result.usage, searchCalls: result.searchCalls, cached: result.ok ? result.cached : undefined });
       for (const failure of (result as { failures?: string[] }).failures ?? []) imageFailures[failure] = (imageFailures[failure] ?? 0) + 1;
       const outcome = result.ok ? `${identity.generic ? "generic" : "branded"}-${result.discovery.status}` : `error-${result.code}`;
@@ -433,13 +545,13 @@ export function createHandler(deps: AppDeps) {
         entry.cached = true;
         return reply(hit);
       }
-      const denial = barcode.limits.admit(clientIp(req));
-      if (denial && denial !== "budget") return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(barcode.limits, payer);
+      if (denial && denial !== "budget") return deny(denial);
 
       const callStarted = now();
       const result = await barcode.lookup.lookup(ean, { allowWeb: !denial });
       const latencyMs = now() - callStarted;
-      if (!denial) barcode.limits.record({ ok: result.ok, latencyMs, usage: result.ok ? result.usage : undefined, extraUsd: result.ok ? result.searchCalls * barcode.searchCallUsd : 0 });
+      if (!denial) await remember(barcode.limits, { ok: result.ok, latencyMs, usage: result.ok ? result.usage : undefined, extraUsd: result.ok ? result.searchCalls * barcode.searchCallUsd : 0 });
       Object.assign(entry, { lookupMs: latencyMs, searchCalls: result.ok ? result.searchCalls : undefined });
       for (const failure of result.failures) count(barcodeFailures, failure);
       count(barcodeOutcomes, result.ok ? result.answer.status : `error-${result.code}`);
@@ -469,11 +581,11 @@ export function createHandler(deps: AppDeps) {
         entry.cached = true;
         return reply(hit);
       }
-      const denial = images.limits.admit(clientIp(req));
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(images.limits, payer);
+      if (denial) return deny(denial);
       const callStarted = now();
       const result = await images.lookup.find(ean, prefer);
-      images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+      await remember(images.limits, { ok: result.ok, latencyMs: now() - callStarted });
       entry.lookupMs = now() - callStarted;
       return reply(result);
     }
@@ -485,10 +597,10 @@ export function createHandler(deps: AppDeps) {
       const ean = request.success ? canonicalEan(request.data.ean) : null;
       const quantity = request.success ? request.data.quantity.trim() : "";
       if (!ean || quantity.length < 1 || quantity.length > 24) return send(400, { status: "error", code: "bad-request" });
-      const denial = deps.limits.admit(clientIp(req));
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(deps.limits, payer);
+      if (denial) return deny(denial);
       const pack = await deps.catalog.recordParentPack({ ean, quantity });
-      deps.limits.record({ ok: Boolean(pack), latencyMs: 0 });
+      await remember(deps.limits, { ok: Boolean(pack), latencyMs: 0 });
       return pack ? send(200, { status: "ok", pack }) : send(502, { status: "error", code: "unavailable" });
     }
 
@@ -503,7 +615,7 @@ export function createHandler(deps: AppDeps) {
       if (!request.success) return send(400, { status: "error", code: "bad-request" });
       const parsed = parseName(request.data.name);
       if (!parsed) return send(422, { status: "error", code: "not-a-product" });
-      const ip = clientIp(req);
+      const ip = payer.ip;
       const purpose = request.data.purpose;
       const retailer = request.data.retailer;
 
@@ -535,12 +647,12 @@ export function createHandler(deps: AppDeps) {
       };
 
       if (purpose === "private-label" && retailer) {
-        const denial = images.limits.admit(ip);
-        if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+        const denial = await reserve(images.limits, payer);
+        if (denial) return deny(denial);
         const callStarted = now();
         const result = await images.lookup.privateLabels(parsed.name, retailer);
         if (result.ok && result.cached) entry.cached = true;
-        images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+        await remember(images.limits, { ok: result.ok, latencyMs: now() - callStarted });
         entry.lookupMs = now() - callStarted;
         return reply(result, false);
       }
@@ -550,12 +662,12 @@ export function createHandler(deps: AppDeps) {
         entry.cached = true;
         return reply(hit, true);
       }
-      const denial = images.limits.admit(ip);
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(images.limits, payer);
+      if (denial) return deny(denial);
       const callStarted = now();
       const result = await images.lookup.find(parsed.name, { retailer });
       if (result.ok && result.cached) entry.cached = true;
-      images.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+      await remember(images.limits, { ok: result.ok, latencyMs: now() - callStarted });
       entry.lookupMs = now() - callStarted;
       return reply(result, true);
     }
@@ -570,11 +682,11 @@ export function createHandler(deps: AppDeps) {
       const ean = product.ean ? canonicalEan(product.ean) : null;
       if (product.ean && !ean) return send(400, { status: "error", code: "bad-request" });
 
-      const denial = offers.limits.admit(clientIp(req));
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(offers.limits, payer);
+      if (denial) return deny(denial);
       const callStarted = now();
       const result = await offers.lookup.find({ ...product, ean: ean ?? undefined }, retailer);
-      offers.limits.record({ ok: result.ok, latencyMs: now() - callStarted });
+      await remember(offers.limits, { ok: result.ok, latencyMs: now() - callStarted });
       Object.assign(entry, { retailer, generic: product.generic, lookupMs: now() - callStarted });
       if (!result.ok) {
         count(offerOutcomes, `error-${result.code}`);
@@ -596,7 +708,7 @@ export function createHandler(deps: AppDeps) {
         count(productOutcomes, "refused-input");
         return send(422, { status: "error", code: "not-a-product" });
       }
-      const ip = clientIp(req);
+      const ip = payer.ip;
       const illustrations = Boolean(products.illustrations);
       const known = products.candidates.find(name);
       if (known) {
@@ -610,13 +722,13 @@ export function createHandler(deps: AppDeps) {
         return send(200, { status: "ok", product: productOf(known), illustrations });
       }
       if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
-      const denial = products.limits.admit(ip);
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(products.limits, payer);
+      if (denial) return deny(denial);
 
       const callStarted = now();
       const result = await products.normalize(name);
       const latencyMs = now() - callStarted;
-      products.limits.record({ ok: result.ok, latencyMs, usage: result.usage });
+      await remember(products.limits, { ok: result.ok, latencyMs, usage: result.usage });
       Object.assign(entry, { model: deps.model, openaiMs: latencyMs, usage: result.usage, code: result.ok ? undefined : result.code });
       count(productOutcomes, result.ok ? "normalized" : result.brand ? "brand" : `error-${result.code}`);
       if (!result.ok) {
@@ -643,12 +755,12 @@ export function createHandler(deps: AppDeps) {
         count(illustrationOutcomes, "cached");
         return send(200, { status: "ok", image: hit });
       }
-      const denial = drawing.limits.admit(clientIp(req));
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(drawing.limits, payer);
+      if (denial) return deny(denial);
       const callStarted = now();
       const result = await drawing.illustrator.draw(candidate);
       const fresh = result.ok && !result.cached;
-      drawing.limits.record({ ok: result.ok, latencyMs: now() - callStarted, extraUsd: fresh ? drawing.illustrator.imageUsd : 0 });
+      await remember(drawing.limits, { ok: result.ok, latencyMs: now() - callStarted, extraUsd: fresh ? drawing.illustrator.imageUsd : 0 });
       Object.assign(entry, { imageMs: now() - callStarted, code: result.ok ? undefined : result.code });
       count(illustrationOutcomes, result.ok ? (result.cached ? "cached" : "generated") : `error-${result.code}`);
       if (!result.ok) return send(STATUS_BY_CODE[result.code] ?? 502, { status: "error", code: result.code });
@@ -726,13 +838,12 @@ export function createHandler(deps: AppDeps) {
     async function assessHealthier(body: unknown) {
       if (!deps.healthier) return send(503, { status: "error", code: "unavailable" });
       if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
-      const ip = clientIp(req);
-      const denial = deps.healthier.limits.admit(ip);
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(deps.healthier.limits, payer);
+      if (denial) return deny(denial);
       const callStarted = now();
       const result = await deps.healthier.assess(body);
       const latencyMs = now() - callStarted;
-      deps.healthier.limits.record({ ok: result.ok, latencyMs, usage: result.ok ? result.usage : result.usage });
+      await remember(deps.healthier.limits, { ok: result.ok, latencyMs, usage: result.ok ? result.usage : result.usage });
       Object.assign(entry, { openaiMs: latencyMs, usage: result.ok ? result.usage : result.usage, cached: result.ok ? result.cached : undefined, code: result.ok ? undefined : result.code });
       if (!result.ok) {
         if (result.code === "insufficient-data" || result.code === "invalid") {
@@ -778,9 +889,8 @@ export function createHandler(deps: AppDeps) {
       const priority = priorityRaw === "background" || priorityRaw === "interactive" ? priorityRaw : "interactive";
       if (!isVoiceEvent(event) || !text) return send(422, { status: "error", code: "invalid" });
 
-      const ip = clientIp(req);
-      const denial = deps.voice.limits.admit(ip);
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(deps.voice.limits, payer);
+      if (denial) return deny(denial);
 
       const callStarted = now();
       const result = await deps.voice.speak({ event, text, priority });
@@ -796,7 +906,7 @@ export function createHandler(deps: AppDeps) {
       });
 
       if (!result.ok) {
-        deps.voice.limits.record({ ok: false, latencyMs });
+        await remember(deps.voice.limits, { ok: false, latencyMs });
         if (result.code === "invalid") return send(422, { status: "error", code: "invalid" });
         if (result.code === "misconfigured") return send(503, { status: "error", code: "misconfigured" });
         // voiceError stays in structured log via `entry`; not returned to clients.
@@ -807,7 +917,7 @@ export function createHandler(deps: AppDeps) {
       const audioTokens = usage?.audioOutputTokens ?? 0;
       const audioExtra =
         !result.cacheHit && audioTokens > 0 ? (audioTokens * deps.voice.audioOutputUsdPerMTok) / 1_000_000 : 0;
-      deps.voice.limits.record({
+      await remember(deps.voice.limits, {
         ok: true,
         latencyMs,
         usage: usage
@@ -857,18 +967,17 @@ export function createHandler(deps: AppDeps) {
       } catch {
         return send(400, { status: "error", code: "bad-request" });
       }
-      const ip = clientIp(req);
-      const denial = deps.sharedLists.limits.admit(ip);
-      if (denial) return send(STATUS_BY_CODE[denial], { status: "error", code: denial });
+      const denial = await reserve(deps.sharedLists.limits, payer);
+      if (denial) return deny(denial);
       const result = await deps.sharedLists.store.create(body);
       if (!result.ok) {
-        deps.sharedLists.limits.record({ ok: false, latencyMs: now() - started });
+        await remember(deps.sharedLists.limits, { ok: false, latencyMs: now() - started });
         if (result.code === "unavailable") return send(503, { status: "error", code: "unavailable" });
         if (result.code === "empty") return send(422, { status: "error", code: "empty" });
         if (result.code === "too-many") return send(422, { status: "error", code: "too-many" });
         return send(422, { status: "error", code: "invalid" });
       }
-      deps.sharedLists.limits.record({ ok: true, latencyMs: now() - started });
+      await remember(deps.sharedLists.limits, { ok: true, latencyMs: now() - started });
       const originBase = deps.sharedLists.publicOrigin.replace(/\/$/, "");
       return send(200, {
         status: "ok",

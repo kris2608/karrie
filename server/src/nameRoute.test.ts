@@ -75,6 +75,7 @@ describe("POST /api/images/name", () => {
       model: "gpt-5.4-mini",
       limits: limits(3),
       recognize: async () => ({ ok: false, code: "unavailable" }) as never,
+      adminToken: "test-admin",
       nameImages: { lookup, limits: limits(perIpPerHour) },
       products: { normalize: async () => ({ ok: false, code: "unavailable" }), candidates, limits: limits(30) },
       log: (entry) => logs.push(entry),
@@ -103,7 +104,7 @@ describe("POST /api/images/name", () => {
     });
     expect(JSON.stringify(body)).not.toContain("8712345678906");
     expect(candidates.list()).toEqual([expect.objectContaining({ classification: "branded", brand: "Chocomel", prijsprofeetMatch: true, offMatch: false, imageAvailable: true, category: "dairy" })]);
-    const health = await (await fetch(`${base}/api/health`)).json();
+    const health = await (await fetch(`${base}/api/admin/health`, { headers: { Authorization: "Bearer test-admin" } })).json();
     expect(health.nameImages.outcomes).toEqual({ "branded-prijsprofeet": 1 });
     expect(health.products.candidates).toMatchObject({ branded: 1, storage: "memory" });
     expect(JSON.stringify(logs)).not.toMatch(/chocomel|static\.ah\.nl/i);

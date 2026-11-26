@@ -114,6 +114,7 @@ describe("POST /api/images/ean", () => {
       model: "gpt-5.4-mini",
       limits: limits(3),
       recognize: async () => ({ ok: false, code: "unavailable" }) as never,
+      adminToken: "test-admin",
       storeImages: { lookup: createStoreImageLookup(fake, () => NOW), limits: limits(perIpPerHour) },
       log: (entry) => logs.push(entry),
     });
@@ -144,7 +145,7 @@ describe("POST /api/images/ean", () => {
         brand: "De Ruijter",
       },
     });
-    const health = await (await fetch(`${base}/api/health`)).json();
+    const health = await (await fetch(`${base}/api/admin/health`, { headers: { Authorization: "Bearer test-admin" } })).json();
     expect(health.storeImages.outcomes).toEqual({ "found-albert_heijn": 1 });
     expect(JSON.stringify(logs)).not.toContain("static.ah.nl");
   });

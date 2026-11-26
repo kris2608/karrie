@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import { imageRetailerName, isImageSourceRetailer, type ImageSourceRetailerId } from "../../domain/retailers";
 
 /**
@@ -105,7 +106,7 @@ export function createStoreImageClient(deps: StoreImageClientDeps) {
 export type StoreImageClient = ReturnType<typeof createStoreImageClient>;
 
 export const storeImageClient = createStoreImageClient({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => navigator.onLine,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
 });

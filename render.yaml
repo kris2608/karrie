@@ -117,6 +117,9 @@ services:
         value: "24.22.1"
       - key: OPENAI_API_KEY
         sync: false
+      # Signs short-lived app tokens. Generate a long random string; do not commit it.
+      - key: APP_TOKEN_SECRET
+        sync: false
       - key: BRAVE_SEARCH_API_KEY
         sync: false
       - key: OPENAI_VISION_MODEL

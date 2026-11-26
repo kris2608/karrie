@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import { assembleProductEvidence, isAssessable, isBareGeneric, type ProductEvidence } from "../../domain/productEvidence";
 import { factsFor, type ProductFacts } from "../../domain/productFacts";
 import type { AdventureItem, AlternativeAssessment } from "../../domain/types";
@@ -82,6 +83,6 @@ export function createHealthierClient(deps: Deps) {
 
 export const healthierClient = createHealthierClient({
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   pageFacts: (item) => factsFor(item, () => undefined),
 });

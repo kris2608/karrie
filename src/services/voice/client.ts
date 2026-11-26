@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import type { VoiceEvent } from "../../domain/voiceScripts";
 import { applyVoiceCacheConfig, ensureVoiceCacheConfig, writeVoiceBlob } from "./cache";
 
@@ -139,7 +140,7 @@ export function createVoiceClient(deps: VoiceClientDeps) {
 }
 
 export const voiceClient = createVoiceClient({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => (typeof navigator === "undefined" ? true : navigator.onLine),
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
 });

@@ -1,5 +1,7 @@
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
+import { hashUsageSubject } from "./appToken.js";
 import OpenAI from "openai";
 import { createHandler } from "./app.js";
 import { createBarcodeLookup } from "./barcode.js";
@@ -26,6 +28,7 @@ import { createMemoryVoiceCache, createPgVoiceCache } from "./voice/cache.js";
 import { VOICE_CACHE_NAMESPACE, VOICE_TEMPLATE_VERSION } from "./voice/personality.js";
 import { createRealtimeSpeechProvider } from "./voice/provider.js";
 import { createSpeakService } from "./voice/speak.js";
+import { createPgUsageStore } from "./usageStore.js";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 
@@ -220,6 +223,48 @@ const healthierLimits = createLimits({
   cachedInputUsdPerMTok: number("PRICE_CACHED_INPUT_PER_MTOK", 0.075),
   outputUsdPerMTok: number("PRICE_OUTPUT_PER_MTOK", 4.5),
 });
+const sessionLimits = createLimits({
+  perIpPerHour: number("SESSION_LIMIT_PER_IP_HOUR", 30),
+  perIpPerDay: number("SESSION_LIMIT_PER_IP_DAY", 120),
+  dailyRequests: number("SESSION_LIMIT_DAILY_REQUESTS", 5000),
+  dailyBudgetUsd: 1_000_000,
+  inputUsdPerMTok: 0,
+  cachedInputUsdPerMTok: 0,
+  outputUsdPerMTok: 0,
+});
+const voiceLimits = createLimits({
+  perIpPerHour: number("VOICE_LIMIT_PER_IP_HOUR", 40),
+  perIpPerDay: number("VOICE_LIMIT_PER_IP_DAY", 120),
+  dailyRequests: number("VOICE_LIMIT_DAILY_REQUESTS", 2000),
+  dailyBudgetUsd: number("VOICE_DAILY_BUDGET_USD", 1),
+  inputUsdPerMTok: number("PRICE_VOICE_INPUT_PER_MTOK", 0.6),
+  cachedInputUsdPerMTok: number("PRICE_VOICE_CACHED_INPUT_PER_MTOK", 0.06),
+  outputUsdPerMTok: number("PRICE_VOICE_OUTPUT_PER_MTOK", 2.4),
+});
+
+/** Stable when APP_TOKEN_SECRET is set; otherwise tokens and per-install windows reset on each boot. */
+const appSecret = (env.APP_TOKEN_SECRET ?? "").trim() || randomBytes(32).toString("base64url");
+const appTokenPersistent = Boolean((env.APP_TOKEN_SECRET ?? "").trim());
+
+if (pgPool) {
+  const usage = createPgUsageStore(pgPool);
+  const hash = (value: string) => hashUsageSubject(appSecret, value);
+  const buckets = [
+    [limits, "recognize"],
+    [imageLimits, "images"],
+    [barcodeLimits, "barcode"],
+    [offerLimits, "offers"],
+    [productLimits, "products"],
+    [illustrationLimits, "illustrations"],
+    [shareLimits, "share"],
+    [healthierLimits, "healthier"],
+    [voiceLimits, "voice"],
+    [sessionLimits, "session"],
+  ] as const;
+  for (const [bucket, scope] of buckets) bucket.useStore(usage, scope, hash);
+  await Promise.all(buckets.map(([bucket]) => bucket.hydrate()));
+}
+
 const sharedLists = pgPool ? createSharedListStore(pgPool) : disabledSharedListStore();
 if (pgPool) {
   void sharedLists.purgeExpired().catch(() => undefined);
@@ -234,6 +279,9 @@ const handler = createHandler({
   requireOrigin: env.REQUIRE_ORIGIN !== "false",
   configured: Boolean(client),
   model: config.model,
+  adminToken: env.CANDIDATES_ADMIN_TOKEN || undefined,
+  appAuth: { secret: appSecret, required: env.APP_TOKEN_REQUIRED !== "false" },
+  sessionLimits,
   limits,
   recognize: (dataUrl, scannedEan) => recognizePhoto(client!, config, dataUrl, scannedEan),
   images: discovery
@@ -274,16 +322,6 @@ const handler = createHandler({
     : undefined,
   voice: (() => {
     if (env.VOICE === "off") return undefined;
-    // Realtime gpt-realtime-2.1-mini text/audio token prices (USD per 1M tokens).
-    const voiceLimits = createLimits({
-      perIpPerHour: number("VOICE_LIMIT_PER_IP_HOUR", 40),
-      perIpPerDay: number("VOICE_LIMIT_PER_IP_DAY", 120),
-      dailyRequests: number("VOICE_LIMIT_DAILY_REQUESTS", 2000),
-      dailyBudgetUsd: number("VOICE_DAILY_BUDGET_USD", 1),
-      inputUsdPerMTok: number("PRICE_VOICE_INPUT_PER_MTOK", 0.6),
-      cachedInputUsdPerMTok: number("PRICE_VOICE_CACHED_INPUT_PER_MTOK", 0.06),
-      outputUsdPerMTok: number("PRICE_VOICE_OUTPUT_PER_MTOK", 2.4),
-    });
     const audioOutputUsdPerMTok = number("PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK", 12);
     let provider = null;
     if (apiKey) {
@@ -331,6 +369,7 @@ createServer((req, res) => {
       port,
       model: config.model,
       configured: Boolean(client),
+      appTokenPersistent,
       imageProvider: discovery?.provider,
       candidates: candidates.storage(),
       ...(candidates.stats().loadError && { candidatesLoadError: candidates.stats().loadError }),

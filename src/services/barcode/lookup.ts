@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiSession";
 import { canonicalEan, sameEan } from "../../domain/ean";
 import type { SavedItem } from "../../domain/types";
 import type { BarcodeLookupSource } from "../analytics";
@@ -147,7 +148,7 @@ export function createBarcodeLookup(deps: BarcodeDeps) {
 }
 
 const barcodeLookup = createBarcodeLookup({
-  fetch: (...args) => fetch(...args),
+  fetch: (input, init) => apiFetch(input, init),
   online: () => typeof navigator === "undefined" || navigator.onLine !== false,
   origin: import.meta.env.VITE_API_ORIGIN ?? "",
   now: Date.now,
