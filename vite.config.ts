@@ -44,7 +44,7 @@ function voiceLibrary(): Plugin {
           next();
           return;
         }
-        res.setHeader("Content-Type", file.endsWith(".json") ? "application/json; charset=utf-8" : "audio/wav");
+        res.setHeader("Content-Type", file.endsWith(".json") ? "application/json; charset=utf-8" : file.endsWith(".mp3") ? "audio/mpeg" : "audio/wav");
         createReadStream(file).pipe(res);
       });
     },
@@ -119,10 +119,10 @@ export default defineConfig({
         globIgnores: ["og-image.png", "voice-library/**/*.wav"],
         runtimeCaching: [
           {
-            urlPattern: /\/voice-library\/.*\.(?:wav|json)$/,
+            urlPattern: /\/voice-library\/.*\.(?:wav|mp3|json)$/,
             handler: "CacheFirst",
             options: {
-              cacheName: "karrie-voice-library-v6",
+              cacheName: "karrie-voice-library-v7",
               cacheableResponse: { statuses: [0, 200] },
               expiration: { maxEntries: 120, maxAgeSeconds: 365 * 24 * 60 * 60, purgeOnQuotaError: true },
             },

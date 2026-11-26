@@ -865,7 +865,6 @@ export function createHandler(deps: AppDeps) {
     async function speakVoice() {
       if (origin !== undefined ? !allowed : deps.requireOrigin) return send(403, { status: "error", code: "origin" });
       if (!deps.voice) return send(503, { status: "error", code: "unavailable" });
-      if (!deps.configured) return send(503, { status: "error", code: "misconfigured" });
       if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) {
         return send(415, { status: "error", code: "unsupported-type" });
       }

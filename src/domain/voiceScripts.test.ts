@@ -65,19 +65,21 @@ describe("voiceScripts", () => {
     expect(isAllowedSpeechText("a".repeat(200))).toBe(false);
   });
 
-  it("uses a v6 coral cache key so marin clips cannot be reused", () => {
+  it("uses a Maarten cache key so coral clips cannot be reused", () => {
     const key = cacheKeyParts({ text: "Hebbes!", voice: DEFAULT_VOICE_NAME, model: DEFAULT_VOICE_MODEL, event: "positive" });
     expect(key).toContain("v6");
-    expect(key).toContain("coral");
-    expect(key).toContain("gpt-realtime-2.1");
-    expect(key).not.toContain("marin");
+    expect(key).toContain("v7");
+    expect(key).toContain("nl-NL-MaartenNeural");
+    expect(key).toContain("edge-tts");
+    expect(key).not.toContain("coral");
     expect(VOICE_INSTRUCTION_VERSION).toBe("v6");
     expect(VOICE_PERSONALITY.toLowerCase()).not.toContain("rustig");
     expect(VOICE_PERSONALITY).toContain("Nederland");
     const server = readFileSync(join(process.cwd(), "server/src/voice/personality.ts"), "utf8");
     expect(server).toContain(VOICE_PERSONALITY);
-    expect(server).toContain(`export const DEFAULT_VOICE_MODEL = "${DEFAULT_VOICE_MODEL}"`);
-    expect(server).toContain(`export const DEFAULT_VOICE_NAME = "${DEFAULT_VOICE_NAME}"`);
+    expect(server).toContain('export const VOICE_CACHE_NAMESPACE = "karrie-voice-v7-maarten"');
+    expect(server).toContain('export const VOICE_DELIVERY_VERSION = "v7"');
+    expect(server).toContain('export const VOICE_INSTRUCTION_VERSION = "v6"');
   });
 
   it("speaks a fixed start line and one bigger ending line", () => {

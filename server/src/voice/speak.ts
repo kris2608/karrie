@@ -1,7 +1,7 @@
 import { isAllowedSpeechText, type VoiceEvent } from "./allowlist.js";
 import { voiceCacheKey, type VoiceCache, type VoiceCacheEntry } from "./cache.js";
 import { libraryLookup } from "./library.js";
-import { DEFAULT_VOICE_MODEL, DEFAULT_VOICE_NAME, VOICE_DELIVERY_VERSION, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE } from "./personality.js";
+import { VOICE_DELIVERY_VERSION, VOICE_INSTRUCTION_VERSION, VOICE_LANGUAGE } from "./personality.js";
 import type { SpeechProvider } from "./provider.js";
 
 export type SpeakRequest = {
@@ -144,8 +144,8 @@ export function createSpeakService(deps: {
     speak: generate,
     stats: () => ({ ...deps.cache.stats(), generates, failures, libraryHits }),
     config: () => ({
-      model: deps.provider?.model ?? DEFAULT_VOICE_MODEL,
-      voice: deps.provider?.voice ?? DEFAULT_VOICE_NAME,
+      model: deps.provider?.model ?? "edge-tts",
+      voice: deps.provider?.voice ?? "nl-NL-MaartenNeural",
       language: VOICE_LANGUAGE,
       instructionVersion: VOICE_INSTRUCTION_VERSION,
       deliveryVersion: VOICE_DELIVERY_VERSION,

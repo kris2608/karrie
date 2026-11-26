@@ -1571,12 +1571,6 @@ a.settings-link { text-decoration: none; color: inherit; }
     "art name name"
     "art meta controls";
 }
-.item-row.has-offer {
-  grid-template-areas:
-    "art name name"
-    "art meta controls"
-    "art offer offer";
-}
 .item-row > .product-art { width: 52px; flex: none; }
 .item-art-button {
   position: relative;
@@ -1591,9 +1585,25 @@ a.settings-link { text-decoration: none; color: inherit; }
 }
 .item-main { display: contents; }
 .item-text-button { grid-area: name; }
+.item-name-line {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.item-name-line .item-text-button { flex: 1 1 auto; min-width: 0; grid-area: auto; }
+.item-name-line .item-text-button strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  word-break: normal;
+}
 .item-meta { grid-area: meta; display: grid; gap: 2px; min-width: 0; align-content: center; }
-.item-offer { grid-area: offer; justify-self: start; max-width: 100%; }
-.item-offer .offer-tag { max-width: 100%; white-space: normal; }
+.item-name-line .item-offer { flex: none; }
+.item-name-line .item-offer.offer-tag-button { min-height: 0; margin: 0; }
 .item-controls {
   grid-area: controls;
   display: flex;
@@ -1755,25 +1765,21 @@ a.settings-link { text-decoration: none; color: inherit; }
 .shop-list-chip svg { width: 22px; height: 22px; }
 .shop-voice-chip {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 48px;
-  height: 48px;
-  padding: 0 10px;
-  border: 2px solid color-mix(in srgb, var(--ink) 18%, transparent);
-  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
   background: #fff;
+  box-shadow: var(--outline-soft);
   color: var(--ink);
   cursor: pointer;
 }
 .shop-voice-chip svg { width: 22px; height: 22px; }
-.shop-voice-chip-label { font-size: 0.85rem; font-weight: 900; line-height: 1; }
 .shop-voice-chip.is-on {
-  background: color-mix(in srgb, var(--green) 22%, white);
-  border-color: transparent;
-  color: var(--green-ink, #0b6b63);
+  color: var(--teal-shade);
 }
 .product-title-replay {
   display: inline-flex;
@@ -1834,6 +1840,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   list-style: none;
 }
 .bekijk-card {
+  position: relative;
   display: grid;
   justify-items: center;
   gap: var(--space-2);
@@ -1852,7 +1859,14 @@ a.settings-link { text-decoration: none; color: inherit; }
 .bekijk-card strong { text-align: center; font-weight: 900; font-size: 0.95rem; }
 .bekijk-card small { color: var(--ink-soft); }
 .bekijk-card.is-active { box-shadow: inset 0 0 0 3px var(--teal, #1aa6a0), var(--shadow-card); }
-.bekijk-card .offer-tag { max-width: 100%; white-space: normal; justify-content: center; text-align: center; }
+.bekijk-card .offer-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  white-space: nowrap;
+  max-width: none;
+}
 .progress {
   position: relative;
   flex: 1;
@@ -2787,6 +2801,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   background: var(--orange);
   box-shadow: 0 2px 0 var(--orange-shade);
   white-space: nowrap;
+  flex-wrap: nowrap;
 }
 .offer-tag svg { width: 14px; height: 14px; flex: none; }
 .offer-tag svg circle { fill: var(--orange); }

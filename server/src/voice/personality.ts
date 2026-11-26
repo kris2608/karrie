@@ -1,8 +1,9 @@
 export const VOICE_INSTRUCTION_VERSION = "v6";
-export const VOICE_DELIVERY_VERSION = "v6";
+/** v7 is the Maarten MP3 delivery. The speaking prompt itself stays v6. */
+export const VOICE_DELIVERY_VERSION = "v7";
 export const VOICE_TEMPLATE_VERSION = "v6";
 export const VOICE_LANGUAGE = "nl-NL";
-export const VOICE_CACHE_NAMESPACE = "karrie-voice-v6";
+export const VOICE_CACHE_NAMESPACE = "karrie-voice-v7-maarten";
 export const DEFAULT_VOICE_MODEL = "gpt-realtime-2.1";
 export const DEFAULT_VOICE_NAME = "coral";
 

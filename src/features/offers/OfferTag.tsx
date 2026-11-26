@@ -14,28 +14,39 @@ export function TagIcon() {
   );
 }
 
+export function offerBadgeText(shown: Shown): string {
+  return shown === "deal" ? "Aanbieding" : "Actie?";
+}
+
+/** Full meaning for the accessible name and the tooltip. */
+export function offerMeaning(shown: Shown): string {
+  return shown === "deal" ? "In de aanbieding" : "Mogelijk in de aanbieding";
+}
+
 export function offerLabel(shown: Shown, retailer: RetailerId): string {
   return shown === "deal" ? `In de aanbieding bij ${retailerName(retailer)}` : `Mogelijk in de aanbieding bij ${retailerName(retailer)}`;
 }
 
 /**
- * A small tag that pops in once; "Mogelijke aanbieding" is drawn as an outline so it never reads as certain.
+ * A small tag that pops in once. A possible offer is "Actie?" so it stays one compact badge.
  * Compact tags (on product tiles) show only the icon.
  */
 export function OfferTag({ shown, retailer, className, compact = false }: { shown: Shown; retailer: RetailerId; className?: string; compact?: boolean }) {
   const classes = ["offer-tag", shown === "maybe" ? "is-maybe" : "", compact ? "is-compact" : "", className ?? ""].filter(Boolean).join(" ");
+  const meaning = shown === "maybe" ? offerMeaning(shown) : offerLabel(shown, retailer);
   return (
     <motion.span
       className={classes}
       role="img"
-      aria-label={offerLabel(shown, retailer)}
+      aria-label={meaning}
+      title={meaning}
       data-testid="offer-tag"
       initial={{ scale: 0.6, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: "spring", stiffness: 520, damping: 26 }}
     >
       <TagIcon />
-      {!compact && <span aria-hidden="true">{shown === "deal" ? "Aanbieding" : "Mogelijke aanbieding"}</span>}
+      {!compact && <span aria-hidden="true">{offerBadgeText(shown)}</span>}
     </motion.span>
   );
 }

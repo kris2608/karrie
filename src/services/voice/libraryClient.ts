@@ -99,10 +99,13 @@ export function isValidWavBlob(blob: Blob, contentType?: string | null): boolean
 export async function assertValidWav(blob: Blob, contentType?: string | null): Promise<boolean> {
   if (!isValidWavBlob(blob, contentType)) return false;
   const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
-  if (head.length < 12) return false;
+  if (head.length < 2) return false;
   const riff = String.fromCharCode(head[0]!, head[1]!, head[2]!, head[3]!);
-  const wave = String.fromCharCode(head[8]!, head[9]!, head[10]!, head[11]!);
-  return riff === "RIFF" && wave === "WAVE";
+  const wave = head.length >= 12 ? String.fromCharCode(head[8]!, head[9]!, head[10]!, head[11]!) : "";
+  if (riff === "RIFF" && wave === "WAVE") return true;
+  const id3 = head[0] === 0x49 && head[1] === 0x44 && head[2] === 0x33;
+  const sync = head[0] === 0xff && (head[1]! & 0xe0) === 0xe0;
+  return id3 || sync;
 }
 
 export async function fetchManifestLibraryClip(

@@ -17,6 +17,8 @@
     "voice:library": "node --experimental-strip-types scripts/voice-library.mjs"
   },
   "dependencies": {
+    "mpg123-decoder": "^1.0.3",
+    "msedge-tts": "^2.1.1",
     "openai": "^7.53.0",
     "pg": "^8.23.1",
     "ws": "^8.23.0",

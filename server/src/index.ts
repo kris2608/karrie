@@ -24,6 +24,7 @@ import { createNameImageLookup } from "./nameImage.js";
 import { createOffSearch } from "./offSearch.js";
 import { createStoreImageLookup } from "./storeImage.js";
 import { recognizePhoto, type RecognizeConfig } from "./recognize.js";
+import { createEdgeSpeechProvider, DEFAULT_EDGE_PITCH, DEFAULT_EDGE_RATE, DEFAULT_EDGE_VOICE } from "./voice/edgeProvider.js";
 import { createMemoryVoiceCache, createPgVoiceCache } from "./voice/cache.js";
 import { DEFAULT_VOICE_MODEL, DEFAULT_VOICE_NAME, VOICE_CACHE_NAMESPACE, VOICE_TEMPLATE_VERSION } from "./voice/personality.js";
 import { createRealtimeSpeechProvider } from "./voice/provider.js";
@@ -322,21 +323,29 @@ const handler = createHandler({
     : undefined,
   voice: (() => {
     if (env.VOICE === "off") return undefined;
-    const audioOutputUsdPerMTok = number("PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK", 64);
+    const providerName = (env.VOICE_PROVIDER || "edge").trim().toLowerCase();
+    const edge = providerName !== "openai";
+    const audioOutputUsdPerMTok = edge ? 0 : number("PRICE_VOICE_AUDIO_OUTPUT_PER_MTOK", 64);
     let provider = null;
-    if (apiKey) {
-      try {
-        provider = createRealtimeSpeechProvider({
-          apiKey,
-          model: env.OPENAI_VOICE_MODEL || DEFAULT_VOICE_MODEL,
-          voice: env.OPENAI_VOICE || DEFAULT_VOICE_NAME,
-          timeoutMs: number("OPENAI_VOICE_TIMEOUT_MS", 12_000),
-          maxConcurrent: number("VOICE_MAX_CONCURRENT", 2),
-        });
-      } catch (error) {
-        console.error(JSON.stringify({ event: "voice_provider_error", error: String(error) }));
-        throw error;
-      }
+    try {
+      provider = edge
+        ? createEdgeSpeechProvider({
+            voice: env.EDGE_VOICE || DEFAULT_EDGE_VOICE,
+            rate: env.EDGE_VOICE_RATE || DEFAULT_EDGE_RATE,
+            pitch: env.EDGE_VOICE_PITCH || DEFAULT_EDGE_PITCH,
+          })
+        : apiKey
+          ? createRealtimeSpeechProvider({
+              apiKey,
+              model: env.OPENAI_VOICE_MODEL || DEFAULT_VOICE_MODEL,
+              voice: env.OPENAI_VOICE || DEFAULT_VOICE_NAME,
+              timeoutMs: number("OPENAI_VOICE_TIMEOUT_MS", 12_000),
+              maxConcurrent: number("VOICE_MAX_CONCURRENT", 2),
+            })
+          : null;
+    } catch (error) {
+      console.error(JSON.stringify({ event: "voice_provider_error", error: String(error) }));
+      throw error;
     }
     const cache = pgPool ? createPgVoiceCache(pgPool) : createMemoryVoiceCache();
     const service = createSpeakService({
