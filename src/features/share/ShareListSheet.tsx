@@ -50,15 +50,17 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
       if (cancel) return;
       if (result.status !== "ok") {
         const message =
-          result.code === "rate-limited"
-            ? "Je hebt te vaak gedeeld. Probeer het zo weer."
-            : result.code === "empty"
-              ? "Dit lijstje is leeg of kan niet worden gedeeld."
-              : result.code === "too-many"
-                ? "Dit lijstje bevat te veel producten om te delen. Verwijder een paar producten en probeer het opnieuw."
-                : result.code === "invalid"
-                  ? "Dit lijstje kan zo niet worden gedeeld. Verwijder vreemde producten en probeer opnieuw."
-                  : "Deellink maken lukt nu niet. Controleer je internet en probeer het zo opnieuw.";
+          result.code === "unavailable"
+            ? "Lijstjes delen is even niet beschikbaar. Je lijstje blijft gewoon op dit toestel."
+            : result.code === "rate-limited"
+              ? "Je hebt te vaak gedeeld. Probeer het zo weer."
+              : result.code === "empty"
+                ? "Dit lijstje is leeg of kan niet worden gedeeld."
+                : result.code === "too-many"
+                  ? "Dit lijstje bevat te veel producten om te delen. Verwijder een paar producten en probeer het opnieuw."
+                  : result.code === "invalid"
+                    ? "Dit lijstje kan zo niet worden gedeeld. Verwijder vreemde producten en probeer opnieuw."
+                    : "Deellink maken lukt nu niet. Controleer je internet en probeer het zo opnieuw.";
         setEncoded({ status: "error", message });
         return;
       }
@@ -115,7 +117,7 @@ export function ShareListSheet({ open, source, onClose }: ShareListSheetProps) {
     <Sheet open={open} onClose={onClose} label="Deel dit lijstje">
       <div className="share-list" data-testid="share-list-sheet">
         <h2>Deel dit lijstje</h2>
-        <p className="share-note">De link is 48 uur geldig.</p>
+        {encoded.status === "ready" && <p className="share-note">De link is 48 uur geldig.</p>}
 
         {encoded.status === "loading" && <p className="share-note">Link maken…</p>}
         {encoded.status === "error" && (

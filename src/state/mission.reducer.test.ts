@@ -103,7 +103,7 @@ describe("bonus missions", () => {
     expect(items(again).every((item) => item.mission?.status === "offered")).toBe(true);
   });
 
-  it("assigns offline play under Bonusmissies without stacking on healthier offers", () => {
+  it("does not assign a guess play on catalog drawings", () => {
     let state = initialState;
     for (const [name, productId, category] of [
       ["Banaan", "banaan", "produce"],
@@ -116,13 +116,12 @@ describe("bonus missions", () => {
       state = reducer(state, { type: "add-recognized", name, category, icon: productId, productId, pack: { recognition: { confidence: "high" } } });
     }
     state = reducer(state, { type: "start-shopping" });
-    const plays = items(state).filter((item) => item.play);
-    expect(plays.length).toBeGreaterThanOrEqual(1);
-    expect(plays.every((item) => !item.mission)).toBe(true);
+    // Guess needs a real photo on the product and on a distractor. Drawings stay a normal find.
+    expect(items(state).every((item) => !item.play)).toBe(true);
 
     const cleared = reducer(state, { type: "set-discovery", enabled: false });
     expect(items(cleared).every((item) => !item.mission || item.mission.status === "done")).toBe(true);
-    expect(items(cleared).every((item) => !item.play || item.play.status === "done" || item.play.status === "skipped")).toBe(true);
+    expect(items(cleared).every((item) => !item.play)).toBe(true);
 
     const off = reducer(cleared, { type: "new-draft" });
     let plain = off;
@@ -131,20 +130,36 @@ describe("bonus missions", () => {
     expect(items(plain).every((item) => !item.play && !item.mission)).toBe(true);
   });
 
-  it("play skip and done update status without inventing stars", () => {
+  it("assigns a guess play when two products have photos, without inventing stars", () => {
     let state = initialState;
-    state = reducer(state, { type: "add-recognized", name: "Banaan", category: "produce", icon: "banaan", productId: "banaan", pack: { recognition: { confidence: "high" } } });
-    state = reducer(state, { type: "add-recognized", name: "Broccoli", category: "produce", icon: "broccoli", productId: "broccoli", pack: { recognition: { confidence: "high" } } });
-    state = reducer(state, { type: "add-recognized", name: "Wortel", category: "produce", icon: "wortel", productId: "wortel", pack: { recognition: { confidence: "high" } } });
+    state = reducer(state, {
+      type: "add-recognized",
+      name: "Banaan",
+      category: "produce",
+      icon: "banaan",
+      productId: "banaan",
+      photoId: "photo-banaan",
+      pack: { recognition: { confidence: "high" } },
+    });
+    state = reducer(state, {
+      type: "add-recognized",
+      name: "Broccoli",
+      category: "produce",
+      icon: "broccoli",
+      productId: "broccoli",
+      photoId: "photo-broccoli",
+      pack: { recognition: { confidence: "high" } },
+    });
     state = reducer(state, { type: "start-shopping" });
-    const playItem = items(state).find((item) => item.play);
-    expect(playItem?.play).toBeTruthy();
-    // Move play item to front by skipping others if needed — use dispatch on whatever is active after sorting.
+    const plays = items(state).filter((item) => item.play);
+    expect(plays).toHaveLength(1);
+    expect(plays[0]?.play).toMatchObject({ kind: "guess", status: "offered" });
+    expect(plays.every((item) => !item.mission)).toBe(true);
+
     while (activeItem(items(state)) && !activeItem(items(state))!.play && items(state).some((item) => item.status === "pending" && item.play)) {
       state = reducer(state, { type: "skip" });
     }
-    const current = activeItem(items(state));
-    if (!current?.play) return;
+    expect(activeItem(items(state))?.play).toBeTruthy();
     state = reducer(state, { type: "play-done" });
     expect(activeItem(items(state))?.play?.status).toBe("done");
     expect(starTotal(items(state))).toBe(0);

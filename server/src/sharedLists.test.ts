@@ -8,6 +8,7 @@ import { createLimits } from "./limits.js";
 import {
   contentHashOf,
   createSharedListStore,
+  disabledSharedListStore,
   sanitizeSharedList,
   sanitizeSharedListResult,
   SHARED_LIST_MAX_ITEMS,
@@ -257,5 +258,39 @@ describe("POST/GET /api/lists/share", () => {
     expect((await post(sample)).status).toBe(200);
     expect((await post(sample)).status).toBe(429);
     expect((await post({ version: 1, items: [] }, "10.0.0.2")).status).toBe(422);
+  });
+
+  it("reports shared lists disabled when the store is the unavailable stub", async () => {
+    const idle = {
+      perIpPerHour: 1,
+      perIpPerDay: 1,
+      dailyRequests: 1,
+      dailyBudgetUsd: 1,
+      inputUsdPerMTok: 0,
+      cachedInputUsdPerMTok: 0,
+      outputUsdPerMTok: 0,
+    };
+    const handler = createHandler({
+      allowedOrigins: ["https://www.karrie.eu"],
+      requireOrigin: true,
+      configured: false,
+      model: "gpt-5.4-mini",
+      limits: createLimits(idle),
+      recognize: async () => ({ ok: false, code: "unavailable" }) as never,
+      sharedLists: {
+        store: disabledSharedListStore(),
+        limits: createLimits(idle),
+        publicOrigin: "https://www.karrie.eu",
+      },
+      log: () => undefined,
+    });
+    server = createServer((req, res) => void handler(req, res));
+    await new Promise<void>((resolve) => server!.listen(0, resolve));
+    const { port } = server.address() as AddressInfo;
+    const health = await fetch(`http://127.0.0.1:${port}/api/health`);
+    const body = await health.json();
+    expect(body.sharedLists).toMatchObject({ enabled: false });
+    expect(disabledSharedListStore().enabled).toBe(false);
+    expect(createSharedListStore({ query: async () => ({ rows: [] }) } as unknown as PoolLike).enabled).toBe(true);
   });
 });

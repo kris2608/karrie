@@ -62,6 +62,7 @@ describe("ShareListSheet", () => {
     Object.assign(navigator, { share });
     render(<ShareListSheet open source={adventure} onClose={() => undefined} />);
     await waitFor(() => expect(screen.getByTestId("share-list-share")).toBeTruthy());
+    expect(screen.getByText("De link is 48 uur geldig.")).toBeTruthy();
     expect(screen.getByTestId("share-list-copy")).toBeTruthy();
     expect(screen.queryByTestId("share-list-qr")).toBeNull();
     expect(document.querySelector(".share-qr")).toBeNull();
@@ -83,11 +84,14 @@ describe("ShareListSheet", () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://www.karrie.eu/s/abcdefghijklmnop");
   });
 
-  it("shows an error when the API refuses", async () => {
+  it("says sharing is off, without promising a 48 hour link", async () => {
     create.mockResolvedValue({ status: "error", code: "unavailable" });
     render(<ShareListSheet open source={adventure} onClose={() => undefined} />);
     await waitFor(() => expect(screen.getByTestId("share-list-error")).toBeTruthy());
-    expect(screen.getByTestId("share-list-error").textContent).toMatch(/lukt nu niet/i);
+    expect(screen.getByTestId("share-list-error").textContent).toBe(
+      "Lijstjes delen is even niet beschikbaar. Je lijstje blijft gewoon op dit toestel.",
+    );
+    expect(screen.queryByText("De link is 48 uur geldig.")).toBeNull();
   });
 
   it("shows a clear Dutch message when the list is too large to share", async () => {

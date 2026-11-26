@@ -94,7 +94,7 @@ services:
         value: no-referrer
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: "24.22.1"
       - key: VITE_API_ORIGIN
         value: https://karrie-api.onrender.com
       # Umami Cloud, read at build time; both values end up public in index.html.
@@ -114,7 +114,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: "24.22.1"
       - key: OPENAI_API_KEY
         sync: false
       - key: BRAVE_SEARCH_API_KEY

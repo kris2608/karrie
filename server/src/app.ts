@@ -293,7 +293,7 @@ export function createHandler(deps: AppDeps) {
           : undefined,
         catalog: deps.catalog?.stats(),
         sharedLists: deps.sharedLists
-          ? { enabled: true, stats: deps.sharedLists.limits.stats(), outcomes: deps.sharedLists.store.stats() }
+          ? { enabled: deps.sharedLists.store.enabled, stats: deps.sharedLists.limits.stats(), outcomes: deps.sharedLists.store.stats() }
           : { enabled: false },
         healthier: deps.healthier ? { enabled: true, stats: deps.healthier.limits.stats() } : { enabled: false },
         voice: deps.voice ? { enabled: true, stats: deps.voice.limits.stats(), cache: deps.voice.stats() } : { enabled: false },
