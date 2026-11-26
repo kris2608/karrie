@@ -327,16 +327,9 @@ h1, h2, p { margin: 0; }
   color: var(--ink);
   font-weight: 900;
 }
-.home-first { gap: var(--space-3); padding-top: calc(var(--safe-top) + var(--space-4)); }
-.home-first .home-mascot { width: min(124px, 33vw); }
-.home-first .wordmark h1 {
-  padding: 3px 24px 8px;
-  font-size: clamp(2.15rem, 10vw, 2.95rem);
-  text-shadow: 0 2px 0 var(--teal-shade);
-  box-shadow: 0 4px 0 var(--teal-shade), var(--shadow-float), var(--shadow-inset);
-}
-.home-first .scene-sun,
-.home-first .scene-clouds { transform: translateY(-84px); }
+.home-first { gap: var(--space-4); }
+.home-first .scene-shop,
+.home-first .scene-trail { transform: translateY(180px); }
 .home-first-copy { gap: var(--space-2); }
 .home-value {
   display: grid;
@@ -390,8 +383,6 @@ h1, h2, p { margin: 0; }
   font-weight: 800;
 }
 @media (max-height: 700px) {
-  .home-first .home-mascot { width: min(96px, 28vw); }
-  .home-first .wordmark h1 { padding: 2px 18px 6px; font-size: clamp(1.85rem, 9vw, 2.4rem); }
   .home-first .home-steps li { grid-template-rows: 48px auto; }
   .home-first .home-step-art { width: 48px; height: 48px; }
   .home-first .home-step-art > :first-child { width: 34px; height: 34px; }

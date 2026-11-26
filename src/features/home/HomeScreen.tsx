@@ -162,7 +162,7 @@ export function HomeScreen() {
           transition={{ ...softSpring, delay: 0.35 }}
         >
           <h1>Karrie</h1>
-          {!firstHome && <p>Speur, vind en vink af!</p>}
+          <p>Speur, vind en vink af!</p>
         </motion.div>
       </section>
 
