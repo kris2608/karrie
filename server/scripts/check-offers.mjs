@@ -17,7 +17,7 @@ const PRODUCTS = [
   { name: "Biologisch halfvolle melk", brand: "Arla", size: "1 l", category: "dairy", generic: false },
   { name: "Biologisch halfvolle melk", brand: "Arla", size: "1 l", ean: "8718166011021", category: "dairy", generic: false },
 ];
-const RETAILERS = ["jumbo", "albert_heijn", "lidl"];
+const RETAILERS = ["jumbo", "albert_heijn", "lidl", "plus"];
 
 const provider = createPrijsProfeet({
   userAgent: process.env.PRIJSPROFEET_USER_AGENT || "Karrie/1.0 (+https://karrie.eu)",

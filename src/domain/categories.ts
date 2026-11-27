@@ -25,6 +25,7 @@ export const RETAILER_CATEGORY_ORDERS: Record<RetailerId, CategoryId[]> = {
   albert_heijn: [...DEFAULT_CATEGORY_ORDER],
   jumbo: [...DEFAULT_CATEGORY_ORDER],
   lidl: [...DEFAULT_CATEGORY_ORDER],
+  plus: [...DEFAULT_CATEGORY_ORDER],
 };
 
 const KNOWN = new Set<string>(DEFAULT_CATEGORY_ORDER);

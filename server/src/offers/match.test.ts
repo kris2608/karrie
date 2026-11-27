@@ -233,4 +233,33 @@ describe("classify", () => {
     const byEan: OfferProduct = { name: "Rauwkost komkommer", brand: "AH", ean: "8718265141643", category: "produce", generic: false };
     expect(classify(byEan, rows(RAW.groentesap, RAW.rauwkost), NOW)).toMatchObject({ matchType: "exact", offer: { sourceProductId: "ah_rauwkost" } });
   });
+
+  it("treats PLUS as a house brand and an EAN at PLUS as exact", () => {
+    const plusMelk = {
+      product_id: "plus_melk",
+      name: "Plus Halfvolle melk",
+      brand: "Plus",
+      unified_category: "zuivel-eieren",
+      quantity: "1 l",
+      retailer: "plus",
+      promotion_status: "active",
+      valid_until: "2026-11-10",
+    };
+    const melk: OfferProduct = { name: "Melk", aliases: ["halfvolle melk"], category: "dairy", generic: true };
+    expect(classify(melk, rows(plusMelk), NOW)).toMatchObject({ matchType: "likely", matchConfidence: "high", offer: { retailer: "plus" } });
+    const kruidnoten = {
+      product_id: "plus_165975",
+      name: "Plus Chocolade Kruidnoten melk,wit & puur",
+      brand: "Plus",
+      ean: "8718989870225",
+      private_label: true,
+      unified_category: "snoep-koek-chips",
+      quantity: "300 g",
+      retailer: "plus",
+      promotion_status: "active",
+      valid_until: "2026-11-10",
+    };
+    const scanned: OfferProduct = { name: "Chocolade kruidnoten", category: "snacks", generic: false, ean: "8718989870225" };
+    expect(classify(scanned, rows(kruidnoten), NOW)).toMatchObject({ matchType: "exact", matchConfidence: "high", offer: { retailer: "plus", ean: "8718989870225" } });
+  });
 });

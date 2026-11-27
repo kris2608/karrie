@@ -42,10 +42,12 @@ describe("supermarket category taxonomy", () => {
     const ah = orderForRetailer("albert_heijn");
     const jumbo = orderForRetailer("jumbo");
     const lidl = orderForRetailer("lidl");
+    const plus = orderForRetailer("plus");
     expect(new Set(ah).size).toBe(ah.length);
     expect(ah).toEqual(expect.arrayContaining(["deli", "snacks", "meals", "care"]));
     expect(jumbo).toEqual(ah);
     expect(lidl).toEqual(ah);
+    expect(plus).toEqual(ah);
   });
 
   it("places Olvarit baby meals in pantry, not produce", () => {

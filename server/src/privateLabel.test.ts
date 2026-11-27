@@ -25,6 +25,13 @@ describe("private-label suggestions stay retailer-scoped", () => {
     row({ name: "Jumbo Hagelslag Puur", retailer: "jumbo", brands: ["Jumbo"], privateLabel: true, imageUrl: JUMBO }),
     row({ name: "De Ruijter Hagelslag", retailer: "albert_heijn", brands: ["De Ruijter"], imageUrl: AH }),
     row({ name: "Lidl Hagelslag", retailer: "lidl", brands: ["Lidl"], privateLabel: true, imageUrl: "https://www.lidl.nl/assets/lidl_hagelslag.png" }),
+    row({
+      name: "Plus Hagelslag Melk",
+      retailer: "plus",
+      brands: ["Plus"],
+      privateLabel: true,
+      imageUrl: "https://images.ctfassets.net/s0lodsnpsezb/plus_hagelslag/plus.png",
+    }),
   ];
 
   it("AH selected → only AH private-label alternatives", () => {
@@ -39,6 +46,11 @@ describe("private-label suggestions stay retailer-scoped", () => {
 
   it("Lidl selected → only Lidl private-label alternatives", () => {
     expect(privateLabelImages("hagelslag", rows, "lidl").map((entry) => entry.retailer)).toEqual(["lidl"]);
+  });
+
+  it("PLUS selected → only PLUS private-label alternatives", () => {
+    expect(privateLabelImages("hagelslag", rows, "plus").map((entry) => entry.productName)).toEqual(["Plus Hagelslag Melk"]);
+    expect(privateLabelImages("hagelslag", rows, "plus").every((entry) => entry.privateLabel)).toBe(true);
   });
 
   it("treats a known house brand as private label even without the flag", () => {
@@ -92,7 +104,8 @@ describe("shopping retailers stay separate from image-source coverage", () => {
   it("offer search stays on one shopping supermarket", () => {
     expect(searchUrl("cola", "albert_heijn")).toContain("retailer=albert_heijn");
     expect(searchUrl("cola", "albert_heijn")).toContain("promotion_status=active");
-    expect([...RETAILERS]).toEqual(["jumbo", "albert_heijn", "lidl"]);
+    expect([...RETAILERS]).toEqual(["jumbo", "albert_heijn", "lidl", "plus"]);
+    expect(searchUrl("cola", "plus")).toContain("retailer=plus");
   });
 
   it("name search covers every retailer and supports pagination", () => {
@@ -100,6 +113,7 @@ describe("shopping retailers stay separate from image-source coverage", () => {
     expect(nameSearchUrl("cola")).not.toContain("retailer=");
     expect(IMAGE_SOURCE_RETAILERS).toEqual(expect.arrayContaining(["plus", "dirk"]));
     expect(privateLabelSearchUrl("hagelslag", "jumbo")).toContain("retailer=jumbo");
+    expect(privateLabelSearchUrl("hagelslag", "plus")).toContain("retailer=plus");
     expect(privateLabelSearchUrl("hagelslag", "jumbo")).not.toContain("albert_heijn");
   });
 });

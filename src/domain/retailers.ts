@@ -1,4 +1,4 @@
-export type RetailerId = "jumbo" | "albert_heijn" | "lidl";
+export type RetailerId = "jumbo" | "albert_heijn" | "lidl" | "plus";
 
 export type Retailer = { id: RetailerId; name: string; short: string };
 
@@ -6,6 +6,7 @@ export const RETAILERS: readonly Retailer[] = [
   { id: "jumbo", name: "Jumbo", short: "Jumbo" },
   { id: "albert_heijn", name: "Albert Heijn", short: "AH" },
   { id: "lidl", name: "Lidl", short: "Lidl" },
+  { id: "plus", name: "PLUS", short: "PLUS" },
 ];
 
 export function isRetailer(value: unknown): value is RetailerId {
@@ -39,8 +40,10 @@ export function imageRetailerName(id: string): string {
   return isImageSourceRetailer(id) ? IMAGE_RETAILER_NAMES[id] : id.replace(/_/g, " ");
 }
 
-/** The short code anonymous statistics use. */
-export function analyticsRetailer(id: RetailerId): "jumbo" | "ah" | "lidl" {
+/** The short code anonymous statistics use. PrijsProfeet's retailer id for PLUS is `plus`. */
+export type AnalyticsRetailer = "jumbo" | "ah" | "lidl" | "plus";
+
+export function analyticsRetailer(id: RetailerId): AnalyticsRetailer {
   return id === "albert_heijn" ? "ah" : id;
 }
 
@@ -48,6 +51,7 @@ const HOUSE_BRAND_MARKERS: { match: RegExp; retailer: RetailerId }[] = [
   { match: /^(ah|albert\s*heijn)\b/i, retailer: "albert_heijn" },
   { match: /^jumbo\b/i, retailer: "jumbo" },
   { match: /^lidl\b/i, retailer: "lidl" },
+  { match: /^plus\b/i, retailer: "plus" },
 ];
 
 /** Detect an observed private-label chain from a brand or product name; unknown brands return undefined. */

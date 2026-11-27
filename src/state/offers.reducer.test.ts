@@ -86,7 +86,7 @@ describe("supermarket per list", () => {
   it("ignores stored supermarkets it does not know", () => {
     const state = reducer(initialState, {
       type: "hydrate",
-      data: { settings: { soundEnabled: false, smartDiscovery: true, referenceImages: true, retailer: "plus" as never }, adventure: { ...withDraft().adventure!, retailer: "plus" as never } },
+      data: { settings: { soundEnabled: false, smartDiscovery: true, referenceImages: true, retailer: "aldi" as never }, adventure: { ...withDraft().adventure!, retailer: "aldi" as never } },
     });
     expect(state.settings).not.toHaveProperty("retailer");
     expect(state.adventure).not.toHaveProperty("retailer");

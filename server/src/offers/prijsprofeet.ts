@@ -17,7 +17,7 @@ export const PRIJSPROFEET_RULES = {
 } as const;
 
 /** Supermarkets the parent can pick for shopping lists and offers. */
-export const RETAILERS = ["jumbo", "albert_heijn", "lidl"] as const;
+export const RETAILERS = ["jumbo", "albert_heijn", "lidl", "plus"] as const;
 export type RetailerId = (typeof RETAILERS)[number];
 
 export function isRetailer(value: unknown): value is RetailerId {
