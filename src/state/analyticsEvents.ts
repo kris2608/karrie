@@ -1,3 +1,4 @@
+import { analyticsRetailer } from "../domain/retailers";
 import type { AddMethod, RecognitionSource, Tracked } from "../services/analytics";
 import { attributionEventData } from "../services/campaignAttribution";
 import { ackAdventureCompleted, ackAdventureStarted, getMilestones, markMilestoneSent } from "../services/analyticsMilestones";
@@ -44,10 +45,17 @@ function addMethod(action: Action): AddMethod | null {
  * quantity of a line that is already there does not. Undo, opening a saved list and hydrating never count.
  */
 export function analyticsEvents(action: Action, before: AppState, after: AppState): Tracked[] {
-  const next = after.adventure;
-  if (!next || before === after) return [];
-  const previous = before.adventure;
   const events: Tracked[] = [];
+  if ((action.type === "set-retailer" || action.type === "set-default-retailer") && action.retailer) {
+    const previousRetailer = action.type === "set-retailer" ? before.adventure?.retailer : before.settings.retailer;
+    if (previousRetailer !== action.retailer) {
+      events.push({ event: { name: "store_selected", data: { retailer: analyticsRetailer(action.retailer) } } });
+    }
+  }
+
+  const next = after.adventure;
+  if (!next || before === after) return events;
+  const previous = before.adventure;
 
   const method = addMethod(action);
   if (method) {

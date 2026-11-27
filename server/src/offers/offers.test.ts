@@ -324,7 +324,7 @@ describe("POST /api/offers/match", () => {
 
   it("refuses unknown supermarkets, extra fields, bad barcodes and other origins", async () => {
     const { post } = await start(async () => ({ ok: true, match: { matchType: "none" } }));
-    expect((await post({ ...body, retailer: "plus" })).status).toBe(400);
+    expect((await post({ ...body, retailer: "dirk" })).status).toBe(400);
     expect((await post({ ...body, family: "x" })).status).toBe(400);
     expect((await post({ ...body, product: { ...body.product, ean: "1234567890123" } })).status).toBe(400);
     expect((await post(body, "https://evil.example")).status).toBe(403);

@@ -162,6 +162,7 @@ describe("adopt-commercial after preview confirmation", () => {
 describe("observed private labels from photo recognition", () => {
   it("marks an AH pack without remapping to the list supermarket", () => {
     expect(houseBrandRetailer("AH", "hagelslag")).toBe("albert_heijn");
+    expect(houseBrandRetailer("PLUS", "melk")).toBe("plus");
     const pack = packFromVision({ brand: "AH", recognition: { specific: true, genericName: "hagelslag", confidence: "high" } });
     expect(pack.privateLabelRetailer).toBe("albert_heijn");
     expect(pack.brand).toBe("AH");

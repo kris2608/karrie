@@ -81,6 +81,18 @@ describe("analytics events", () => {
     resetMilestonesMemory();
   });
 
+  it("counts a chosen supermarket once, including the default before a list exists", () => {
+    const picked = run(initialState, { type: "set-retailer", retailer: "plus" });
+    expect(picked.events.map((entry) => entry.event)).toEqual([{ name: "store_selected", data: { retailer: "plus" } }]);
+    const again = run(picked.state, { type: "set-retailer", retailer: "plus" });
+    expect(names(again.events)).not.toContain("store_selected");
+    const cleared = run(picked.state, { type: "set-retailer", retailer: null });
+    expect(names(cleared.events)).not.toContain("store_selected");
+    const home = run(initialState, { type: "set-default-retailer", retailer: "albert_heijn" });
+    expect(home.state.adventure).toBeNull();
+    expect(home.events.map((entry) => entry.event)).toEqual([{ name: "store_selected", data: { retailer: "ah" } }]);
+  });
+
   it("counts a new list once, at its first product, and each new line as an added product", () => {
     const { events } = play([
       { type: "add-product", product: first },

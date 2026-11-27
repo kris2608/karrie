@@ -40,8 +40,8 @@ export function PrivacyInfo({ headingRef }: { headingRef: Ref<HTMLHeadingElement
       <section>
         <h3>Karrie verbeteren</h3>
         <p>
-          Met Umami tellen we anoniem hoe de app wordt gebruikt, bijvoorbeeld welk scherm opent, of iemand terugkomt, hoe een product is toegevoegd
-          en of herkennen of delen lukte. Umami zet geen cookies. We sturen geen namen, productfoto&apos;s of de inhoud van je boodschappenlijstjes
+          Met Umami tellen we anoniem hoe de app wordt gebruikt, bijvoorbeeld welk scherm opent, of iemand terugkomt, hoe een product is toegevoegd,
+          welke supermarkt je kiest, en of herkennen of delen lukte. Umami zet geen cookies. We sturen geen namen, productfoto&apos;s of de inhoud van je boodschappenlijstjes
           naar Umami. Bij een deellink telt Umami alleen het pad /l, zonder de geheime code. Campagneparameters (<code>utm_source</code>,{" "}
           <code>utm_medium</code>, <code>utm_campaign</code>) mogen alleen via vaste gebeurtenissen mee — nooit willekeurige zoekparameters.
         </p>

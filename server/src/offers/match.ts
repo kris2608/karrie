@@ -131,7 +131,7 @@ const DESCRIPTORS = new Set([
   "halve",
 ]);
 
-const HOUSE_BRANDS = new Set(["ah", "albert heijn", "jumbo", "lidl", "ah biologisch", "ah terra", "ah basic"]);
+const HOUSE_BRANDS = new Set(["ah", "albert heijn", "jumbo", "lidl", "plus", "ah biologisch", "ah terra", "ah basic"]);
 
 export function words(value: string): string[] {
   return value
@@ -213,7 +213,7 @@ function isHouseBrand(row: OfferRow): boolean {
 /** The row's name without its brand, number and unit tokens, as stems. */
 function rowStems(row: OfferRow): string[] {
   const brand = new Set(brandWords(row.brand));
-  const house = new Set(["ah", "jumbo", "lidl", "albert", "heijn"]);
+  const house = new Set(["ah", "jumbo", "lidl", "plus", "albert", "heijn"]);
   return words(row.productName)
     .filter((word) => !brand.has(word) && !house.has(word) && !/^\d/.test(word))
     .map(stem);

@@ -1,3 +1,4 @@
+import type { AnalyticsRetailer } from "../domain/retailers";
 import type { CategoryId } from "../domain/types";
 
 export type AddMethod = "catalog" | "manual" | "paste" | "photo" | "barcode" | "saved" | "custom";
@@ -45,7 +46,8 @@ export type AnalyticsEvent =
   | { name: "bonus_skipped"; data: { kind: BonusKind } }
   | { name: "bonus_mission_completed"; data: { choice: "alternative" | "original" } }
   | { name: "bonus_play_completed"; data: { kind: "guess" | "color" | "drag" } }
-  | { name: "offer_opened"; data: { retailer: "jumbo" | "ah" | "lidl"; match_type: "exact" | "likely" } }
+  | { name: "offer_opened"; data: { retailer: AnalyticsRetailer; match_type: "exact" | "likely" } }
+  | { name: "store_selected"; data: { retailer: AnalyticsRetailer } }
   | { name: "app_first_open" }
   | { name: "first_home_viewed" }
   | { name: "shopping_list_reviewed" }
