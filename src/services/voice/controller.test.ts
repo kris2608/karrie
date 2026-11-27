@@ -162,6 +162,39 @@ describe("voiceController ownership FSM", () => {
     expect((await second).status).toBe("completed");
   });
 
+  it("speaks on the device when the generation cap is hit, and does not call that a failure", async () => {
+    fetchInteractive.mockResolvedValue({ ok: false, code: "device-limit", ms: 4 });
+    const controller = createVoiceController({
+      speakFallback: async () => "ok",
+    });
+    controller.setEnabled(true);
+    const generation = controller.bump();
+    const outcome = await controller.play(positivePhrase("cap"), { generation, priority: "high" });
+    expect(outcome.status).toBe("completed");
+    expect(outcome.code).toBe("synth");
+    expect(trackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "voice_fetch", data: expect.objectContaining({ source: "synth" }) }),
+    );
+    expect(trackEvent.mock.calls.some((call) => call[0]?.name === "voice_playback_failed")).toBe(false);
+  });
+
+  it("does not count a replaced clip's AbortError as a playback failure", async () => {
+    fetchInteractive.mockResolvedValue({
+      ok: true,
+      blob: new Blob([new Uint8Array([1])], { type: "audio/wav" }),
+      source: "memory",
+      ms: 1,
+    });
+    const el = mockAudio();
+    el.play.mockImplementation(() => Promise.reject(new DOMException("interrupted", "AbortError")));
+    const controller = createVoiceController();
+    controller.setEnabled(true);
+    const generation = controller.bump();
+    const outcome = await controller.play(positivePhrase("swap"), { generation, priority: "high" });
+    expect(outcome.status).toBe("cancelled");
+    expect(trackEvent.mock.calls.some((call) => call[0]?.name === "voice_playback_failed")).toBe(false);
+  });
+
   it("tracks fetch failures when the server returns no audio", async () => {
     const controller = createVoiceController();
     controller.setEnabled(true);
@@ -171,7 +204,7 @@ describe("voiceController ownership FSM", () => {
     expect(trackEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "voice_playback_failed",
-        data: expect.objectContaining({ reason: "fetch", code: "upstream" }),
+        data: expect.objectContaining({ reason: "fetch", stage: "fetch", code: "upstream" }),
       }),
     );
   });

@@ -2,6 +2,7 @@ import type { VoiceEvent, VoicePhrase } from "../../domain/voiceScripts";
 import { getSpeechElement, unlockAudio } from "../../feedback/sound";
 import { trackEvent } from "../analytics";
 import { peekVoiceBlob, readVoiceBlob } from "./cache";
+import { speakOnDevice, type DeviceSpeechResult } from "./deviceSpeech";
 import { applySpeechPlayback } from "./playbackRate";
 import { voiceScheduler } from "./scheduler";
 
@@ -40,12 +41,26 @@ type ActivePlay = {
   settled: boolean;
 };
 
+const BENIGN_FETCH = new Set(["cancelled", "promoted", "replaced", "queue-full"]);
+const SPOKEN_FALLBACK = new Set(["device-limit", "rate-limited", "daily-limit", "budget", "upstream", "network", "deadline"]);
+
+function voicePlatform(): "ios" | "android" | "other" {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua)) return "ios";
+  if (/Android/i.test(ua)) return "android";
+  return "other";
+}
+
 /**
  * Single-speaker controller with playId ownership.
  * generation invalidates shopping context; playId owns the active clip.
  * Every play path settles its promise (completed / cancelled / failed / skipped).
  */
-export function createVoiceController(_options?: { synthFallback?: boolean }) {
+export function createVoiceController(options?: {
+  speakFallback?: (text: string, signal: AbortSignal) => Promise<DeviceSpeechResult>;
+}) {
+  const speakFallback = options?.speakFallback ?? speakOnDevice;
   let enabled = false;
   let generation = 0;
   let nextPlayId = 0;
@@ -190,9 +205,28 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
     lastByEvent.set(phrase.event, phrase.text);
 
     if (!fetched.ok) {
+      if (BENIGN_FETCH.has(fetched.code)) {
+        finishOwner(playId, { status: "cancelled", playId, code: fetched.code, fetchMs: fetched.ms });
+        return;
+      }
+      if (SPOKEN_FALLBACK.has(fetched.code)) {
+        const spoken = await speakFallback(phrase.text, abort.signal);
+        if (dropped() || spoken === "cancelled") {
+          finishOwner(playId, { status: "cancelled", playId, code: fetched.code, fetchMs: fetched.ms });
+          return;
+        }
+        if (spoken === "ok") {
+          trackEvent({
+            name: "voice_fetch",
+            data: { source: "synth", ms: fetched.ms, event: phrase.event },
+          });
+          finishOwner(playId, { status: "completed", playId, code: "synth", fetchMs: fetched.ms });
+          return;
+        }
+      }
       trackEvent({
         name: "voice_playback_failed",
-        data: { reason: "fetch", code: fetched.code },
+        data: { reason: "fetch", stage: "fetch", code: fetched.code, platform: voicePlatform() },
       });
       finishOwner(playId, { status: "failed", playId, code: fetched.code, fetchMs: fetched.ms });
       return;
@@ -235,18 +269,34 @@ export function createVoiceController(_options?: { synthFallback?: boolean }) {
       }
       audio.onended = () => done("completed");
       audio.onerror = () => {
-        trackEvent({ name: "voice_playback_failed", data: { reason: "element" } });
-        trackEvent({ name: "voice_autoplay_reject", data: { reason: "element" } });
+        if (play.abort.signal.aborted || active?.playId !== play.playId) {
+          done("cancelled", "aborted");
+          return;
+        }
+        trackEvent({
+          name: "voice_playback_failed",
+          data: { reason: "element", stage: "play", code: "element", platform: voicePlatform() },
+        });
         done("failed", "element");
       };
       audio.src = url;
       // Safari can reset the rate when src changes or playback starts. Pitch lock stays on.
       applySpeechPlayback(audio);
       audio.onplay = () => applySpeechPlayback(audio);
-      void audio.play().catch(() => {
-        trackEvent({ name: "voice_playback_failed", data: { reason: "play" } });
-        trackEvent({ name: "voice_autoplay_reject", data: { reason: "play" } });
-        done("failed", "play");
+      void audio.play().catch((error: unknown) => {
+        const name = error instanceof DOMException ? error.name : error instanceof Error ? error.name : "";
+        if (name === "AbortError" || play.abort.signal.aborted || active?.playId !== play.playId) {
+          done("cancelled", "aborted");
+          return;
+        }
+        if (name === "NotAllowedError") {
+          trackEvent({ name: "voice_autoplay_reject", data: { reason: name } });
+        }
+        trackEvent({
+          name: "voice_playback_failed",
+          data: { reason: "play", stage: "play", code: name || "play", platform: voicePlatform() },
+        });
+        done("failed", name || "play");
       });
     });
   }

@@ -24,6 +24,8 @@ export type SpeakResult =
 const inflight = new Map<string, Promise<SpeakResult>>();
 
 export type SpeakService = {
+  /** Cache or bundled library only. Does not call the speech provider. */
+  lookup(request: SpeakRequest): Promise<SpeakResult | null>;
   speak(request: SpeakRequest): Promise<SpeakResult>;
   stats(): ReturnType<VoiceCache["stats"]> & { generates: number; failures: number; libraryHits: number };
   config(): {
@@ -47,45 +49,51 @@ export function createSpeakService(deps: {
   let failures = 0;
   let libraryHits = 0;
 
+  function cacheKeyFor(text: string, event: SpeakRequest["event"]): string | null {
+    if (!deps.provider) return null;
+    return voiceCacheKey({
+      text,
+      language: VOICE_LANGUAGE,
+      voice: deps.provider.voice,
+      instructionVersion: `${VOICE_INSTRUCTION_VERSION}|${VOICE_DELIVERY_VERSION}|${deps.templateVersion}|${event}`,
+      model: deps.provider.model,
+    });
+  }
+
+  /** Shared clip for this text, voice and event. Same words on any device reuse one generation. */
+  async function lookup(request: SpeakRequest): Promise<SpeakResult | null> {
+    const text = request.text.replace(/\s+/g, " ").trim();
+    if (!isAllowedSpeechText(text)) return { ok: false, code: "invalid" };
+    const key = cacheKeyFor(text, request.event);
+    if (!key) return null;
+    const cached = await deps.cache.get(key);
+    if (cached) return { ok: true, entry: cached, cacheHit: true, key };
+    const fromLibrary = libraryLookup({ cacheKey: key, event: request.event, text });
+    if (!fromLibrary) return null;
+    libraryHits += 1;
+    await deps.cache.set(key, fromLibrary);
+    return { ok: true, entry: fromLibrary, cacheHit: true, libraryHit: true, key };
+  }
+
   async function generate(request: SpeakRequest): Promise<SpeakResult> {
     const text = request.text.replace(/\s+/g, " ").trim();
     if (!isAllowedSpeechText(text)) return { ok: false, code: "invalid" };
     if (!deps.provider) return { ok: false, code: "misconfigured" };
 
-    const key = voiceCacheKey({
-      text,
-      language: VOICE_LANGUAGE,
-      voice: deps.provider.voice,
-      instructionVersion: `${VOICE_INSTRUCTION_VERSION}|${VOICE_DELIVERY_VERSION}|${deps.templateVersion}|${request.event}`,
-      model: deps.provider.model,
-    });
-
-    const cached = await deps.cache.get(key);
-    if (cached) {
-      console.info(
-        JSON.stringify({
-          event: "voice_speak",
-          cache: "hit",
-          priority: request.priority ?? "interactive",
-          textLen: text.length,
-        }),
-      );
-      return { ok: true, entry: cached, cacheHit: true, key };
-    }
-
-    const fromLibrary = libraryLookup({ cacheKey: key, event: request.event, text });
-    if (fromLibrary) {
-      libraryHits += 1;
-      await deps.cache.set(key, fromLibrary);
-      console.info(
-        JSON.stringify({
-          event: "voice_speak",
-          cache: "library",
-          priority: request.priority ?? "interactive",
-          textLen: text.length,
-        }),
-      );
-      return { ok: true, entry: fromLibrary, cacheHit: true, libraryHit: true, key };
+    const key = cacheKeyFor(text, request.event)!;
+    const ready = await lookup(request);
+    if (ready) {
+      if (ready.ok) {
+        console.info(
+          JSON.stringify({
+            event: "voice_speak",
+            cache: ready.libraryHit ? "library" : "hit",
+            priority: request.priority ?? "interactive",
+            textLen: text.length,
+          }),
+        );
+      }
+      return ready;
     }
 
     const pending = inflight.get(key);
@@ -141,6 +149,7 @@ export function createSpeakService(deps: {
   }
 
   return {
+    lookup,
     speak: generate,
     stats: () => ({ ...deps.cache.stats(), generates, failures, libraryHits }),
     config: () => ({

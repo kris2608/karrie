@@ -24,6 +24,7 @@ import type { SharedListStore } from "./sharedLists.js";
 import { sharedListPreviewHtml } from "./sharedListPreview.js";
 import { checkImage, MAX_BODY_BYTES } from "./validate.js";
 import { isVoiceEvent } from "./voice/allowlist.js";
+import type { SpeakRequest } from "./voice/speak.js";
 
 export type ImageDeps = {
   discovery: Pick<ImageDiscovery, "discover" | "cached" | "busy" | "provider">;
@@ -136,6 +137,8 @@ export type VoiceConfigPayload = {
 };
 
 export type VoiceDeps = {
+  /** Cache or library only. A hit must not spend the generation quota. */
+  lookup?: (request: import("./voice/speak.js").SpeakRequest) => Promise<import("./voice/speak.js").SpeakResult | null>;
   speak: (request: import("./voice/speak.js").SpeakRequest) => Promise<import("./voice/speak.js").SpeakResult>;
   config: () => VoiceConfigPayload;
   limits: Limits;
@@ -885,14 +888,32 @@ export function createHandler(deps: AppDeps) {
       const event = (body as { event?: unknown })?.event;
       const text = typeof (body as { text?: unknown })?.text === "string" ? (body as { text: string }).text : "";
       const priorityRaw = (body as { priority?: unknown })?.priority;
-      const priority = priorityRaw === "background" || priorityRaw === "interactive" ? priorityRaw : "interactive";
+      const priority: SpeakRequest["priority"] =
+        priorityRaw === "background" || priorityRaw === "interactive" ? priorityRaw : "interactive";
       if (!isVoiceEvent(event) || !text) return send(422, { status: "error", code: "invalid" });
+
+      const request: SpeakRequest = { event, text, priority };
+      const cached = await deps.voice.lookup?.(request);
+      if (cached?.ok) {
+        Object.assign(entry, {
+          voiceEvent: event,
+          voicePriority: priority,
+          voiceCacheHit: true,
+          voiceLibraryHit: cached.libraryHit,
+        });
+        return sendVoiceAudio(cached);
+      }
+      if (cached && !cached.ok && cached.code === "invalid") return send(422, { status: "error", code: "invalid" });
+
+      const generateHeader = req.headers["x-voice-generate"];
+      const cacheOnly = generateHeader === "0" || (Array.isArray(generateHeader) && generateHeader.includes("0"));
+      if (cacheOnly) return send(429, { status: "error", code: "device-limit" });
 
       const denial = await reserve(deps.voice.limits, payer);
       if (denial) return deny(denial);
 
       const callStarted = now();
-      const result = await deps.voice.speak({ event, text, priority });
+      const result = await deps.voice.speak(request);
       const latencyMs = now() - callStarted;
       Object.assign(entry, {
         voiceEvent: event,
@@ -930,7 +951,11 @@ export function createHandler(deps: AppDeps) {
         extraUsd: audioExtra,
       });
 
-      const cfg = deps.voice.config();
+      return sendVoiceAudio(result);
+    }
+
+    function sendVoiceAudio(result: Extract<import("./voice/speak.js").SpeakResult, { ok: true }>) {
+      const cfg = deps.voice!.config();
       res.writeHead(200, {
         "Content-Type": result.entry.contentType,
         "Cache-Control": "public, max-age=604800",

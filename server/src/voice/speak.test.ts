@@ -48,6 +48,9 @@ describe("createSpeakService", () => {
     expect(service.config().cacheNamespace).toBe("karrie-voice-v5");
     expect(service.config().voice).toBe("marin");
     expect(service.stats().libraryHits).toBe(0);
+    const looked = await service.lookup({ event: "positive", text: "Hebbes!" });
+    expect(looked?.ok && looked.cacheHit).toBe(true);
+    expect(calls).toBe(1);
   });
 
   it("includes event in cache identity so delivery styles do not collide", async () => {

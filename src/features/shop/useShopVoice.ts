@@ -62,7 +62,7 @@ export function staticFeedbackPhrases(): VoicePhrase[] {
   ];
 }
 
-const PERMANENT_FAIL = new Set(["invalid", "misconfigured"]);
+const PERMANENT_FAIL = new Set(["invalid", "misconfigured", "device-limit", "rate-limited", "daily-limit", "budget"]);
 const OPENING_WAIT_MS = 8_000;
 
 function waitFor(pending: Promise<unknown> | null, limitMs: number): Promise<void> {
