@@ -565,7 +565,7 @@ export function AddScreen() {
   };
 
   return (
-    <main className="screen screen-add">
+    <main className={retailer ? "screen screen-add" : "screen screen-add is-unset-store"}>
       <div
         className={pullRefreshing || pullProgress > 0.05 ? "ptr-indicator is-visible" : "ptr-indicator"}
         style={{ "--ptr": pullProgress } as CSSProperties}

@@ -24,7 +24,9 @@ export function TopBar({
           </svg>
         </Link>
       )}
-      <h1>{title}</h1>
+      <div className="topbar-title">
+        <h1>{title}</h1>
+      </div>
       {action && <div className="topbar-action">{action}</div>}
     </header>
   );
