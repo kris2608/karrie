@@ -1169,8 +1169,8 @@ a.settings-link { text-decoration: none; color: inherit; }
   border-radius: var(--radius-pill);
   color: #fff;
   font-weight: 900;
-  font-size: 1.1rem;
-  line-height: 1.1;
+  font-size: 1.28rem;
+  line-height: 1;
   background: linear-gradient(180deg, #ffa246, var(--orange));
   box-shadow:
     0 5px 0 var(--orange-shade),
@@ -1468,6 +1468,7 @@ a.settings-link { text-decoration: none; color: inherit; }
   flex: none;
 }
 .dock-fixed > .pbtn { flex: 1; min-width: 0; white-space: nowrap; }
+.screen-add .dock-fixed > .pbtn { font-size: 1.22rem; }
 .dock-fixed > .pbtn-quiet { flex: none; padding: 0 var(--space-4); }
 .dock-fixed > .pbtn-l { min-height: 60px; padding: 0 var(--space-4); font-size: 1.1rem; }
 .dock-review > .pbtn-quiet { padding: 0 var(--space-5); }
@@ -1485,7 +1486,7 @@ a.settings-link { text-decoration: none; color: inherit; }
     font-size: 0.92rem;
   }
   .dock-review.dock-fixed > .pbtn-quiet { flex: 1; padding: 0 8px; }
-  .screen-add .dock-fixed > .pbtn { font-size: 1.05rem; padding: 0 16px; }
+  .screen-add .dock-fixed > .pbtn { padding: 0 16px; }
 }
 .dock-count {
   display: inline-grid;
@@ -2493,12 +2494,11 @@ a.settings-link { text-decoration: none; color: inherit; }
 
 /* Photo recognition */
 
-.scan-button .camera-icon { width: 22px; height: 22px; }
+.scan-button .camera-icon { width: 26px; height: 26px; }
 .search-row.is-searching .scan-button .camera-icon { width: 26px; height: 26px; }
 .item-sheet-actions .camera-icon { width: 24px; height: 24px; }
 @media (max-width: 400px) {
   .search-row { gap: 6px; }
-  .scan-label { font-size: 0.98rem; }
 }
 .camera { gap: var(--space-2); overflow: hidden; }
 .camera-frame {
