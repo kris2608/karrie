@@ -228,6 +228,20 @@ h1, h2, p { margin: 0; }
   gap: var(--space-3);
 }
 .topbar h1 { font-size: var(--text-title); font-weight: 900; line-height: 1.1; }
+.topbar-title { display: contents; }
+/* The add title sits between a back button and a store chip. Size it to that gap so it stays one line. */
+.screen-add .topbar-title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  container-type: inline-size;
+}
+.screen-add .topbar-title h1 {
+  white-space: nowrap;
+  font-size: clamp(1.05rem, 9.2cqi, var(--text-title));
+}
+/* "Supermarkt" is wider than AH, Jumbo or Lidl; wrap the title instead of clipping it. */
+.screen-add.is-unset-store .topbar-title h1 { white-space: normal; }
 
 /* Home */
 
@@ -1131,9 +1145,9 @@ a.settings-link { text-decoration: none; color: inherit; }
 .search:focus-within { box-shadow: 0 0 0 3px var(--teal-soft), var(--shadow-card); }
 .search-row { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
 .search-row .search {
-  flex: 0 0 52px;
-  width: 52px;
-  min-height: 52px;
+  flex: 0 0 46px;
+  width: 46px;
+  min-height: 46px;
   margin-top: 0;
   padding: 0;
   justify-content: center;
@@ -1151,9 +1165,9 @@ a.settings-link { text-decoration: none; color: inherit; }
   padding: 0 var(--space-4);
   justify-content: flex-start;
 }
-.search-row.is-searching .search input { position: static; width: auto; height: auto; opacity: 1; }
+.search-row.is-searching .search input { position: static; width: auto; height: auto; min-height: 46px; opacity: 1; }
 .search-row.is-searching .scan-label { display: none; }
-.search-row.is-searching .scan-button { flex: 0 0 52px; width: 52px; padding: 0; }
+.search-row.is-searching .scan-button { flex: 0 0 46px; width: 46px; padding: 0; }
 .scan-button {
   display: flex;
   align-items: center;
@@ -1161,15 +1175,15 @@ a.settings-link { text-decoration: none; color: inherit; }
   gap: 8px;
   flex: 1 1 auto;
   width: auto;
-  min-width: 52px;
-  min-height: 52px;
-  height: 52px;
+  min-width: 46px;
+  min-height: 46px;
+  height: 46px;
   padding: 0 var(--space-6);
   border: 0;
   border-radius: var(--radius-pill);
   color: #fff;
   font-weight: 900;
-  font-size: 1.28rem;
+  font-size: 1.125rem;
   line-height: 1;
   background: linear-gradient(180deg, #ffa246, var(--orange));
   box-shadow:
@@ -2494,8 +2508,8 @@ a.settings-link { text-decoration: none; color: inherit; }
 
 /* Photo recognition */
 
-.scan-button .camera-icon { width: 26px; height: 26px; }
-.search-row.is-searching .scan-button .camera-icon { width: 26px; height: 26px; }
+.scan-button .camera-icon { width: 23px; height: 23px; }
+.search-row.is-searching .scan-button .camera-icon { width: 23px; height: 23px; }
 .item-sheet-actions .camera-icon { width: 24px; height: 24px; }
 @media (max-width: 400px) {
   .search-row { gap: 6px; }
