@@ -234,8 +234,9 @@ const sessionLimits = createLimits({
   outputUsdPerMTok: 0,
 });
 const voiceLimits = createLimits({
-  perIpPerHour: number("VOICE_LIMIT_PER_IP_HOUR", 40),
-  perIpPerDay: number("VOICE_LIMIT_PER_IP_DAY", 120),
+  // Counts new generations only. A long list of new product names, tried a few times, stays under this.
+  perIpPerHour: number("VOICE_LIMIT_PER_IP_HOUR", 150),
+  perIpPerDay: number("VOICE_LIMIT_PER_IP_DAY", 500),
   dailyRequests: number("VOICE_LIMIT_DAILY_REQUESTS", 2000),
   dailyBudgetUsd: number("VOICE_DAILY_BUDGET_USD", 1),
   inputUsdPerMTok: number("PRICE_VOICE_INPUT_PER_MTOK", 4),
@@ -355,6 +356,7 @@ const handler = createHandler({
       cacheNamespace: VOICE_CACHE_NAMESPACE,
     });
     return {
+      lookup: service.lookup,
       speak: service.speak,
       config: service.config,
       limits: voiceLimits,
