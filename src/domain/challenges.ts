@@ -12,6 +12,7 @@ export const CHALLENGES: Challenge[] = [
     ids: [
       "brood",
       "bolletjes",
+      "pistoletjes",
       "krentenbollen",
       "croissant",
       "beschuit",

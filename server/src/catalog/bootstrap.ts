@@ -67,6 +67,7 @@ export const BOOTSTRAP_PRODUCTS: BootstrapProduct[] = [
   p("krentenbollen", "Krentenbollen", "bakery", "currant-buns", ["krentenbol", "krenten broodjes"]),
   p("croissant", "Croissant", "bakery", "croissant", ["croissants"]),
   p("stokbrood", "Stokbrood", "bakery", "baguette", ["stokbroden"]),
+  p("pistoletjes", "Pistoletjes", "bakery", "pistolets", ["pistolet", "pistoletje"]),
   p("kipfilet", "Kipfilet", "meat", "chicken", ["kip"]),
   p("gehakt", "Gehakt", "meat", "mince", ["half om half"]),
   p("zalm", "Zalm", "meat", "salmon"),

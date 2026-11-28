@@ -51,6 +51,7 @@ const ROWS: readonly Row[] = [
   ["krentenbollen", "de", "krentenbollen", "plural", "zoek"],
   ["croissant", "de", "croissant", "singular", "waar"],
   ["stokbrood", "het", "stokbrood", "singular", "zoek"],
+  ["pistoletjes", "de", "pistoletjes", "plural", "waar"],
   ["kipfilet", "de", "kipfilet", "singular", "waar"],
   ["gehakt", "het", "gehakt", "mass", "kun"],
   ["zalm", "de", "zalm", "mass", "kun"],

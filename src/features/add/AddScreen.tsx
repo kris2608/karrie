@@ -10,6 +10,7 @@ import { productHeading } from "../../domain/productHeading";
 import type { AdventureItem, CategoryId, Product, SavedItem } from "../../domain/types";
 import { artIdOf, productById, products } from "../../data/catalog";
 import { hasPhoto, ItemArt } from "../../components/ItemArt";
+import { FreezeBadge } from "../../components/FreezeBadge";
 import { ProductArt } from "../../components/ProductArt";
 import { TopBar } from "../../components/TopBar";
 import { PhotoButton } from "../../components/ui/PhotoButton";
@@ -94,6 +95,7 @@ type GridTileProps = {
 function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo, mine = false, offer, subtitle }: GridTileProps) {
   const { pressing, handlers } = useLongPress(onRemove, !mine && quantity === 0);
   const classes = ["product-card", quantity ? "is-added" : "", pressing ? "is-pressing" : ""].filter(Boolean).join(" ");
+  const frozenHint = category === "frozen" ? ", diepvries" : "";
   const deal = offer && quantity ? `, in de aanbieding bij ${retailerName(offer)}` : "";
   const genericHint = subtitle ? `, ${subtitle}` : "";
   const longHint =
@@ -105,10 +107,10 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo,
           ? "Lang drukken om uit Mijn producten te verwijderen"
           : "";
   const label = mine
-    ? `${name}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}${longHint ? `. ${longHint}` : ""}`
+    ? `${name}${frozenHint}, uit Mijn producten${quantity ? `, ${quantity} op de lijst` : ""}${deal}${longHint ? `. ${longHint}` : ""}`
     : quantity
-      ? `${name}${genericHint}, ${quantity} op de lijst${deal}. ${longHint}`
-      : `${name}${genericHint}`;
+      ? `${name}${frozenHint}${genericHint}, ${quantity} op de lijst${deal}. ${longHint}`
+      : `${name}${frozenHint}${genericHint}`;
   const corner = infoCorner(quantity);
   return (
     <div className="product-card-shell">
@@ -131,6 +133,7 @@ function GridTile({ name, category, art, quantity, pop, onAdd, onRemove, onInfo,
           transition={{ duration: 0.45, ease: "easeOut" }}
         >
           {art}
+          {category === "frozen" && <FreezeBadge />}
         </motion.span>
         <span className="card-name">{name}</span>
         {subtitle ? <span className="card-sub">{subtitle}</span> : null}
