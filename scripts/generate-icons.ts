@@ -30,8 +30,20 @@ const svg = (viewBox: string, body: string) =>
 
 const favicon = svg("15 0 236 236", withoutShadow);
 const icon = svg("-7 -20 280 280", scene(-7, -20, 280) + cart);
-// Maskable icons get cropped to a circle of 80% of the width, so Karrie has to fit inside that.
-const maskable = svg("-59 -72 384 384", scene(-59, -72, 384) + cart);
+// Android 12+ splash and adaptive icons inset the image into a squircle (66% safe
+// zone). The web maskable spec is 80%. Keep the same 280x280 scene as the launcher
+// icons, but sit it inside a larger mint canvas so the outer ring is one colour
+// (the grass must not reach the edges, otherwise Chrome may fall back to black).
+const MASKABLE_SIZE = 448; // 280/448 = 62.5%, inside both 66% and 80%
+const maskablePad = (MASKABLE_SIZE - 280) / 2;
+const maskableX = -7 - maskablePad;
+const maskableY = -20 - maskablePad;
+const maskable = svg(
+  `${maskableX} ${maskableY} ${MASKABLE_SIZE} ${MASKABLE_SIZE}`,
+  `<rect x="${maskableX}" y="${maskableY}" width="${MASKABLE_SIZE}" height="${MASKABLE_SIZE}" fill="#d4f4f0"/>` +
+    scene(-7, -20, 280) +
+    cart,
+);
 
 function findChrome() {
   const candidates = [
