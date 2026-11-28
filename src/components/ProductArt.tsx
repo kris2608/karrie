@@ -557,20 +557,23 @@ const box: Draw = ({ color, accent = "#ff8c1a" }) => ({
   marks: line("M46 92h36", tint(color, 0.4), 4),
 });
 
-/** Bundle of dry spaghetti in a plain clear sleeve, no label. */
+/** Open pack of dry spaghetti, strands sticking out and held by a band. */
 const pasta: Draw = () => ({
   layers: [
-    L(<path d="M38 20h52c3 0 5 2 5 5v82c0 4-3 7-7 7H40c-4 0-7-3-7-7V25c0-3 2-5 5-5z" />, "#f4f7f2", {
-      shine: [{ cx: 48, cy: 48, rx: 3, ry: 22 }],
+    L(
+      <>
+        {[44, 51, 58, 65, 72, 79].map((x) => (
+          <rect key={x} x={x} y={10} width={4} height={72} rx={2} transform={`rotate(${(x - 64) * 0.35} ${x + 2} 78)`} />
+        ))}
+      </>,
+      "#f0c14a",
+      { shine: [{ cx: 56, cy: 32, rx: 5, ry: 14 }] },
+    ),
+    L(<path d="M30 72h68l6 34c0 6-8 10-20 10H44c-12 0-20-4-20-10z" />, "#f7f4ee", {
+      shine: [{ cx: 46, cy: 92, rx: 4, ry: 12 }],
     }),
+    L(<rect x="38" y="66" width="52" height="12" rx="4" />, "#e8c07a", { flat: true }),
   ],
-  marks: (
-    <g fill="none" strokeLinecap="round">
-      {[46, 51, 56, 61, 66, 71, 76, 81].map((x, index) => (
-        <path key={x} d={`M${x} 30c1 24-1 48 1 70`} stroke={index % 2 ? "#e2b15a" : "#f0c14a"} strokeWidth="2.6" />
-      ))}
-    </g>
-  ),
 });
 
 /** Whole avocado with a cut half showing the pit. */
@@ -834,14 +837,13 @@ const babyFood: Draw = () => ({
   ],
 });
 
-/** Wrapped block of butter, one end opened so the pale butter shows. No brand. */
+/** White butter wrapper with a green stripe, one end open so the butter shows. No brand. */
 const butterBlock: Draw = () => ({
   layers: [
-    L(<rect x="70" y="56" width="38" height="30" rx="4" />, "#ffe98a", { shine: [{ cx: 84, cy: 64, rx: 8, ry: 4 }] }),
-    L(<rect x="16" y="48" width="70" height="42" rx="5" />, "#fff6e0", { shine: [{ cx: 36, cy: 60, rx: 14, ry: 4 }] }),
-    L(<path d="M60 48 84 28h-10L52 48z" />, "#f0e2b8", { flat: true }),
+    L(<rect x="78" y="54" width="32" height="30" rx="4" />, "#ffe98a", { shine: [{ cx: 88, cy: 62, rx: 7, ry: 4 }] }),
+    L(<rect x="14" y="46" width="76" height="42" rx="5" />, "#fffdf8", { shine: [{ cx: 34, cy: 58, rx: 14, ry: 4 }] }),
   ],
-  marks: line("M24 72h54", "#f3e6c0", 2),
+  marks: <rect x="22" y="60" width="60" height="12" rx="3" fill="#3aaa4a" />,
 });
 
 const crispBag: Draw = () => ({
@@ -1006,37 +1008,36 @@ const oliveJar: Draw = () => ({
   ),
 });
 
-/** Plain bag of white rice, with a few grains spilled beside it. */
+/** A small bowl of white rice, with a few loose grains beside it. */
 const riceBag: Draw = () => ({
   layers: [
-    L(<path d="M28 40h50l6 54c0 5-4 8-8 8H30c-4 0-8-3-8-8z" />, "#f7f1e4", { shine: [{ cx: 40, cy: 68, rx: 3, ry: 16 }] }),
-    L(<path d="M26 26h54l-3 16H29z" />, "#e2c9a0", { flat: true }),
+    L(<path d="M16 66h80c2 24-12 42-40 44S14 92 16 66z" />, "#f4efe8", { shine: [{ cx: 38, cy: 84, rx: 8, ry: 10 }] }),
+    L(<ellipse cx="56" cy="66" rx="40" ry="13" />, "#fff8ee", { shine: [{ cx: 44, cy: 62, rx: 10, ry: 4 }] }),
   ],
   marks: (
     <g>
       {[
-        [40, 58],
-        [52, 62],
-        [64, 56],
-        [44, 72],
-        [58, 74],
-        [48, 86],
-        [62, 88],
-        [38, 96],
+        [40, 64],
+        [50, 60],
+        [60, 64],
+        [70, 60],
+        [36, 70],
+        [48, 72],
+        [60, 70],
+        [72, 68],
+        [44, 66],
+        [66, 66],
       ].map(([cx, cy]) => (
-        <ellipse key={`in-${cx}-${cy}`} cx={cx} cy={cy} rx="2.4" ry="3.2" fill="#fffdf8" stroke="#e2c9a0" strokeWidth="1" />
+        <ellipse key={`in-${cx}-${cy}`} cx={cx} cy={cy} rx="3.2" ry="2.1" fill="#fffdf8" stroke="#e2d0b0" strokeWidth="1.1" />
       ))}
       {[
-        [84, 78],
-        [96, 84],
-        [78, 92],
-        [90, 98],
-        [104, 96],
-        [86, 110],
-        [100, 110],
-        [72, 104],
+        [102, 78],
+        [112, 90],
+        [98, 98],
+        [110, 106],
+        [104, 114],
       ].map(([cx, cy]) => (
-        <ellipse key={`out-${cx}-${cy}`} cx={cx} cy={cy} rx="3.1" ry="2.2" fill="#fffdf8" stroke="#e2c9a0" strokeWidth="1.2" />
+        <ellipse key={`out-${cx}-${cy}`} cx={cx} cy={cy} rx="3.4" ry="2.2" fill="#fffdf8" stroke="#e2d0b0" strokeWidth="1.2" />
       ))}
     </g>
   ),
@@ -1198,49 +1199,38 @@ const spiceCake: Draw = () => ({
   ),
 });
 
-/** Several small mandarins in an orange supermarket net. */
+/** Separate small mandarins inside an orange mesh bag, closed with a clip. */
 const mandarinNet: Draw = ({ color = "#ffb23a" }) => {
   const fruits: Array<[number, number, number, string]> = [
-    [50, 68, 12, color],
-    [72, 62, 13, "#ff9a1f"],
-    [58, 88, 14, color],
-    [80, 84, 11, "#ffc14a"],
-    [66, 74, 8, "#ffd27a"],
-  ];
-  const mesh = [
-    "M42 58l14 14M48 50l22 22M58 46l28 28M70 46l22 22",
-    "M40 72l18 18M50 66l24 24M62 62l26 24M74 70l16 16",
-    "M42 88l14 14M54 84l20 18M66 82l18 16",
-    "M88 56L74 70M80 48L56 72M68 46L46 68",
-    "M92 70L72 90M82 64L56 90M70 62L48 84",
-    "M90 86L74 102M78 82L58 102M66 88L50 104",
+    [50, 70, 13, color],
+    [72, 66, 13, "#ff9a1f"],
+    [60, 92, 14, "#ffc14a"],
+    [80, 90, 11, color],
   ];
   return {
     layers: [
       L(
-        <path d="M50 44c2-12 8-18 14-18s12 6 14 18c8 2 16 10 18 20 2 18-2 38-10 50-6 8-14 12-22 12s-16-4-22-12c-8-12-12-32-10-50 2-10 10-18 18-20z" />,
-        "#ff9a1f",
-        { shine: [{ cx: 52, cy: 74, rx: 6, ry: 16, rot: -12 }] },
+        <path d="M44 50c0-8 8-14 20-14s20 6 20 14l10 48c2 14-8 22-30 24-22-2-32-10-30-24z" />,
+        "#ffe4c2",
+        { shine: [{ cx: 54, cy: 78, rx: 5, ry: 14, rot: -10 }] },
       ),
-      L(<circle cx="64" cy="26" r="6" />, "#e07010", { flat: true }),
+      L(<rect x="52" y="22" width="24" height="14" rx="4" />, "#ff8a1f", { flat: true }),
     ],
     marks: (
       <g>
         {fruits.map(([cx, cy, r, fill]) => (
-          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} fill={fill} />
+          <g key={`${cx}-${cy}`}>
+            <circle cx={cx} cy={cy} r={r} fill={fill} stroke="#e07a12" strokeWidth="2" />
+            <circle cx={cx - 4} cy={cy - 4} r="2.2" fill="#fff" opacity="0.65" />
+          </g>
         ))}
-        {[
-          [46, 64],
-          [68, 58],
-          [54, 82],
-        ].map(([cx, cy]) => (
-          <circle key={`h-${cx}`} cx={cx} cy={cy} r="2.4" fill="#fff" opacity="0.55" />
-        ))}
-        <g fill="none" stroke="#c45010" strokeWidth="2.1" strokeLinecap="round">
-          {mesh.map((d) => (
-            <path key={d} d={d} />
-          ))}
+        <g fill="none" stroke="#ff7a18" strokeWidth="2.2" strokeLinecap="round">
+          <path d="M44 64l16 16M52 58l20 20M62 56l22 22M74 60l16 16" />
+          <path d="M40 80l16 16M52 76l20 20M66 74l18 18" />
+          <path d="M86 62L70 78M80 56L58 78M68 54L48 74" />
+          <path d="M90 78L74 94M78 74L58 94M66 80L50 96" />
         </g>
+        <path d="M58 26h12" stroke="#fff6e8" strokeWidth="2" strokeLinecap="round" />
       </g>
     ),
   };
@@ -1269,13 +1259,14 @@ const rusk: Draw = ({ color = "#f6e2b8", accent = "#c4a06a" }) => ({
   ),
 });
 
-/** Green Dutch kwark bucket: green body, label and lid, no brand. */
-const quarkTub: Draw = ({ color = "#3aaa4a", accent = "#1f8a45" }) => ({
+/** White kwark tub with a green lid rim and label band. No brand. */
+const quarkTub: Draw = () => ({
   layers: [
-    L(<path d="M28 60h72l-8 46c-1 5-6 8-14 8H50c-8 0-13-3-14-8z" />, color, { shine: [{ cx: 44, cy: 82, rx: 4, ry: 16 }] }),
-    L(<path d="M34 78h60l-3 16H37z" />, tint(color, 0.32), { flat: true }),
-    L(<ellipse cx="64" cy="58" rx="38" ry="12" />, accent),
+    L(<path d="M28 62h72l-8 44c-1 5-6 8-14 8H50c-8 0-13-3-14-8z" />, "#fffdf8", { shine: [{ cx: 44, cy: 84, rx: 4, ry: 14 }] }),
+    L(<ellipse cx="64" cy="60" rx="38" ry="12" />, "#3aaa4a"),
+    L(<ellipse cx="64" cy="56" rx="30" ry="8" />, "#fffdf8", { flat: true }),
   ],
+  marks: <path d="M36 82h56l-2 12H38z" fill="#3aaa4a" />,
 });
 
 /** Three pale crusty pistolets, each with a score on top. */

@@ -37,7 +37,7 @@ export const COLOR_HUNT: Readonly<Record<string, string>> = {
   water: "blauw",
   melk: "wit",
   yoghurt: "wit",
-  kwark: "groen",
+  kwark: "wit",
 };
 
 /** Only the comparison game is active for now; color/drag stay in the type system but are not assigned. */

@@ -97,7 +97,7 @@ export const ART: Record<string, ArtSpec> = {
   babyvoeding: { kind: "jar", color: "#f0b15a", accent: "#7dbe6a" },
   melk: { kind: "carton", color: "#f7f4ee", accent: "#3aa0d8" },
   yoghurt: { kind: "cup", color: "#fffdf8", accent: "#f2b4c8" },
-  kwark: { kind: "cup", color: "#3aaa4a", accent: "#1f8a45" },
+  kwark: { kind: "cup", color: "#fffdf8", accent: "#3aaa4a" },
   salami: { kind: "piece", color: "#c4453a", accent: "#fff6e8" },
   kaas: { kind: "wedge", color: "#ffd23a", accent: "#f0a81a" },
   mozzarella: { kind: "cup", color: "#fffdf8", accent: "#e8f0f4" },
