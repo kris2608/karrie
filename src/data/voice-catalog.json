@@ -168,6 +168,11 @@
       "instruction": "Zoek maar het stokbrood!"
     },
     {
+      "productId": "pistoletjes",
+      "spokenName": "pistoletjes",
+      "instruction": "Waar zijn de pistoletjes?"
+    },
+    {
       "productId": "kipfilet",
       "spokenName": "kipfilet",
       "instruction": "Waar is de kipfilet?"

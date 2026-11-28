@@ -22,7 +22,7 @@ export const FOOD_TYPES = [
   "appel", "banaan", "peer", "sinaasappel", "aardbei", "druiven", "mandarijn", "citroen", "kiwi", "tomaat", "komkommer", "paprika",
   "wortel", "broccoli", "sla", "avocado", "aardappel", "aardappeltjes", "ui", "knoflook", "champignons", "courgette", "aubergine",
   "sperziebonen", "prei", "verse-spinazie", "wokgroenten", "pastagroenten",
-  "brood", "bolletjes", "krentenbollen", "croissant", "stokbrood",
+  "brood", "bolletjes", "krentenbollen", "croissant", "stokbrood", "pistoletjes",
   "kipfilet", "gehakt", "zalm", "vegaburger",
   "beschuit", "crackers", "havermout", "pindakaas", "noten", "jam", "hagelslag", "muesli", "honing", "appelstroop", "ontbijtkoek",
   "pasta", "rijst", "tomatenpuree", "soep", "olijfolie", "suiker", "koekjes", "chips", "chocoladereep", "pastasaus", "mais",

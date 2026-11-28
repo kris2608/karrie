@@ -1375,6 +1375,25 @@ a.settings-link { text-decoration: none; color: inherit; }
   width: 84px;
   height: 84px;
 }
+.freeze-badge {
+  position: absolute;
+  z-index: 2;
+  right: -2px;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e7f6ff;
+  color: #2f7ed1;
+  box-shadow: inset 0 0 0 2px #fff, 0 1px 0 rgba(43, 54, 64, 0.12);
+  pointer-events: none;
+}
+.freeze-badge svg {
+  width: 16px;
+  height: 16px;
+}
 .card-art::before {
   content: "";
   position: absolute;

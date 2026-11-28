@@ -79,6 +79,8 @@ const ARTICLES: Record<string, "de" | "het"> = {
   koekjes: "de",
   winkelwagen: "de",
   croissant: "de",
+  pistolet: "de",
+  pistoletjes: "de",
   ui: "de",
   uien: "de",
   mais: "de",
