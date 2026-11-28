@@ -91,7 +91,7 @@ export default defineConfig({
       // at a safe moment. clientsClaim then takes the open page so it can reload.
       registerType: "prompt",
       injectRegister: false,
-      includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png"],
+      includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png", "pwa-512x512-maskable.png"],
       manifest: {
         name: "Karrie",
         short_name: "Karrie",
